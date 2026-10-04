@@ -23,6 +23,7 @@ import (
 	routerpkg "tachyon-installer/internal/router"
 	sshpkg "tachyon-installer/internal/ssh"
 	"tachyon-installer/internal/updater"
+	"tachyon-installer/internal/fleet"
 )
 
 // Options holds command line parameters for headless execution.
@@ -53,9 +54,15 @@ type Options struct {
 	TestSub        string
 	SelfUpdate     bool
 	TuneNetwork    bool
-	GuidedSetup    bool
-	Yes            bool
-	AppVersion     string
+	GuidedSetup       bool
+	FleetScan         bool
+	FleetDeploy       bool
+	FleetSubnets      string
+	FleetOnlyOutdated bool
+	FleetOnlyClean    bool
+	FleetConcurrency  int
+	Yes               bool
+	AppVersion        string
 }
 
 // ParseFlags parses command line arguments and populates Options.
@@ -102,6 +109,12 @@ func ParseFlags(args []string, defaultCfg *appconfig.Config, appVersion string) 
 	fs.StringVar(&opts.TestSub, "test-sub", "", "Проверить и протестировать пинг до нод в подписке (HTTPS, vless://, base64)")
 	fs.BoolVar(&opts.Yes, "yes", false, "Автоматическое подтверждение (без интерактивного меню)")
 	fs.BoolVar(&opts.Yes, "y", false, "Короткий алиас для -yes")
+	fs.BoolVar(&opts.FleetScan, "fleet-scan", false, "Сканировать сеть и вывести инвентарь всех роутеров с их статусом Tachyon")
+	fs.BoolVar(&opts.FleetDeploy, "fleet-deploy", false, "Массовая параллельная установка/обновление Tachyon на обнаруженные роутеры")
+	fs.StringVar(&opts.FleetSubnets, "fleet-subnets", "", "Список подсетей через запятую для сканирования (например 192.168.1.0/24,192.168.31.0/24)")
+	fs.BoolVar(&opts.FleetOnlyOutdated, "fleet-only-outdated", false, "Применять fleet-deploy только к роутерам с устаревшим Tachyon")
+	fs.BoolVar(&opts.FleetOnlyClean, "fleet-only-clean", false, "Применять fleet-deploy только к чистым роутерам без Tachyon")
+	fs.IntVar(&opts.FleetConcurrency, "fleet-concurrency", 3, "Количество одновременных потоков установки при fleet-deploy")
 
 	if err := fs.Parse(args); err != nil {
 		return nil, err
@@ -112,7 +125,7 @@ func ParseFlags(args []string, defaultCfg *appconfig.Config, appVersion string) 
 
 // ShouldRunHeadless checks if flags request non-interactive execution.
 func (o *Options) ShouldRunHeadless() bool {
-	return o.RunDiag || o.RunUninstall || o.RunRestore != "" || o.ListBackups || o.CheckUpdate || o.SelfUpdate || o.TuneNetwork || o.GuidedSetup || o.SwitchEngine != "" || o.RunRescue || o.FixConflicts || o.FullSnapshot || o.OfflineBundle != "" || o.RunMonitor || o.TestSub != "" || o.Yes
+	return o.RunDiag || o.RunUninstall || o.RunRestore != "" || o.ListBackups || o.CheckUpdate || o.SelfUpdate || o.TuneNetwork || o.GuidedSetup || o.SwitchEngine != "" || o.RunRescue || o.FixConflicts || o.FullSnapshot || o.OfflineBundle != "" || o.RunMonitor || o.TestSub != "" || o.FleetScan || o.FleetDeploy || o.Yes
 }
 
 // Run executes non-interactive CLI operations.
@@ -218,6 +231,123 @@ func Run(opts *Options) int {
 			}
 			fmt.Printf(" [%2d] | %-28.28s | %-8s | %-24.24s | %s\n", i+1, r.Name, r.Protocol, fmt.Sprintf("%s:%d", r.Host, r.Port), status)
 		}
+		return 0
+	}
+
+	// 5. Fleet Scan
+	if opts.FleetScan {
+		fmt.Println("⚡ Поиск и опрос OpenWrt роутеров в локальной сети...")
+		subnets := fleet.SplitSubnets(opts.FleetSubnets)
+		scanCfg := fleet.DefaultScanConfig(opts.Password, opts.Version)
+		scanCfg.Subnets = subnets
+		if opts.KeyPath != "" {
+			scanCfg.KeyPath = opts.KeyPath
+		}
+		if opts.RouterIP != "" {
+			scanCfg.Gateway = opts.RouterIP
+		}
+
+		nodes, err := fleet.ScanFleet(context.Background(), scanCfg, func(done, total int, ip string) {
+			fmt.Printf("\r[Сканирование %d/%d] Проверка хоста %-16s", done, total, ip)
+		})
+		fmt.Print("\r" + strings.Repeat(" ", 60) + "\r")
+
+		if err != nil {
+			fmt.Printf("❌ Ошибка сканирования сети: %v\n", err)
+			return 1
+		}
+
+		if len(nodes) == 0 {
+			fmt.Println("Роутеры OpenWrt не найдены в сети.")
+			return 0
+		}
+
+		fmt.Printf("\n=== TACHYON FLEET INVENTORY (Найдено: %d) ===\n\n", len(nodes))
+		fmt.Printf("%-16s %-24s %-10s %-10s %-26s %s\n", "IP-АДРЕС", "МОДЕЛЬ", "АРХ", "ОЗУ (СВОБ)", "СТАТУС TACHYON", "РЕКОМ. ЯДРО")
+		fmt.Println(strings.Repeat("-", 100))
+		for _, n := range nodes {
+			model := n.Model
+			if len(model) > 23 {
+				model = model[:20] + "..."
+			}
+			ramStr := fmt.Sprintf("%.0f МБ", n.RAMFreeMB)
+			if n.RAMFreeMB == 0 {
+				ramStr = "-"
+			}
+			arch := n.Arch
+			if arch == "" {
+				arch = "-"
+			}
+			fmt.Printf("%-16s %-24s %-10s %-10s %-26s %s\n",
+				n.IP, model, arch, ramStr, n.StatusText, n.RecommendedEngine)
+		}
+		fmt.Println()
+		return 0
+	}
+
+	// 6. Fleet Mass Deploy
+	if opts.FleetDeploy {
+		fmt.Println("⚡ Запуск массового развертывания Tachyon на роутеры сети...")
+		subnets := fleet.SplitSubnets(opts.FleetSubnets)
+		scanCfg := fleet.DefaultScanConfig(opts.Password, opts.Version)
+		scanCfg.Subnets = subnets
+		if opts.KeyPath != "" {
+			scanCfg.KeyPath = opts.KeyPath
+		}
+		if opts.RouterIP != "" {
+			scanCfg.Gateway = opts.RouterIP
+		}
+
+		nodes, err := fleet.ScanFleet(context.Background(), scanCfg, nil)
+		if err != nil {
+			fmt.Printf("❌ Ошибка обнаружения роутеров: %v\n", err)
+			return 1
+		}
+
+		var selected []*fleet.FleetNode
+		for _, n := range nodes {
+			if opts.FleetOnlyOutdated && n.Status != fleet.StatusOutdated {
+				continue
+			}
+			if opts.FleetOnlyClean && n.Status != fleet.StatusClean {
+				continue
+			}
+			if !opts.FleetOnlyOutdated && !opts.FleetOnlyClean {
+				if n.Status != fleet.StatusOutdated && n.Status != fleet.StatusClean {
+					continue
+				}
+			}
+			n.Selected = true
+			selected = append(selected, n)
+		}
+
+		if len(selected) == 0 {
+			fmt.Println("ℹ️  Нет подходящих роутеров для установки или обновления.")
+			return 0
+		}
+
+		fmt.Printf("⚡ Выбрано роутеров для установки: %d шт.\n", len(selected))
+		for _, s := range selected {
+			fmt.Printf("  • %-16s %-24s (%s, %s)\n", s.IP, s.Model, s.Arch, s.RecommendedEngine)
+		}
+		fmt.Println()
+
+		deployCfg := fleet.DeployConfig{
+			TargetVersion:  opts.Version,
+			SelectedMirror: opts.Mirror,
+			InstallI18n:    opts.InstallI18n,
+			Concurrency:    opts.FleetConcurrency,
+		}
+
+		err = fleet.DeployFleet(context.Background(), selected, deployCfg, func(node *fleet.FleetNode) {
+			fmt.Printf("[%s] [%3.0f%%] %s\n", node.IP, node.DeployProgress*100, node.DeployStage)
+		})
+		if err != nil {
+			fmt.Printf("❌ Ошибка массового развертывания: %v\n", err)
+			return 1
+		}
+
+		fmt.Println("\n🎉 Массовое развертывание Tachyon успешно завершено!")
 		return 0
 	}
 

@@ -128,5 +128,22 @@ func TestParseFlags_HeadlessTriggers(t *testing.T) {
 	if err != nil || !optsGuided.ShouldRunHeadless() || !optsGuided.GuidedSetup {
 		t.Errorf("expected -guided to trigger headless mode")
 	}
+
+	// 17. -fleet-scan and -fleet-deploy
+	optsFleetScan, err := ParseFlags([]string{"-fleet-scan", "-fleet-subnets", "192.168.1.0/24,192.168.2.0/24"}, cfg, "v1.6.3")
+	if err != nil || !optsFleetScan.ShouldRunHeadless() || !optsFleetScan.FleetScan {
+		t.Errorf("expected -fleet-scan to trigger headless mode")
+	}
+	if optsFleetScan.FleetSubnets != "192.168.1.0/24,192.168.2.0/24" {
+		t.Errorf("parsed fleet subnets mismatch: %s", optsFleetScan.FleetSubnets)
+	}
+
+	optsFleetDeploy, err := ParseFlags([]string{"-fleet-deploy", "-fleet-only-outdated", "-fleet-concurrency", "5"}, cfg, "v1.6.3")
+	if err != nil || !optsFleetDeploy.ShouldRunHeadless() || !optsFleetDeploy.FleetDeploy {
+		t.Errorf("expected -fleet-deploy to trigger headless mode")
+	}
+	if !optsFleetDeploy.FleetOnlyOutdated || optsFleetDeploy.FleetConcurrency != 5 {
+		t.Errorf("parsed fleet deploy options mismatch")
+	}
 }
 

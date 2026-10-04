@@ -104,6 +104,9 @@ func ShowWelcomeWizard(ctx *AppContext) {
 		ctx.Pages.SwitchToPage("ssh_wizard")
 		ctx.App.SetFocus(step2Form)
 	})
+	step1Form.AddButton("🌐 Флот роутеров", func() {
+		ShowFleetModal(ctx, "welcome_wizard")
+	})
 	step1Form.AddButton("Выход", func() {
 		ctx.App.Stop()
 	})
@@ -401,6 +404,10 @@ func ShowOptionsWizard(ctx *AppContext, profile ProfileData) {
 
 	optSelector.OnGuidedSetup = func() {
 		ShowGuidedSetupModal(ctx, "options_wizard")
+	}
+
+	optSelector.OnFleetManager = func() {
+		ShowFleetModal(ctx, "options_wizard")
 	}
 
 	optSelector.OnHotSwap = func(engineKey, mirrorKey string) {

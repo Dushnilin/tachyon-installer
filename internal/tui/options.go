@@ -94,6 +94,7 @@ type OptionsSelector struct {
 	OnTuneNetwork          func()
 	OnSelfUpdate           func()
 	OnGuidedSetup          func()
+	OnFleetManager         func()
 
 	prefVersion string
 }
@@ -615,7 +616,7 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 		})
 		curY++
 
-		footer := "  [#64748b]↑↓←→ навигация · Enter выбор · A автопилот · D диаг · M монитор · T тюнинг · R rescue · S сменить ядро · Esc назад[-]"
+		footer := "  [#64748b]↑↓←→ навигация · Enter выбор · A автопилот · F флот · D диаг · M монитор · T тюнинг · R rescue · S сменить ядро · Esc назад[-]"
 		opt.printClip(screen, footer, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	} else {
 		btnInstall := "  [#38bdf8:#1e293b]  🚀  Начать установку  [-]  "
@@ -648,7 +649,7 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 		})
 		curY++
 
-		footer := "  [#64748b]↑↓←→ навигация · Enter выбор · A автопилот · D диаг · M монитор · T тюнинг · R rescue · C конфликты · Esc назад[-]"
+		footer := "  [#64748b]↑↓←→ навигация · Enter выбор · A автопилот · F флот · D диаг · M монитор · T тюнинг · R rescue · C конфликты · Esc назад[-]"
 		opt.printClip(screen, footer, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	}
 }
@@ -762,6 +763,11 @@ func (opt *OptionsSelector) InputHandler() func(event *tcell.EventKey, setFocus 
 			case 'a', 'A', 'ф', 'Ф', 'w', 'W', 'ц', 'Ц':
 				if opt.OnGuidedSetup != nil {
 					opt.OnGuidedSetup()
+				}
+				return
+			case 'f', 'F', 'а', 'А':
+				if opt.OnFleetManager != nil {
+					opt.OnFleetManager()
 				}
 				return
 			case 's', 'S', 'ы', 'Ы':
