@@ -24,16 +24,16 @@ type TachyonRelease struct {
 
 // TachyonAssetsToDownload represents the resolved files for a release.
 type TachyonAssetsToDownload struct {
-	Version      string
-	IsAPK        bool
-	BackendURL   string
-	BackendName  string
-	AppURL       string
-	AppName      string
-	I18nURL      string
-	I18nName     string
-	SHA256URL    string
-	SHA256Name   string
+	Version     string
+	IsAPK       bool
+	BackendURL  string
+	BackendName string
+	AppURL      string
+	AppName     string
+	I18nURL     string
+	I18nName    string
+	SHA256URL   string
+	SHA256Name  string
 }
 
 // FetchTachyonReleases queries Dushnilin/tachyon releases via mirrors.

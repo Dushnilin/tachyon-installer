@@ -25,7 +25,7 @@ func NewClient(mirrorMgr *MirrorManager) *Client {
 	}
 	return &Client{
 		mirrorMgr: mirrorMgr,
-		httpCli: &http.Client{
+		httpCli:   &http.Client{
 			// No global timeout so large packages (30+ MB) on slow links don't get abruptly cut off.
 			// Instead per-request deadlines or idle connection timeouts apply.
 		},

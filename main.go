@@ -12,6 +12,12 @@ import (
 	"tachyon-installer/internal/tui/widgets"
 )
 
+// AppVersion and BuildDate are set at build time via -ldflags.
+var (
+	AppVersion = "dev"
+	BuildDate  = ""
+)
+
 func main() {
 	cfg := appconfig.Load("manager_config.json")
 
@@ -24,7 +30,7 @@ func main() {
 	header := tview.NewTextView().
 		SetDynamicColors(true).
 		SetTextAlign(tview.AlignCenter).
-		SetText("[#38bdf8]🛰️  TACHYON ONE-CLICK EXPRESS INSTALLER & DIAGNOSTIC WIZARD[-]")
+		SetText("[#38bdf8]🛰️  TACHYON ONE-CLICK EXPRESS INSTALLER & DIAGNOSTIC WIZARD[-] [#64748b]" + AppVersion + "[-]")
 
 	// Console view
 	consoleView := tview.NewTextView().
@@ -99,6 +105,13 @@ func handleProfileReady(ctx *tui.AppContext) {
 	}
 	ctx.SSHClient = client
 
+	if ctx.DiagOnly {
+		ctx.App.QueueUpdateDraw(func() {
+			tui.ShowDiagnosticsWizard(ctx, "welcome_wizard")
+		})
+		return
+	}
+
 	profile, err := routerpkg.RunPreConnectionCheck(client)
 	if err != nil {
 		client.Close()
@@ -129,4 +142,3 @@ func handleProfileReady(ctx *tui.AppContext) {
 		tui.ShowOptionsWizard(ctx, profileData)
 	})
 }
-

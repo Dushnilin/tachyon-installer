@@ -55,4 +55,3 @@ func TestVerifyAndFallback_EmptySubscriptionSkipsWaiting(t *testing.T) {
 		t.Errorf("expected OK=true Reason=need_subscription_update, got OK=%v Reason=%s", res.OK, res.Reason)
 	}
 }
-

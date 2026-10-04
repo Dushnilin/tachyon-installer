@@ -126,6 +126,9 @@ func RunExpressInstall(ctx *AppContext, opts InstallOptions) {
 		}
 
 		cfg.SelectedMirror = opts.SelectedMirror
+		cfg.SelectedEngine = opts.SelectedEngine
+		cfg.TachyonVersion = opts.TachyonVersion
+		cfg.InstallI18n = opts.InstallI18n
 		cfg.Save("manager_config.json")
 
 		dlClient := dlpkg.NewClient(mirrorMgr)
@@ -207,8 +210,9 @@ func RunExpressInstall(ctx *AppContext, opts InstallOptions) {
 			ctx.ProgressView.SetStep(3, "4/7: Проверка целостности (SHA256)")
 		}
 		ctx.SetSubTask("Проверка целостности файлов...", 0.5)
-		ctx.ConsoleWrite("[#cbd5e1]⚡ Проверка целостности и контрольных сумм пакетов...[-]\n")
-		ctx.ConsoleWrite("[#22c55e]✓ Все пакеты прошли валидацию и готовы к отправке на роутер![-]\n\n")
+		if !verifyStagedFiles(ctx, staging.Dir) {
+			return
+		}
 		ctx.SetSubTask("Целостность проверена ✓", 1.0)
 
 		// ==========================================
@@ -287,9 +291,11 @@ func RunExpressInstall(ctx *AppContext, opts InstallOptions) {
 			result := routerpkg.VerifyAndFallback(sshClient, execFn, ctx.SetSubTask)
 			if result.OK {
 				ctx.ConsoleWrite("[#22c55e]🎉 ПОЛНЫЙ УСПЕХ: Служба Tachyon запущена и проверена![-]\n")
+				postInstallDiagnostics(ctx, func(cmd string) (string, error) { return execFn(sshClient, cmd) })
 				FinishAndExit(ctx, true, tachyonAssets.Version)
 			} else {
 				ctx.ConsoleWritef("[#eab308]⚠️  Проверка завершилась с предупреждением: %s[-]\n", result.Reason)
+				postInstallDiagnostics(ctx, func(cmd string) (string, error) { return execFn(sshClient, cmd) })
 				FinishAndExit(ctx, false, tachyonAssets.Version)
 			}
 		}

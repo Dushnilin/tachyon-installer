@@ -220,4 +220,3 @@ func IsAPKPackage(client *gossh.Client) bool {
 	}
 	return strings.TrimSpace(string(out)) == "yes"
 }
-

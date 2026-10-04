@@ -17,6 +17,15 @@
   <img src="assets/readme/divider_stream.svg" width="100%" alt="divider" />
 </p>
 
+## 🔍 Diagnostics & UX (v1.2)
+
+- **Diagnostics-only mode** — button on the first screen or `D` in the options dashboard: system, memory, flash, time, fw4, kernel modules, conflicts, DNS, internet, GitHub, Tachyon state and logs. Report can be saved.
+- **Automatic post-install diagnostics**; report: `%TEMP%/tachyon-diagnostics.txt`.
+- **Router auto-discovery** on the LAN (Dropbear/OpenWrt SSH).
+- **SSH key login**; the password is never stored on disk.
+- **Confirmation screen** before install and remembered choices.
+- **File checks**: size + sha256 of each downloaded file, rejects HTML/broken packages. Tachyon packages are verified against `sha256sums.txt`; engine packages get format sanity checks only.
+
 ## ⚡ About The Project
 
 **Tachyon Express Installer** is a standalone, cross-platform desktop utility and interactive Terminal User Interface (TUI) wizard designed for autonomous deployment and pre-flight hardware diagnostics of the **[Tachyon](https://github.com/Dushnilin/tachyon)** ecosystem on **OpenWrt** routers (compatible with 23.05, 24.10, 25.x, and SNAPSHOT).

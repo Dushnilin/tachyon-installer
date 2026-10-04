@@ -17,7 +17,8 @@ type Config struct {
 	RouterIP       string `json:"router_ip"`
 	SSHPort        int    `json:"ssh_port"`
 	Username       string `json:"username"`
-	Password       string `json:"password"`
+	Password       string `json:"-"` // never written to disk
+	KeyPath        string `json:"key_path,omitempty"`
 	TachyonVersion string `json:"tachyon_version,omitempty"`
 	SelectedEngine string `json:"selected_engine,omitempty"`
 	SelectedMirror string `json:"selected_mirror,omitempty"`

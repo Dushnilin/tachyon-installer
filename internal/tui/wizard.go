@@ -10,7 +10,10 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 
+	appconfig "tachyon-installer/internal/config"
+	"tachyon-installer/internal/discover"
 	dlpkg "tachyon-installer/internal/downloader"
+	sshpkg "tachyon-installer/internal/ssh"
 	"tachyon-installer/internal/tui/widgets"
 )
 
@@ -73,7 +76,13 @@ func ShowWelcomeWizard(ctx *AppContext) {
 
 	step1Form = tview.NewForm()
 	StyleForm(step1Form)
-	step1Form.AddButton("Продолжить →", func() {
+	step1Form.AddButton("Установить →", func() {
+		ctx.DiagOnly = false
+		ctx.Pages.SwitchToPage("ssh_wizard")
+		ctx.App.SetFocus(step2Form)
+	})
+	step1Form.AddButton("🔍 Только диагностика", func() {
+		ctx.DiagOnly = true
 		ctx.Pages.SwitchToPage("ssh_wizard")
 		ctx.App.SetFocus(step2Form)
 	})
@@ -148,6 +157,39 @@ func ShowWelcomeWizard(ctx *AppContext) {
 		ctx.App.SetFocus(step3Form)
 	}
 	step2Form.AddButton("Продолжить →", goStep3)
+	step2Form.AddButton("🔎 Найти роутер", func() {
+		step2Err.SetText("  [#38bdf8]Поиск роутеров в локальной сети…[-]")
+		port, _ := strconv.Atoi(strings.TrimSpace(portInput.GetText()))
+		if port < 1 || port > 65535 {
+			port = 22
+		}
+		go func() {
+			ctxScan, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+			defer cancel()
+			hosts := discover.Scan(ctxScan, port, appconfig.GetDefaultGateway())
+			ctx.App.QueueUpdateDraw(func() {
+				if len(hosts) == 0 {
+					step2Err.SetText("  [#eab308]Роутеры с открытым SSH не найдены. Введите адрес вручную.[-]")
+					return
+				}
+				best := hosts[0]
+				ipInput.SetText(best.IP)
+				kind := "SSH"
+				if best.OpenWrt {
+					kind = "OpenWrt (Dropbear)"
+				}
+				msg := fmt.Sprintf("  [#22c55e]✓ Найден %s: %s[-]", kind, best.IP)
+				if len(hosts) > 1 {
+					var others []string
+					for _, h := range hosts[1:min(len(hosts), 4)] {
+						others = append(others, h.IP)
+					}
+					msg += fmt.Sprintf("  [#94a3b8]ещё: %s[-]", strings.Join(others, ", "))
+				}
+				step2Err.SetText(msg)
+			})
+		}()
+	})
 	step2Form.AddButton("← Назад", func() {
 		ctx.Pages.SwitchToPage("welcome_wizard")
 		ctx.App.SetFocus(step1Form)
@@ -167,7 +209,8 @@ func ShowWelcomeWizard(ctx *AppContext) {
 
 	step3Text := "\n  [#38bdf8]🔒  Аутентификация администратора[-]\n\n" +
 		"  [#cbd5e1]Введите системный пароль администратора (root) роутера.[-]\n" +
-		"  [#94a3b8]Пароль используется только для SSH-сессии установки.[-]"
+		"  [#94a3b8]Пароль используется только для SSH-сессии и не сохраняется на диск.[-]\n" +
+		"  [#94a3b8]Вход по ключу: укажите путь к ключу (пароль станет его парольной фразой).[-]"
 
 	step3TextView := tview.NewTextView().
 		SetDynamicColors(true).
@@ -176,7 +219,16 @@ func ShowWelcomeWizard(ctx *AppContext) {
 
 	step3Form = tview.NewForm()
 	StyleForm(step3Form)
+	keyInput := tview.NewInputField().
+		SetLabel("SSH-ключ (путь):").
+		SetFieldWidth(36)
+	if ctx.Config != nil {
+		keyInput.SetText(ctx.Config.KeyPath)
+	}
+	step3Err := tview.NewTextView().SetDynamicColors(true)
+	step3Err.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
 	step3Form.AddFormItem(passInput)
+	step3Form.AddFormItem(keyInput)
 
 	submitCredentials := func() {
 		port, err := strconv.Atoi(strings.TrimSpace(portInput.GetText()))
@@ -187,7 +239,17 @@ func ShowWelcomeWizard(ctx *AppContext) {
 		ctx.Config.RouterIP = strings.TrimSpace(ipInput.GetText())
 		ctx.Config.SSHPort = port
 		ctx.Config.Username = strings.TrimSpace(userInput.GetText())
+		keyPath := strings.TrimSpace(keyInput.GetText())
+		if keyPath != "" {
+			if _, err := sshpkg.LoadSigner(keyPath, passInput.GetText()); err != nil {
+				step3Err.SetText("  [#ef5350]✗ " + tview.Escape(err.Error()) + "[-]")
+				return
+			}
+		}
+		step3Err.SetText("")
 		ctx.Config.Password = passInput.GetText()
+		ctx.Config.KeyPath = keyPath
+		sshpkg.PrivateKeyPath = keyPath
 
 		ShowLoadingWizard(ctx)
 
@@ -203,9 +265,9 @@ func ShowWelcomeWizard(ctx *AppContext) {
 	})
 	EnableFormArrowNavigation(step3Form)
 
-	step3Panel.AddItem(textViewLayout(step3TextView), 6, 1, false)
-	step3Panel.AddItem(nil, 1, 0, false)
-	step3Panel.AddItem(formLayout(step3Form), 6, 1, true)
+	step3Panel.AddItem(textViewLayout(step3TextView), 7, 1, false)
+	step3Panel.AddItem(step3Err, 1, 0, false)
+	step3Panel.AddItem(formLayout(step3Form), 8, 1, true)
 
 	step3Modal := CreateWizardModal(step3Panel)
 
@@ -226,6 +288,11 @@ func ShowWelcomeWizard(ctx *AppContext) {
 		}
 	})
 	passInput.SetDoneFunc(func(key tcell.Key) {
+		if key == tcell.KeyEnter {
+			submitCredentials()
+		}
+	})
+	keyInput.SetDoneFunc(func(key tcell.Key) {
 		if key == tcell.KeyEnter {
 			submitCredentials()
 		}
@@ -261,24 +328,32 @@ func ShowOptionsWizard(ctx *AppContext, profile ProfileData) {
 
 	optSelector := NewOptionsSelector(profile)
 
-	// Pre-select mirror if already configured
-	if ctx.Config != nil && ctx.Config.SelectedMirror != "" {
-		for idx, m := range optSelector.mirrors {
-			if m.Key == ctx.Config.SelectedMirror {
-				optSelector.selectedMirror = idx
-				optSelector.mirrorCursor = idx
-				break
-			}
-		}
+	if ctx.Config != nil {
+		optSelector.Preselect(ctx.Config.SelectedEngine, ctx.Config.SelectedMirror, ctx.Config.TachyonVersion, ctx.Config.InstallI18n)
 	}
 
-	optSelector.OnSubmit = func(opts InstallOptions) {
+	startInstall := func(opts InstallOptions) {
+		ctx.Pages.RemovePage("confirm_wizard")
 		ctx.Pages.SwitchToPage("progress")
 		ctx.App.SetFocus(ctx.ConsoleView)
 
 		if ctx.OnStartInstall != nil {
 			ctx.OnStartInstall(opts)
 		}
+	}
+
+	optSelector.OnSubmit = func(opts InstallOptions) {
+		showConfirmModal(ctx, profile, opts,
+			func() { startInstall(opts) },
+			func() {
+				ctx.Pages.RemovePage("confirm_wizard")
+				ctx.Pages.SwitchToPage("options_wizard")
+				ctx.App.SetFocus(optSelector)
+			})
+	}
+
+	optSelector.OnDiagnostics = func() {
+		ShowDiagnosticsWizard(ctx, "options_wizard")
 	}
 
 	optSelector.OnBack = func() {
@@ -443,15 +518,13 @@ func EnableFormArrowNavigation(form *tview.Form) {
 	})
 }
 
-
-
 // StyleForm applies custom dark Slate and Sky-600 styling to forms and buttons,
 // eliminating glaring white inverted boxes on focus.
 func StyleForm(form *tview.Form) {
 	form.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
 	form.SetLabelColor(tview.Styles.SecondaryTextColor)
 	form.SetFieldTextColor(tview.Styles.PrimaryTextColor)
-	form.SetFieldBackgroundColor(tcell.NewRGBColor(30, 41, 59)) // Slate 800
+	form.SetFieldBackgroundColor(tcell.NewRGBColor(30, 41, 59))  // Slate 800
 	form.SetButtonBackgroundColor(tcell.NewRGBColor(30, 41, 59)) // Slate 800
 	form.SetButtonTextColor(tcell.NewRGBColor(241, 245, 249))    // Slate 100
 	form.SetButtonActivatedStyle(tcell.StyleDefault.

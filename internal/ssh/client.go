@@ -15,7 +15,7 @@ import (
 func Connect(host string, port int, user, password string) (*gossh.Client, error) {
 	sshConfig := &gossh.ClientConfig{
 		User:            user,
-		Auth:            []gossh.AuthMethod{gossh.Password(password)},
+		Auth:            authMethods(password),
 		HostKeyCallback: gossh.InsecureIgnoreHostKey(),
 		Timeout:         5 * time.Second,
 	}

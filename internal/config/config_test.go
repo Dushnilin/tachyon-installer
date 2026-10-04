@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"tachyon-installer/internal/config"
@@ -39,13 +40,8 @@ func TestLoad_InvalidJSON(t *testing.T) {
 func TestLoad_ValidJSON(t *testing.T) {
 	tmp := t.TempDir()
 	path := filepath.Join(tmp, "config.json")
-	data, _ := json.MarshalIndent(config.Config{
-		RouterIP: "10.0.0.1",
-		SSHPort:  2222,
-		Username: "admin",
-		Password: "secret",
-	}, "", "  ")
-	os.WriteFile(path, data, 0644)
+	// A legacy file may still contain a plaintext password; it must be ignored.
+	os.WriteFile(path, []byte(`{"router_ip":"10.0.0.1","ssh_port":2222,"username":"admin","password":"secret","key_path":"/k/id"}`), 0644)
 
 	cfg := config.Load(path)
 	if cfg.RouterIP != "10.0.0.1" {
@@ -57,8 +53,11 @@ func TestLoad_ValidJSON(t *testing.T) {
 	if cfg.Username != "admin" {
 		t.Errorf("expected Username admin, got %s", cfg.Username)
 	}
-	if cfg.Password != "secret" {
-		t.Errorf("expected Password secret, got %s", cfg.Password)
+	if cfg.Password != "" {
+		t.Errorf("password must never be loaded from disk, got %q", cfg.Password)
+	}
+	if cfg.KeyPath != "/k/id" {
+		t.Errorf("expected KeyPath /k/id, got %q", cfg.KeyPath)
 	}
 }
 
@@ -101,8 +100,8 @@ func TestSave(t *testing.T) {
 	if loaded.RouterIP != "192.168.8.1" {
 		t.Errorf("expected RouterIP 192.168.8.1, got %s", loaded.RouterIP)
 	}
-	if loaded.Password != "pass123" {
-		t.Errorf("expected Password pass123, got %s", loaded.Password)
+	if strings.Contains(string(data), "pass123") {
+		t.Errorf("password leaked into the config file:\n%s", data)
 	}
 }
 

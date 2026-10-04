@@ -64,6 +64,11 @@ type AppContext struct {
 	FirewallNotReady bool
 	// LogPath is the file with the full raw installer output.
 	LogPath string
+	// ReportPath is the saved post-install diagnostics report.
+	ReportPath string
+
+	// DiagOnly makes the wizard run diagnostics instead of an installation.
+	DiagOnly bool
 }
 
 // ExecSSH executes a command on the router with reconnection support.
@@ -174,6 +179,9 @@ func PrintFinalResultsToConsole(ctx *AppContext, success bool, archiveVer string
 		ctx.ConsoleWrite("  [#eab308]⚠ Правила firewall fw4 не применились: таблица ещё не была загружена.[-]\n")
 		ctx.ConsoleWrite("  [#cbd5e1]Это не ломает установку. Если прокси не заработает, выполните на роутере:[-]\n")
 		ctx.ConsoleWrite("  [#38bdf8]/etc/init.d/firewall restart && /etc/init.d/tachyon restart[-]\n\n")
+	}
+	if ctx.ReportPath != "" {
+		ctx.ConsoleWrite(fmt.Sprintf("  [#94a3b8]Отчёт диагностики: %s[-]\n", ctx.ReportPath))
 	}
 	if ctx.LogPath != "" {
 		ctx.ConsoleWrite(fmt.Sprintf("  [#94a3b8]Полный лог установки: %s[-]\n\n", ctx.LogPath))

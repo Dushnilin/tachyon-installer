@@ -77,6 +77,9 @@ type OptionsSelector struct {
 	OnSubmit               func(opts InstallOptions)
 	OnBack                 func()
 	OnRequestManualVersion func(current string, callback func(newVer string))
+	OnDiagnostics          func()
+
+	prefVersion string
 }
 
 // NewOptionsSelector initializes the OptionsSelector with default choices.
@@ -376,7 +379,7 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 	curY++
 
 	// Navigation Footer
-	footer := "  [#64748b]Tab разделы · ↑↓←→ выбор · Space переключить · Enter далее · Esc назад[-]"
+	footer := "  [#64748b]Tab разделы · ↑↓←→ выбор · Space переключить · Enter далее · D диагностика · Esc назад[-]"
 	opt.printClip(screen, footer, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 }
 
@@ -402,6 +405,16 @@ func (opt *OptionsSelector) InputHandler() func(event *tcell.EventKey, setFocus 
 				opt.OnBack()
 			}
 			return
+		}
+
+		if event.Key() == tcell.KeyRune {
+			switch event.Rune() {
+			case 'd', 'D', 'в', 'В':
+				if opt.OnDiagnostics != nil {
+					opt.OnDiagnostics()
+				}
+				return
+			}
 		}
 
 		switch opt.activeSection {
@@ -577,7 +590,7 @@ func (opt *OptionsSelector) SetReleases(tags []string) {
 	}
 	list = append(list, VersionItem{Key: "custom", Name: "Вручную..."})
 	opt.versions = list
-	opt.selectedVersion, opt.versionCursor = 0, 0
+	opt.applyPrefVersion()
 }
 
 func (opt *OptionsSelector) submit() {
@@ -592,4 +605,40 @@ func (opt *OptionsSelector) printClip(screen tcell.Screen, text string, x, y, ma
 		return
 	}
 	tview.Print(screen, text, x, y, maxWidth, align, color)
+}
+
+// Preselect applies previously used values. Unknown values are ignored.
+func (opt *OptionsSelector) Preselect(engine, mirror, version string, installRussian bool) {
+	for i, e := range opt.engines {
+		if e.Key == engine {
+			opt.selectedEngine, opt.engineCursor = i, i
+		}
+	}
+	for i, m := range opt.mirrors {
+		if m.Key == mirror {
+			opt.selectedMirror, opt.mirrorCursor = i, i
+		}
+	}
+	opt.installRussian = installRussian
+	opt.prefVersion = version
+	opt.applyPrefVersion()
+}
+
+// applyPrefVersion selects the preferred version in the current list, or falls back
+// to the manual entry so a previously typed tag is not lost.
+func (opt *OptionsSelector) applyPrefVersion() {
+	v := opt.prefVersion
+	if v == "" || v == "latest" {
+		opt.selectedVersion, opt.versionCursor = 0, 0
+		return
+	}
+	for i, it := range opt.versions {
+		if it.Key == v && it.Key != "custom" {
+			opt.selectedVersion, opt.versionCursor = i, i
+			return
+		}
+	}
+	last := len(opt.versions) - 1
+	opt.customVersionText = v
+	opt.selectedVersion, opt.versionCursor = last, last
 }
