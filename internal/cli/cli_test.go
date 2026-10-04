@@ -69,4 +69,41 @@ func TestParseFlags_HeadlessTriggers(t *testing.T) {
 	if err != nil || !optsSwitch.ShouldRunHeadless() || optsSwitch.SwitchEngine != "sing-box-tiny" {
 		t.Errorf("expected -switch-engine to trigger headless mode with engine sing-box-tiny")
 	}
+
+	// 8. -rescue
+	optsRescue, err := ParseFlags([]string{"-rescue"}, cfg, "v1.6.0")
+	if err != nil || !optsRescue.ShouldRunHeadless() || !optsRescue.RunRescue {
+		t.Errorf("expected -rescue to trigger headless mode")
+	}
+
+	// 9. -fix-conflicts
+	optsConflicts, err := ParseFlags([]string{"-fix-conflicts"}, cfg, "v1.6.0")
+	if err != nil || !optsConflicts.ShouldRunHeadless() || !optsConflicts.FixConflicts {
+		t.Errorf("expected -fix-conflicts to trigger headless mode")
+	}
+
+	// 10. -snapshot
+	optsSnap, err := ParseFlags([]string{"-snapshot"}, cfg, "v1.6.0")
+	if err != nil || !optsSnap.ShouldRunHeadless() || !optsSnap.FullSnapshot {
+		t.Errorf("expected -snapshot to trigger headless mode")
+	}
+
+	// 11. -offline-bundle
+	optsBundle, err := ParseFlags([]string{"-offline-bundle", "cache/"}, cfg, "v1.6.0")
+	if err != nil || !optsBundle.ShouldRunHeadless() || optsBundle.OfflineBundle != "cache/" {
+		t.Errorf("expected -offline-bundle to trigger headless mode")
+	}
+
+	// 12. -monitor
+	optsMon, err := ParseFlags([]string{"-monitor"}, cfg, "v1.6.0")
+	if err != nil || !optsMon.ShouldRunHeadless() || !optsMon.RunMonitor {
+		t.Errorf("expected -monitor to trigger headless mode")
+	}
+
+	// 13. -test-sub
+	optsSub, err := ParseFlags([]string{"-test-sub", "vless://test"}, cfg, "v1.6.0")
+	if err != nil || !optsSub.ShouldRunHeadless() || optsSub.TestSub != "vless://test" {
+		t.Errorf("expected -test-sub to trigger headless mode")
+	}
 }
+

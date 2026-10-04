@@ -254,6 +254,13 @@ func handleProfileReady(ctx *tui.AppContext) {
 		return
 	}
 
+	if ctx.RescueOnly {
+		ctx.App.QueueUpdateDraw(func() {
+			tui.ShowRescueModal(ctx, "welcome_wizard")
+		})
+		return
+	}
+
 	profile, err := routerpkg.RunPreConnectionCheck(client)
 	if err != nil {
 		client.Close()

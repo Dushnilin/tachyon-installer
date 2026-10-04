@@ -17,11 +17,17 @@
   <img src="assets/readme/divider_stream.svg" width="100%" alt="divider" />
 </p>
 
-## 🔍 Key Highlights (v1.5)
+## 🔍 Key Highlights (v1.6)
 
 - **⚡ Instant 1-Line Bootstrap**: Launch directly in console without manual downloading via PowerShell (`irm ... | iex`) or Linux/macOS (`curl | bash`).
+- **🚑 Emergency Network Rescue**: Safely flushes deadlocked nftables/iptables interception rules, clears TProxy routes, restarts dnsmasq/firewall, and restores native internet access instantly (`-rescue` flag in CLI or `🚑 Rescue` button / `R` hotkey in TUI).
+- **🛡️ Conflict Auto-Fix**: Automatically detects, stops, and disables conflicting proxy/DNS tools (`passwall`, `openclash`, `zapret`, `xray`, `shadowsocksr`, etc.) via `-fix-conflicts` flag or `C` hotkey in TUI.
+- **📊 Real-Time Live Monitor**: Interactive telemetry dashboard displaying CPU loadavg, RAM usage (with visual bar), system uptime, active proxy core (PID, memory), open conntrack connections, and LAN RX/TX traffic live (`-monitor` flag in CLI or `M` hotkey in TUI).
+- **💾 Full System Snapshot**: Backs up entire router network configurations (`/etc/config/network`, `/etc/config/dhcp`, `/etc/config/firewall`, `/etc/nftables.d/`, `/etc/config/tachyon`) into a local `.tar.gz` archive on host PC (`-snapshot` flag or `B` hotkey in TUI).
+- **⚡ Subscription Benchmark & Latency Ping**: Concurrently measures TCP handshake latency to all nodes in a subscription (HTTPS URL, raw `vless://`, file, or base64), sorted from lowest to highest ping (`-test-sub "vless://..."`).
+- **📦 Offline Bundle Downloader**: Pre-downloads Tachyon releases (OPKG + APK, i18n, and cores for x86_64, arm64, mipsle, mips) into a local bundle directory for air-gapped / offline deployments (`-offline-bundle "offline_pkg/"`).
+- **🌐 Multi-Target Bypass Probes**: Verifies router Fake-IP DNS interception and tests response latency across YouTube, Discord, Telegram, and GitHub directly through the router pipeline, reporting egress GeoIP country and IP.
 - **⚡ Engine Hot-Swap**: Swap routing engines (`sing-box-extended`, `sing-box-tiny`, `steer`, `steer-extended`) in ~3 seconds without reinstalling LuCI or clearing subscriptions — via `--switch-engine` or hotkey `S` in TUI.
-- **🧪 End-to-End Bypass & Fake-IP Check**: Verifies router Fake-IP DNS interception (`198.18.0.0/15`) and probes `youtube.com` latency (ms) directly through the router proxy pipeline.
 - **🌐 1-Click LuCI Launch**: Completion modal and global hotkey `O` instantly launch the Tachyon LuCI web panel in your default system browser.
 - **🖥️ Dual Mode (Interactive TUI + Headless CLI)**: Beautiful zinc terminal dashboard with mouse & arrow keys support, plus automated unattended CLI execution (`--yes`, `--ip`, `--pass`, `--engine`, `--zram`).
 - **🧠 Hardware-Aware Intelligence**: Real-time evaluation of router RAM/Flash with smart core recommendations; optional automatic activation of **zRAM-swap** for OOM prevention on constrained routers (<128 MB RAM).
@@ -145,6 +151,24 @@ Follow the on-screen TUI wizard:
 For script-based automation, CI/CD pipelines, or execution without launching the interactive TUI, use command-line flags:
 
 ```bash
+# Emergency rescue: flush interception rules and recover native internet
+./tachyon-installer -ip 192.168.1.1 -pass "secret" -rescue
+
+# Auto-fix conflicts: stop and disable passwall, openclash, zapret, etc.
+./tachyon-installer -ip 192.168.1.1 -pass "secret" -fix-conflicts
+
+# Create full system snapshot (network, firewall, dhcp, tachyon)
+./tachyon-installer -ip 192.168.1.1 -pass "secret" -snapshot
+
+# Real-time live performance monitoring (CPU, RAM, core, traffic, conntrack)
+./tachyon-installer -ip 192.168.1.1 -pass "secret" -monitor
+
+# Benchmark and ping subscription nodes concurrently (URL / vless / base64)
+./tachyon-installer -test-sub "https://example.com/sub"
+
+# Pre-download complete offline package bundle for air-gapped routers
+./tachyon-installer -offline-bundle "offline_pack/"
+
 # Hot-swap routing engine to sing-box-tiny in ~3 seconds (without LuCI reinstallation)
 ./tachyon-installer -ip 192.168.1.1 -pass "secret" -switch-engine sing-box-tiny
 

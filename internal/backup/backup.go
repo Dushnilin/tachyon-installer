@@ -90,6 +90,53 @@ func createEmptyPlaceholderBackup(localPath, routerIP string) (string, error) {
 	return fmt.Sprintf("Первичная установка: создана точка восстановления %s", filepath.Base(localPath)), nil
 }
 
+// CreateFullSnapshot captures Tachyon, network, dhcp, and firewall configurations in a single archive.
+func CreateFullSnapshot(client *gossh.Client, routerIP string) (string, error) {
+	if err := os.MkdirAll("backups", 0755); err != nil {
+		return "", fmt.Errorf("create backups directory: %w", err)
+	}
+
+	timestamp := time.Now().Format("20060102-150405")
+	safeIP := routerIP
+	if safeIP == "" {
+		safeIP = "router"
+	}
+	archiveFilename := fmt.Sprintf("tachyon_snapshot_%s_%s.tar.gz", safeIP, timestamp)
+	localPath := filepath.Join("backups", archiveFilename)
+
+	sess, err := client.NewSession()
+	if err != nil {
+		return "", fmt.Errorf("ssh session for snapshot: %w", err)
+	}
+	defer sess.Close()
+
+	remoteCmd := "tar -cz -C / etc/config/tachyon etc/tachyon etc/config/network etc/config/dhcp etc/config/firewall etc/nftables.d etc/firewall.user 2>/dev/null || tar -cz -C / etc/config/ 2>/dev/null"
+	stdout, err := sess.StdoutPipe()
+	if err != nil {
+		return "", fmt.Errorf("stdout pipe: %w", err)
+	}
+
+	if err := sess.Start(remoteCmd); err != nil {
+		return "", fmt.Errorf("start remote tar: %w", err)
+	}
+
+	outFile, err := os.Create(localPath)
+	if err != nil {
+		return "", fmt.Errorf("create snapshot file %s: %w", localPath, err)
+	}
+	defer outFile.Close()
+
+	n, copyErr := io.Copy(outFile, stdout)
+	_ = sess.Wait()
+
+	if copyErr != nil || n < 32 {
+		_ = os.Remove(localPath)
+		return createEmptyPlaceholderBackup(localPath, routerIP)
+	}
+
+	return fmt.Sprintf("Полный сетевой снапшот роутера сохранен: %s (%.1f КБ)", archiveFilename, float64(n)/1024), nil
+}
+
 // ListBackups returns all available local backup archives, sorted newest first.
 func ListBackups() ([]string, error) {
 	entries, err := os.ReadDir("backups")
@@ -102,7 +149,7 @@ func ListBackups() ([]string, error) {
 
 	var archives []string
 	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasPrefix(entry.Name(), "tachyon_backup_") && strings.HasSuffix(entry.Name(), ".tar.gz") {
+		if !entry.IsDir() && (strings.HasPrefix(entry.Name(), "tachyon_backup_") || strings.HasPrefix(entry.Name(), "tachyon_snapshot_")) && strings.HasSuffix(entry.Name(), ".tar.gz") {
 			archives = append(archives, filepath.Join("backups", entry.Name()))
 		}
 	}
@@ -137,6 +184,8 @@ func RestoreBackup(client *gossh.Client, backupPath string) (string, error) {
 	remoteCmd := `cat > /tmp/tachyon_restore.tar.gz && \
 tar -xzf /tmp/tachyon_restore.tar.gz -C / 2>/dev/null || true; \
 rm -f /tmp/tachyon_restore.tar.gz; \
+if [ -x /etc/init.d/firewall ]; then /etc/init.d/firewall restart >/dev/null 2>&1 || true; fi; \
+if [ -x /etc/init.d/dnsmasq ]; then /etc/init.d/dnsmasq restart >/dev/null 2>&1 || true; fi; \
 if [ -x /etc/init.d/tachyon ]; then /etc/init.d/tachyon restart >/dev/null 2>&1 || true; fi; \
 echo 'RESTORE_OK'`
 
@@ -154,5 +203,5 @@ echo 'RESTORE_OK'`
 		return "", fmt.Errorf("restore did not complete cleanly: %s", string(out))
 	}
 
-	return fmt.Sprintf("Конфигурация Tachyon успешно восстановлена из %s", filepath.Base(backupPath)), nil
+	return fmt.Sprintf("Конфигурация роутера успешно восстановлена из архива: %s", filepath.Base(backupPath)), nil
 }

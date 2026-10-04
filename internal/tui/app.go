@@ -71,6 +71,8 @@ type AppContext struct {
 
 	// DiagOnly makes the wizard run diagnostics instead of an installation.
 	DiagOnly bool
+	// RescueOnly makes the wizard run emergency rescue directly after connecting.
+	RescueOnly bool
 }
 
 // ExecSSH executes a command on the router with reconnection support.

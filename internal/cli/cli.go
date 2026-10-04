@@ -45,6 +45,12 @@ type Options struct {
 	ListBackups    bool
 	CheckUpdate    bool
 	SwitchEngine   string
+	RunRescue      bool
+	FixConflicts   bool
+	FullSnapshot   bool
+	OfflineBundle  string
+	RunMonitor     bool
+	TestSub        string
 	Yes            bool
 	AppVersion     string
 }
@@ -80,6 +86,12 @@ func ParseFlags(args []string, defaultCfg *appconfig.Config, appVersion string) 
 	fs.StringVar(&opts.RunRestore, "restore", "", "Восстановить настройки из файла бэкапа или 'latest'")
 	fs.BoolVar(&opts.ListBackups, "list-backups", false, "Показать список доступных локальных бэкапов")
 	fs.BoolVar(&opts.CheckUpdate, "check-update", false, "Проверить наличие обновлений программы на GitHub")
+	fs.BoolVar(&opts.RunRescue, "rescue", false, "Аварийный сброс правил перехвата и восстановление прямого интернета")
+	fs.BoolVar(&opts.FixConflicts, "fix-conflicts", false, "Отключить конфликтующие прокси-пакеты (passwall, openclash, zapret и др.)")
+	fs.BoolVar(&opts.FullSnapshot, "snapshot", false, "Создать полный бэкап настроек сети, dhcp, firewall и Tachyon")
+	fs.StringVar(&opts.OfflineBundle, "offline-bundle", "", "Скачать полный оффлайн-бандл пакетов в указанную папку (например 'offline/')")
+	fs.BoolVar(&opts.RunMonitor, "monitor", false, "Мониторинг нагрузки CPU, RAM, трафика и ячеек прокси в реальном времени")
+	fs.StringVar(&opts.TestSub, "test-sub", "", "Проверить и протестировать пинг до нод в подписке (HTTPS, vless://, base64)")
 	fs.BoolVar(&opts.Yes, "yes", false, "Автоматическое подтверждение (без интерактивного меню)")
 	fs.BoolVar(&opts.Yes, "y", false, "Короткий алиас для -yes")
 
@@ -92,7 +104,7 @@ func ParseFlags(args []string, defaultCfg *appconfig.Config, appVersion string) 
 
 // ShouldRunHeadless checks if flags request non-interactive execution.
 func (o *Options) ShouldRunHeadless() bool {
-	return o.RunDiag || o.RunUninstall || o.RunRestore != "" || o.ListBackups || o.CheckUpdate || o.SwitchEngine != "" || o.Yes
+	return o.RunDiag || o.RunUninstall || o.RunRestore != "" || o.ListBackups || o.CheckUpdate || o.SwitchEngine != "" || o.RunRescue || o.FixConflicts || o.FullSnapshot || o.OfflineBundle != "" || o.RunMonitor || o.TestSub != "" || o.Yes
 }
 
 // Run executes non-interactive CLI operations.
@@ -139,6 +151,54 @@ func Run(opts *Options) int {
 		return 0
 	}
 
+	// 3. Offline Bundle Downloader
+	if opts.OfflineBundle != "" {
+		fmt.Printf("⚡ Создание оффлайн-пакета в директории: %s...\n", opts.OfflineBundle)
+		mirrorMgr := dlpkg.NewMirrorManager(opts.Mirror)
+		dlClient := dlpkg.NewClient(mirrorMgr)
+		manifest, err := dlpkg.CreateOfflineBundle(
+			context.Background(),
+			dlClient,
+			opts.OfflineBundle,
+			opts.Version,
+			nil,
+			func(msg string) { fmt.Print(msg) },
+		)
+		if err != nil {
+			fmt.Printf("❌ Ошибка создания оффлайн-пакета: %v\n", err)
+			return 1
+		}
+		fmt.Printf("\n✓ Оффлайн-бандл успешно сформирован! Всего пакетов: %d\n", len(manifest.Packages))
+		return 0
+	}
+
+	// 4. Test Subscription Nodes (Ping & Benchmark)
+	if opts.TestSub != "" {
+		fmt.Println("⚡ Анализ и тестирование задержки узлов подписки...")
+		nodes, err := routerpkg.ResolveNodesFromInput(context.Background(), opts.TestSub)
+		if err != nil {
+			fmt.Printf("❌ Ошибка разбора подписки: %v\n", err)
+			return 1
+		}
+		if len(nodes) == 0 {
+			fmt.Println("❌ В подписке не найдено поддерживаемых узлов")
+			return 1
+		}
+		fmt.Printf("✓ Найдено узлов: %d. Запуск TCP handshake пинга...\n\n", len(nodes))
+		results := routerpkg.BenchmarkNodes(context.Background(), nodes, 3*time.Second)
+
+		fmt.Printf(" %-4s | %-28s | %-8s | %-24s | %s\n", "#", "Имя узла", "Протокол", "Хост:Порт", "Пинг / Статус")
+		fmt.Println(strings.Repeat("-", 82))
+		for i, r := range results {
+			status := fmt.Sprintf("%d ms", r.LatencyMs)
+			if !r.Success {
+				status = "TIMEOUT / FAIL"
+			}
+			fmt.Printf(" [%2d] | %-28.28s | %-8s | %-24.24s | %s\n", i+1, r.Name, r.Protocol, fmt.Sprintf("%s:%d", r.Host, r.Port), status)
+		}
+		return 0
+	}
+
 	// Connect to router over SSH
 	fmt.Printf("⚡ Подключение к роутеру %s:%d (%s)...\n", opts.RouterIP, opts.SSHPort, opts.Username)
 	client, err := sshpkg.Connect(opts.RouterIP, opts.SSHPort, opts.Username, opts.Password)
@@ -151,7 +211,113 @@ func Run(opts *Options) int {
 
 	isAPK := routerpkg.IsAPKPackage(client)
 
-	// 3. Uninstall
+	// 5. Emergency Rescue
+	if opts.RunRescue {
+		fmt.Println("⚡ АВАРИЙНЫЙ СБРОС И ВОССТАНОВЛЕНИЕ СЕТИ РОУТЕРА...")
+		execCmd := func(_ *gossh.Client, cmd string) (string, error) {
+			sess, err := client.NewSession()
+			if err != nil {
+				return "", err
+			}
+			defer sess.Close()
+			out, err := sess.CombinedOutput(cmd)
+			return string(out), err
+		}
+		rep := routerpkg.EmergencyRescue(client, execCmd)
+		for _, a := range rep.ActionsTaken {
+			fmt.Printf("  • %s\n", a)
+		}
+		if rep.Success {
+			fmt.Println("\n✓ Правила перехвата и службы сброшены.")
+			fmt.Printf("  • Пинг до шлюза провайдера: %v\n", rep.GatewayPing)
+			fmt.Printf("  • Пинг в интернет (8.8.8.8): %v\n", rep.InternetPing)
+			if rep.InternetPing {
+				fmt.Println("✓ Доступ в Интернет успешно восстановлен напрямую!")
+			} else {
+				fmt.Println("⚠️ Интернет не отвечает по прямому пингу (проверьте WAN/кабель).")
+			}
+			return 0
+		}
+		fmt.Printf("❌ Сбой аварийного сброса: %s\n", rep.Detail)
+		return 1
+	}
+
+	// 6. Conflict Auto-Fix
+	if opts.FixConflicts {
+		fmt.Println("⚡ Поиск и отключение конфликтующих прокси-пакетов...")
+		execCmd := func(_ *gossh.Client, cmd string) (string, error) {
+			sess, err := client.NewSession()
+			if err != nil {
+				return "", err
+			}
+			defer sess.Close()
+			out, err := sess.CombinedOutput(cmd)
+			return string(out), err
+		}
+		rep := routerpkg.DisableConflicts(client, execCmd, nil)
+		if !rep.Success {
+			fmt.Printf("❌ Ошибка: %s\n", rep.Details)
+			return 1
+		}
+		if rep.DisabledCount > 0 {
+			fmt.Printf("✓ %s\n", rep.Details)
+		} else {
+			fmt.Println("✓ Конфликтующих служб (passwall, openclash, zapret и др.) не обнаружено.")
+		}
+		return 0
+	}
+
+	// 7. Full System Snapshot
+	if opts.FullSnapshot {
+		fmt.Println("⚡ Создание полного снимка настроек роутера (сеть, firewall, dhcp, tachyon)...")
+		msg, err := backuppkg.CreateFullSnapshot(client, opts.RouterIP)
+		if err != nil {
+			fmt.Printf("❌ Ошибка создания полного бэкапа: %v\n", err)
+			return 1
+		}
+		fmt.Printf("✓ %s\n", msg)
+		return 0
+	}
+
+	// 8. Live Real-Time Monitor
+	if opts.RunMonitor {
+		fmt.Printf("⚡ Запуск мониторинга роутера %s (Ctrl+C для выхода)...\n\n", opts.RouterIP)
+		execCmd := func(_ *gossh.Client, cmd string) (string, error) {
+			sess, err := client.NewSession()
+			if err != nil {
+				return "", err
+			}
+			defer sess.Close()
+			out, err := sess.CombinedOutput(cmd)
+			return string(out), err
+		}
+
+		for {
+			stats, err := routerpkg.CollectLiveStats(client, execCmd)
+			if err != nil {
+				fmt.Printf("⚠️ Ошибка сбора метрик: %v\n", err)
+			} else {
+				ramPercent := float64(0)
+				if stats.RAMTotalMB > 0 {
+					ramPercent = (stats.RAMUsedMB / stats.RAMTotalMB) * 100.0
+				}
+				engInfo := "не запущен"
+				if stats.EngineName != "" {
+					engInfo = fmt.Sprintf("%s (PID: %s, VSZ: %s)", stats.EngineName, stats.EnginePID, stats.EngineVSZ)
+				}
+				fmt.Printf("\r[Load: %.2f %.2f %.2f] [RAM: %.1f/%.1f MB (%.0f%%)] [Uptime: %s] [Ядро: %s] [Соединений: %d]   ",
+					stats.Load1, stats.Load5, stats.Load15,
+					stats.RAMUsedMB, stats.RAMTotalMB, ramPercent,
+					stats.UptimeString(),
+					engInfo,
+					stats.Connections,
+				)
+			}
+			time.Sleep(2 * time.Second)
+		}
+	}
+
+	// 9. Uninstall
 	if opts.RunUninstall {
 		fmt.Println("⚡ Запуск чистого удаления Tachyon...")
 		out, err := deploypkg.UninstallTachyon(client, isAPK)

@@ -78,11 +78,19 @@ func ShowWelcomeWizard(ctx *AppContext) {
 	StyleForm(step1Form)
 	step1Form.AddButton("Установить →", func() {
 		ctx.DiagOnly = false
+		ctx.RescueOnly = false
 		ctx.Pages.SwitchToPage("ssh_wizard")
 		ctx.App.SetFocus(step2Form)
 	})
-	step1Form.AddButton("🔍 Только диагностика", func() {
+	step1Form.AddButton("🔍 Диагностика", func() {
 		ctx.DiagOnly = true
+		ctx.RescueOnly = false
+		ctx.Pages.SwitchToPage("ssh_wizard")
+		ctx.App.SetFocus(step2Form)
+	})
+	step1Form.AddButton("🚑 Rescue", func() {
+		ctx.DiagOnly = false
+		ctx.RescueOnly = true
 		ctx.Pages.SwitchToPage("ssh_wizard")
 		ctx.App.SetFocus(step2Form)
 	})
@@ -355,6 +363,22 @@ func ShowOptionsWizard(ctx *AppContext, profile ProfileData) {
 
 	optSelector.OnDiagnostics = func() {
 		ShowDiagnosticsWizard(ctx, "options_wizard")
+	}
+
+	optSelector.OnMonitor = func() {
+		ShowMonitorModal(ctx, "options_wizard")
+	}
+
+	optSelector.OnRescue = func() {
+		ShowRescueModal(ctx, "options_wizard")
+	}
+
+	optSelector.OnFixConflicts = func() {
+		ShowConflictFixModal(ctx, "options_wizard")
+	}
+
+	optSelector.OnSnapshot = func() {
+		ShowSnapshotModal(ctx, "options_wizard")
 	}
 
 	optSelector.OnHotSwap = func(engineKey, mirrorKey string) {
