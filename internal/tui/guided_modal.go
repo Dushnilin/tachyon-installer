@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 	gossh "golang.org/x/crypto/ssh"
 
@@ -11,6 +12,186 @@ import (
 	routerpkg "tachyon-installer/internal/router"
 	sshpkg "tachyon-installer/internal/ssh"
 )
+
+// cycleSelectorItem is an inline FormItem that switches between multiple choices
+// using Left/Right arrows, Space, or number keys (1, 2, 3...) without any popup menus,
+// avoiding dropdown clipping and visual overlap in modal dialogs.
+type cycleSelectorItem struct {
+	*tview.Box
+	label      string
+	labelWidth int
+	labelColor tcell.Color
+	options    []string
+	selected   int
+	onChanged  func(index int)
+	finished   func(key tcell.Key)
+	disabled   bool
+}
+
+func newCycleSelectorItem(label string, options []string, initialIdx int, onChanged func(index int)) *cycleSelectorItem {
+	if initialIdx < 0 || initialIdx >= len(options) {
+		initialIdx = 0
+	}
+	return &cycleSelectorItem{
+		Box:        tview.NewBox(),
+		label:      label,
+		options:    options,
+		selected:   initialIdx,
+		onChanged:  onChanged,
+		labelColor: tcell.NewRGBColor(203, 213, 225), // Slate 300
+	}
+}
+
+func (c *cycleSelectorItem) GetLabel() string {
+	return c.label
+}
+
+func (c *cycleSelectorItem) SetFormAttributes(labelWidth int, labelColor, bgColor, fieldTextColor, fieldBgColor tcell.Color) tview.FormItem {
+	c.labelWidth = labelWidth
+	c.labelColor = labelColor
+	c.SetBackgroundColor(bgColor)
+	return c
+}
+
+func (c *cycleSelectorItem) GetFieldWidth() int {
+	return 0 // flexible
+}
+
+func (c *cycleSelectorItem) GetFieldHeight() int {
+	return 1
+}
+
+func (c *cycleSelectorItem) SetFinishedFunc(handler func(key tcell.Key)) tview.FormItem {
+	c.finished = handler
+	return c
+}
+
+func (c *cycleSelectorItem) SetDisabled(disabled bool) tview.FormItem {
+	c.disabled = disabled
+	return c
+}
+
+func (c *cycleSelectorItem) Draw(screen tcell.Screen) {
+	c.Box.DrawForSubclass(screen, c)
+	x, y, width, height := c.GetInnerRect()
+	if height < 1 || width < 1 {
+		return
+	}
+
+	labelWidth := c.labelWidth
+	if labelWidth == 0 {
+		labelWidth = tview.TaggedStringWidth(c.label)
+	}
+	if labelWidth > width {
+		labelWidth = width
+	}
+
+	// 1. Draw Label
+	tview.Print(screen, c.label, x, y, labelWidth, tview.AlignLeft, c.labelColor)
+
+	x += labelWidth
+	width -= labelWidth
+	if width < 1 {
+		return
+	}
+
+	// 2. Format Option Text
+	optText := ""
+	if c.selected >= 0 && c.selected < len(c.options) {
+		optText = c.options[c.selected]
+	}
+
+	displayText := fmt.Sprintf("◄ %s ►", optText)
+	if width < len([]rune(displayText)) {
+		displayText = optText
+	}
+
+	var style tcell.Style
+	if c.HasFocus() {
+		style = tcell.StyleDefault.
+			Background(tcell.NewRGBColor(2, 132, 199)). // Sky 600
+			Foreground(tcell.ColorWhite).
+			Bold(true)
+	} else {
+		style = tcell.StyleDefault.
+			Background(tcell.NewRGBColor(30, 41, 59)).  // Slate 800
+			Foreground(tcell.NewRGBColor(241, 245, 249)) // Slate 100
+	}
+
+	// Fill background of the field
+	for col := 0; col < width; col++ {
+		screen.SetContent(x+col, y, ' ', nil, style)
+	}
+
+	// Print text inside the field area
+	fg, _, _ := style.Decompose()
+	tview.Print(screen, displayText, x+1, y, width-2, tview.AlignLeft, fg)
+}
+
+func (c *cycleSelectorItem) InputHandler() func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
+	return c.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
+		if c.disabled {
+			return
+		}
+		switch event.Key() {
+		case tcell.KeyLeft:
+			c.selected = (c.selected - 1 + len(c.options)) % len(c.options)
+			if c.onChanged != nil {
+				c.onChanged(c.selected)
+			}
+		case tcell.KeyRight:
+			c.selected = (c.selected + 1) % len(c.options)
+			if c.onChanged != nil {
+				c.onChanged(c.selected)
+			}
+		case tcell.KeyEnter, tcell.KeyDown, tcell.KeyTab:
+			if c.finished != nil {
+				c.finished(tcell.KeyTab)
+			}
+		case tcell.KeyUp, tcell.KeyBacktab:
+			if c.finished != nil {
+				c.finished(tcell.KeyBacktab)
+			}
+		case tcell.KeyEscape:
+			if c.finished != nil {
+				c.finished(tcell.KeyEscape)
+			}
+		case tcell.KeyRune:
+			switch event.Rune() {
+			case ' ':
+				c.selected = (c.selected + 1) % len(c.options)
+				if c.onChanged != nil {
+					c.onChanged(c.selected)
+				}
+			case '1', '2', '3', '4', '5', '6', '7', '8', '9':
+				idx := int(event.Rune() - '1')
+				if idx >= 0 && idx < len(c.options) {
+					c.selected = idx
+					if c.onChanged != nil {
+						c.onChanged(c.selected)
+					}
+				}
+			}
+		}
+	})
+}
+
+func (c *cycleSelectorItem) MouseHandler() func(action tview.MouseAction, event *tcell.EventMouse, setFocus func(p tview.Primitive)) (consumed bool, recipient tview.Primitive) {
+	return c.WrapMouseHandler(func(action tview.MouseAction, event *tcell.EventMouse, setFocus func(p tview.Primitive)) (consumed bool, recipient tview.Primitive) {
+		if !c.InRect(event.Position()) {
+			return false, nil
+		}
+		if action == tview.MouseLeftClick {
+			setFocus(c)
+			c.selected = (c.selected + 1) % len(c.options)
+			if c.onChanged != nil {
+				c.onChanged(c.selected)
+			}
+			return true, c
+		}
+		return false, nil
+	})
+}
 
 // ShowGuidedSetupModal displays the hand-in-hand autopilot setup wizard.
 func ShowGuidedSetupModal(ctx *AppContext, returnPage string) {
@@ -32,6 +213,8 @@ func ShowGuidedSetupModal(ctx *AppContext, returnPage string) {
 
 	form := tview.NewForm()
 	StyleForm(form)
+	form.SetBorderPadding(0, 0, 0, 0)
+	form.SetItemPadding(1)
 
 	closeModal := func() {
 		ctx.Pages.RemovePage("guided_modal")
@@ -48,11 +231,10 @@ func ShowGuidedSetupModal(ctx *AppContext, returnPage string) {
 	form.SetCancelFunc(closeModal)
 	EnableFormArrowNavigation(form)
 
-	panel.AddItem(infoView, 14, 1, false)
-	panel.AddItem(nil, 1, 0, false)
-	panel.AddItem(formLayout(form), 5, 1, true)
+	panel.AddItem(infoView, 0, 1, false)
+	panel.AddItem(formLayout(form), 7, 0, true)
 
-	modal := CreateWizardModalCustom(panel, 88, 22)
+	modal := CreateWizardModalCustom(panel, 92, 27)
 	ctx.Pages.AddPage("guided_modal", modal, true, true)
 	ctx.App.SetFocus(form)
 
@@ -77,7 +259,10 @@ func ShowGuidedSetupModal(ctx *AppContext, returnPage string) {
 				ctx.App.QueueUpdateDraw(func() {
 					infoView.SetText(fmt.Sprintf("\n  [#ef5350:b]❌ Ошибка SSH подключения:[-] %v\n\n  [#cbd5e1]Проверьте IP-адрес роутера и пароль.[-]\n", err))
 					form.Clear(true)
+					StyleForm(form)
+					form.SetBorderPadding(0, 0, 0, 0)
 					form.AddButton("Закрыть", closeModal)
+					form.SetCancelFunc(closeModal)
 					ctx.App.SetFocus(form)
 				})
 				return
@@ -135,27 +320,39 @@ func ShowGuidedSetupModal(ctx *AppContext, returnPage string) {
 
 			// Build Interactive Options Form
 			form.Clear(true)
+			StyleForm(form)
+			form.SetBorderPadding(0, 0, 0, 0)
+			form.SetItemPadding(1)
 
 			modeOptions := []string{
-				"Автономный обход (Steer/Zapret) — без серверов и без подписок",
-				"Подключение VLESS / Sing-box подписки (Туннель)",
-				"Гибридный режим (Zapret для незаблокированного + Туннель)",
+				"1. Автономный обход (Steer/Zapret — без серверов)",
+				"2. VLESS / Sing-box подписка (Туннель)",
+				"3. Гибридный режим (Zapret + VLESS Туннель)",
 			}
 			selectedModeIdx := 0
-			form.AddDropDown("Режим работы: ", modeOptions, 0, func(option string, index int) {
+			modeItem := newCycleSelectorItem("Режим работы:        ", modeOptions, 0, func(index int) {
 				selectedModeIdx = index
 			})
+			form.AddFormItem(modeItem)
 
 			tuneStack := true
-			form.AddCheckbox("Оптимизировать сеть (BBR, буферы, offloading): ", true, func(checked bool) {
-				tuneStack = checked
-			})
+			cb := tview.NewCheckbox().
+				SetLabel("Оптимизация сети:    ").
+				SetChecked(true).
+				SetCheckedString("[X] Включить TCP BBR, тюнинг буферов и Flow Offloading").
+				SetUncheckedString("[ ] Отключено (стандартные параметры ядра)").
+				SetChangedFunc(func(checked bool) {
+					tuneStack = checked
+				})
+			form.AddFormItem(cb)
 
 			// Apply Button
 			form.AddButton("🚀 Настроить всё автоматически (Enter)", func() {
 				// Switch to execution view
 				infoView.SetText("\n  [#38bdf8:b]⚡ Применение параметров автопилота... Пожалуйста, подождите[-]\n\n")
 				form.Clear(true)
+				StyleForm(form)
+				form.SetBorderPadding(0, 0, 0, 0)
 				form.AddButton("⏳ Выполняется...", nil)
 
 				go func() {
@@ -236,6 +433,8 @@ func ShowGuidedSetupModal(ctx *AppContext, returnPage string) {
 						infoView.SetText(resSB.String())
 
 						form.Clear(true)
+						StyleForm(form)
+						form.SetBorderPadding(0, 0, 0, 0)
 						form.AddButton("🌐 Открыть LuCI", func() {
 							ip := "192.168.1.1"
 							if ctx.Config != nil && ctx.Config.RouterIP != "" {
@@ -246,6 +445,7 @@ func ShowGuidedSetupModal(ctx *AppContext, returnPage string) {
 						})
 						form.AddButton("✅ Закрыть (Enter)", closeModal)
 						form.SetCancelFunc(closeModal)
+						EnableFormArrowNavigation(form)
 						ctx.App.SetFocus(form)
 					})
 				}()
