@@ -17,8 +17,9 @@ const (
 	SectionMirror     = 2
 	SectionLang       = 3
 	SectionBtnInstall = 4
-	SectionBtnBack    = 5
-	totalSections     = 6
+	SectionBtnHotSwap = 5
+	SectionBtnBack    = 6
+	totalSections     = 7
 )
 
 // EngineItem represents a selectable proxy engine option.
@@ -82,11 +83,24 @@ type OptionsSelector struct {
 
 	// Callbacks
 	OnSubmit               func(opts InstallOptions)
+	OnHotSwap              func(engineKey, mirrorKey string)
 	OnBack                 func()
 	OnRequestManualVersion func(current string, callback func(newVer string))
 	OnDiagnostics          func()
 
 	prefVersion string
+}
+
+func (opt *OptionsSelector) hasInstalledTachyon() bool {
+	return opt.Profile.InstalledTachyonVer != ""
+}
+
+func (opt *OptionsSelector) triggerHotSwap() {
+	if opt.OnHotSwap != nil {
+		engineKey := opt.engines[opt.selectedEngine].Key
+		mirrorKey := opt.mirrors[opt.selectedMirror].Key
+		opt.OnHotSwap(engineKey, mirrorKey)
+	}
 }
 
 type optClickTarget struct {
@@ -551,39 +565,85 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 	// -------------------------------------------------------------
 	// SECTION 5 & 6: ACTION BUTTONS
 	// -------------------------------------------------------------
-	btnInstall := "  [#38bdf8:#1e293b]  🚀  Начать установку  [-]  "
-	if opt.activeSection == SectionBtnInstall {
-		btnInstall = "  [#ffffff:#0284c7:b] ▶ 🚀  Начать установку (Enter)  [-]  "
-	}
-	btnBack := "  [#94a3b8:#1e293b]  ←  Назад к SSH  [-]  "
-	if opt.activeSection == SectionBtnBack {
-		btnBack = "  [#ffffff:#0284c7:b] ▶ ←  Назад к SSH (Enter)  [-]  "
-	}
+	if opt.hasInstalledTachyon() {
+		btnInstall := " [#38bdf8:#1e293b] 🚀 Полная установка [-] "
+		if opt.activeSection == SectionBtnInstall {
+			btnInstall = " [#ffffff:#0284c7:b] ▶ 🚀 Полная установка (Enter) [-] "
+		}
+		btnSwap := " [#eab308:#1e293b] ⚡ Сменить ядро (S) [-] "
+		if opt.activeSection == SectionBtnHotSwap {
+			btnSwap = " [#ffffff:#ca8a04:b] ▶ ⚡ Сменить ядро (Enter) [-] "
+		}
+		btnBack := " [#94a3b8:#1e293b] ← Назад к SSH [-] "
+		if opt.activeSection == SectionBtnBack {
+			btnBack = " [#ffffff:#0284c7:b] ▶ ← Назад к SSH (Enter) [-] "
+		}
 
-	buttonsLine := fmt.Sprintf("        %s        %s", btnInstall, btnBack)
-	opt.printClip(screen, buttonsLine, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
-	midX := x + width/2
-	opt.clickTargets = append(opt.clickTargets, optClickTarget{
-		x1: x + 4, y1: curY, x2: midX - 2, y2: curY,
-		onClick: func() {
-			opt.activeSection = SectionBtnInstall
-			opt.submit()
-		},
-	})
-	opt.clickTargets = append(opt.clickTargets, optClickTarget{
-		x1: midX + 2, y1: curY, x2: x + width - 4, y2: curY,
-		onClick: func() {
-			opt.activeSection = SectionBtnBack
-			if opt.OnBack != nil {
-				opt.OnBack()
-			}
-		},
-	})
-	curY++
+		buttonsLine := fmt.Sprintf("   %s   %s   %s", btnInstall, btnSwap, btnBack)
+		opt.printClip(screen, buttonsLine, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 
-	// Navigation Footer
-	footer := "  [#64748b]↑↓←→ навигация · Enter/Space выбор · Клик мышью · D диагностика · Esc назад[-]"
-	opt.printClip(screen, footer, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
+		colW := width / 3
+		opt.clickTargets = append(opt.clickTargets, optClickTarget{
+			x1: x, y1: curY, x2: x + colW, y2: curY,
+			onClick: func() {
+				opt.activeSection = SectionBtnInstall
+				opt.submit()
+			},
+		})
+		opt.clickTargets = append(opt.clickTargets, optClickTarget{
+			x1: x + colW, y1: curY, x2: x + 2*colW, y2: curY,
+			onClick: func() {
+				opt.activeSection = SectionBtnHotSwap
+				opt.triggerHotSwap()
+			},
+		})
+		opt.clickTargets = append(opt.clickTargets, optClickTarget{
+			x1: x + 2*colW, y1: curY, x2: x + width, y2: curY,
+			onClick: func() {
+				opt.activeSection = SectionBtnBack
+				if opt.OnBack != nil {
+					opt.OnBack()
+				}
+			},
+		})
+		curY++
+
+		footer := "  [#64748b]↑↓←→ навигация · Enter выбор · Клик мышью · D диагностика · S смена ядра · Esc назад[-]"
+		opt.printClip(screen, footer, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
+	} else {
+		btnInstall := "  [#38bdf8:#1e293b]  🚀  Начать установку  [-]  "
+		if opt.activeSection == SectionBtnInstall {
+			btnInstall = "  [#ffffff:#0284c7:b] ▶ 🚀  Начать установку (Enter)  [-]  "
+		}
+		btnBack := "  [#94a3b8:#1e293b]  ←  Назад к SSH  [-]  "
+		if opt.activeSection == SectionBtnBack {
+			btnBack = "  [#ffffff:#0284c7:b] ▶ ←  Назад к SSH (Enter)  [-]  "
+		}
+
+		buttonsLine := fmt.Sprintf("        %s        %s", btnInstall, btnBack)
+		opt.printClip(screen, buttonsLine, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
+		midX := x + width/2
+		opt.clickTargets = append(opt.clickTargets, optClickTarget{
+			x1: x + 4, y1: curY, x2: midX - 2, y2: curY,
+			onClick: func() {
+				opt.activeSection = SectionBtnInstall
+				opt.submit()
+			},
+		})
+		opt.clickTargets = append(opt.clickTargets, optClickTarget{
+			x1: midX + 2, y1: curY, x2: x + width - 4, y2: curY,
+			onClick: func() {
+				opt.activeSection = SectionBtnBack
+				if opt.OnBack != nil {
+					opt.OnBack()
+				}
+			},
+		})
+		curY++
+
+		footer := "  [#64748b]↑↓←→ навигация · Enter/Space выбор · Клик мышью · D диагностика · Esc назад[-]"
+		opt.printClip(screen, footer, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
+	}
 }
 
 func drawOptionDivider(screen tcell.Screen, x, y, width int) {
@@ -615,10 +675,16 @@ func (opt *OptionsSelector) MouseHandler() func(action tview.MouseAction, event 
 
 		case tview.MouseScrollDown:
 			opt.activeSection = (opt.activeSection + 1) % totalSections
+			if opt.activeSection == SectionBtnHotSwap && !opt.hasInstalledTachyon() {
+				opt.activeSection = SectionBtnBack
+			}
 			return true, opt
 
 		case tview.MouseScrollUp:
 			opt.activeSection = (opt.activeSection + totalSections - 1) % totalSections
+			if opt.activeSection == SectionBtnHotSwap && !opt.hasInstalledTachyon() {
+				opt.activeSection = SectionBtnInstall
+			}
 			return true, opt
 		}
 
@@ -632,9 +698,15 @@ func (opt *OptionsSelector) InputHandler() func(event *tcell.EventKey, setFocus 
 		switch event.Key() {
 		case tcell.KeyTab:
 			opt.activeSection = (opt.activeSection + 1) % totalSections
+			if opt.activeSection == SectionBtnHotSwap && !opt.hasInstalledTachyon() {
+				opt.activeSection = SectionBtnBack
+			}
 			return
 		case tcell.KeyBacktab:
 			opt.activeSection = (opt.activeSection + totalSections - 1) % totalSections
+			if opt.activeSection == SectionBtnHotSwap && !opt.hasInstalledTachyon() {
+				opt.activeSection = SectionBtnInstall
+			}
 			return
 		case tcell.KeyEscape:
 			if opt.OnBack != nil {
@@ -650,6 +722,11 @@ func (opt *OptionsSelector) InputHandler() func(event *tcell.EventKey, setFocus 
 					opt.OnDiagnostics()
 				}
 				return
+			case 's', 'S', 'ы', 'Ы':
+				if opt.hasInstalledTachyon() && opt.OnHotSwap != nil {
+					opt.triggerHotSwap()
+					return
+				}
 			}
 		}
 
@@ -864,7 +941,11 @@ func (opt *OptionsSelector) InputHandler() func(event *tcell.EventKey, setFocus 
 				opt.activeSection = SectionLang
 				opt.langCursor = 1
 			case tcell.KeyRight:
-				opt.activeSection = SectionBtnBack
+				if opt.hasInstalledTachyon() {
+					opt.activeSection = SectionBtnHotSwap
+				} else {
+					opt.activeSection = SectionBtnBack
+				}
 			case tcell.KeyLeft:
 				opt.activeSection = SectionBtnBack
 			case tcell.KeyDown:
@@ -877,12 +958,35 @@ func (opt *OptionsSelector) InputHandler() func(event *tcell.EventKey, setFocus 
 				}
 			}
 
+		case SectionBtnHotSwap:
+			switch event.Key() {
+			case tcell.KeyUp:
+				opt.activeSection = SectionLang
+				opt.langCursor = 1
+			case tcell.KeyLeft:
+				opt.activeSection = SectionBtnInstall
+			case tcell.KeyRight:
+				opt.activeSection = SectionBtnBack
+			case tcell.KeyDown:
+				opt.activeSection = SectionEngine
+			case tcell.KeyEnter:
+				opt.triggerHotSwap()
+			case tcell.KeyRune:
+				if event.Rune() == ' ' {
+					opt.triggerHotSwap()
+				}
+			}
+
 		case SectionBtnBack:
 			switch event.Key() {
 			case tcell.KeyUp:
 				opt.activeSection = SectionLang
 			case tcell.KeyLeft:
-				opt.activeSection = SectionBtnInstall
+				if opt.hasInstalledTachyon() {
+					opt.activeSection = SectionBtnHotSwap
+				} else {
+					opt.activeSection = SectionBtnInstall
+				}
 			case tcell.KeyRight:
 				opt.activeSection = SectionBtnInstall
 			case tcell.KeyDown:

@@ -323,6 +323,13 @@ func RunExpressInstall(ctx *AppContext, opts InstallOptions) {
 			result := routerpkg.VerifyAndFallback(sshClient, execFn, ctx.SetSubTask)
 			if result.OK {
 				ctx.ConsoleWrite("[#22c55e]🎉 ПОЛНЫЙ УСПЕХ: Служба Tachyon запущена и проверена![-]\n")
+				ctx.ConsoleWrite("[#cbd5e1]⚡ Сквозная проверка обхода блокировок и Fake-IP с роутера...[-]\n")
+				bpReport := routerpkg.TestBypass(sshClient, execFn)
+				if bpReport.Success {
+					ctx.ConsoleWritef("[#22c55e]✓ %s[-]\n", bpReport.Details)
+				} else {
+					ctx.ConsoleWritef("[#eab308]⚠️ %s[-]\n", bpReport.Details)
+				}
 				postInstallDiagnostics(ctx, func(cmd string) (string, error) { return execFn(sshClient, cmd) })
 				FinishAndExit(ctx, true, tachyonAssets.Version)
 			} else {
@@ -363,6 +370,13 @@ func RunSaveSubscription(ctx *AppContext, subURL string) {
 	result := routerpkg.VerifyAndFallback(ctx.SSHClient, execFn, ctx.SetSubTask)
 	if result.OK {
 		ctx.ConsoleWrite("[#22c55e]🎉 ПОДПИСКА АКТИВНА: Обход блокировок запущен и проверен![-]\n")
+		ctx.ConsoleWrite("[#cbd5e1]⚡ Сквозная проверка обхода блокировок и Fake-IP с роутера...[-]\n")
+		bpReport := routerpkg.TestBypass(ctx.SSHClient, execFn)
+		if bpReport.Success {
+			ctx.ConsoleWritef("[#22c55e]✓ %s[-]\n", bpReport.Details)
+		} else {
+			ctx.ConsoleWritef("[#eab308]⚠️ %s[-]\n", bpReport.Details)
+		}
 		FinishAndExit(ctx, true, "")
 	} else {
 		ctx.ConsoleWritef("[#eab308]⚠️ Подписка сохранена, статус проверки: %s[-]\n", result.Reason)

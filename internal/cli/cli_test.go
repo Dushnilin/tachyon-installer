@@ -63,4 +63,10 @@ func TestParseFlags_HeadlessTriggers(t *testing.T) {
 	if err != nil || !optsUpd.ShouldRunHeadless() || !optsUpd.CheckUpdate {
 		t.Errorf("expected -check-update to trigger headless mode")
 	}
+
+	// 7. -switch-engine
+	optsSwitch, err := ParseFlags([]string{"-switch-engine", "sing-box-tiny"}, cfg, "v1.5.0")
+	if err != nil || !optsSwitch.ShouldRunHeadless() || optsSwitch.SwitchEngine != "sing-box-tiny" {
+		t.Errorf("expected -switch-engine to trigger headless mode with engine sing-box-tiny")
+	}
 }

@@ -44,6 +44,7 @@ type Options struct {
 	RunRestore     string
 	ListBackups    bool
 	CheckUpdate    bool
+	SwitchEngine   string
 	Yes            bool
 	AppVersion     string
 }
@@ -67,6 +68,7 @@ func ParseFlags(args []string, defaultCfg *appconfig.Config, appVersion string) 
 	fs.StringVar(&opts.Password, "pass", "", "SSH пароль")
 	fs.StringVar(&opts.KeyPath, "key", defaultCfg.KeyPath, "Путь к SSH приватному ключу")
 	fs.StringVar(&opts.Engine, "engine", defaultCfg.SelectedEngine, "Ядро прокси: sing-box-extended, sing-box-extended-compressed, sing-box-tiny, sing-box-lx, steer, steer-extended, skip")
+	fs.StringVar(&opts.SwitchEngine, "switch-engine", "", "Горячая смена ядра прокси на роутере без переустановки LuCI")
 	fs.StringVar(&opts.Mirror, "mirror", defaultCfg.SelectedMirror, "Зеркало загрузки GitHub: auto, direct, https://gh-proxy.com/ и др.")
 	fs.StringVar(&opts.Version, "version", defaultCfg.TachyonVersion, "Версия Tachyon: latest или тег релиза (например 1.4.9)")
 	fs.BoolVar(&opts.InstallI18n, "i18n", defaultCfg.InstallI18n, "Установить русскую локализацию LuCI")
@@ -90,7 +92,7 @@ func ParseFlags(args []string, defaultCfg *appconfig.Config, appVersion string) 
 
 // ShouldRunHeadless checks if flags request non-interactive execution.
 func (o *Options) ShouldRunHeadless() bool {
-	return o.RunDiag || o.RunUninstall || o.RunRestore != "" || o.ListBackups || o.CheckUpdate || o.Yes
+	return o.RunDiag || o.RunUninstall || o.RunRestore != "" || o.ListBackups || o.CheckUpdate || o.SwitchEngine != "" || o.Yes
 }
 
 // Run executes non-interactive CLI operations.
@@ -212,7 +214,54 @@ func Run(opts *Options) int {
 		return 0
 	}
 
-	// 6. Automated Express Installation
+	// 6. Switch Engine (Hot-Swap)
+	if opts.SwitchEngine != "" {
+		fmt.Printf("⚡ Горячая смена ядра на [%s]...\n", opts.SwitchEngine)
+		detectedArch := routerpkg.DetectArch(client)
+		distribArch := routerpkg.DetectRawArch(client)
+		if distribArch == "" {
+			distribArch = detectedArch
+		}
+		logFn := func(msg string) { fmt.Print(msg) }
+		err := deploypkg.HotSwapEngine(
+			context.Background(),
+			client,
+			opts.SwitchEngine,
+			opts.Mirror,
+			isAPK,
+			distribArch,
+			detectedArch,
+			logFn,
+		)
+		if err != nil {
+			fmt.Printf("❌ Сбой горячей смены ядра: %v\n", err)
+			return 1
+		}
+
+		execFn := func(_ *gossh.Client, cmd string) (string, error) {
+			sess, err := client.NewSession()
+			if err != nil {
+				return "", err
+			}
+			defer sess.Close()
+			out, err := sess.CombinedOutput(cmd)
+			return string(out), err
+		}
+
+		fmt.Println("\n⚡ Проверка сквозного обхода через роутер...")
+		bypassRes := routerpkg.TestBypass(client, execFn)
+		if bypassRes.Success {
+			fmt.Printf("  ✓ %s\n", bypassRes.Details)
+		} else {
+			fmt.Printf("  ⚠️ %s\n", bypassRes.Details)
+		}
+
+		luciURL := fmt.Sprintf("http://%s/cgi-bin/luci/admin/services/tachyon", opts.RouterIP)
+		fmt.Printf("\n✓ Горячая смена ядра завершена!\nВеб-интерфейс: %s\n", luciURL)
+		return 0
+	}
+
+	// 7. Automated Express Installation
 	if opts.Yes {
 		return runHeadlessInstall(client, isAPK, opts)
 	}
@@ -357,13 +406,23 @@ func runHeadlessInstall(client *gossh.Client, isAPK bool, opts *Options) int {
 
 	time.Sleep(3 * time.Second)
 	checkRes := routerpkg.VerifyAndFallback(client, execCmd, progFn)
+
+	fmt.Println("\n⚡ Проверка сквозного обхода блокировок через роутер...")
+	bypassRes := routerpkg.TestBypass(client, execCmd)
+	if bypassRes.Success {
+		fmt.Printf("  ✓ %s\n", bypassRes.Details)
+	} else {
+		fmt.Printf("  ⚠️ %s\n", bypassRes.Details)
+	}
+
+	luciURL := fmt.Sprintf("http://%s/cgi-bin/luci/admin/services/tachyon", opts.RouterIP)
 	if checkRes.OK {
 		fmt.Println("\n🎉 УСТАНОВКА УСПЕШНО ЗАВЕРШЕНА!")
-		fmt.Println("Панель управления доступна в веб-интерфейсе LuCI -> Службы -> Tachyon.")
+		fmt.Printf("Панель управления доступна в веб-интерфейсе LuCI: %s\n", luciURL)
 		return 0
 	}
 
-	fmt.Printf("\n⚠️ Установка завершена, но служба сообщила: %s\n", checkRes.Reason)
+	fmt.Printf("\n⚠️ Установка завершена, но служба сообщила: %s\nВеб-интерфейс: %s\n", checkRes.Reason, luciURL)
 	return 0
 }
 

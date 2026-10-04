@@ -43,6 +43,7 @@ type AppContext struct {
 	// Callbacks provided by the installer orchestrator.
 	OnProfileReady func(profile *routerpkg.RouterProfile)
 	OnStartInstall func(opts InstallOptions)
+	OnHotSwap      func(engineKey, mirrorKey string)
 	OnSaveSub      func(subURL string)
 	OnSkipSub      func()
 
@@ -173,8 +174,9 @@ func PrintFinalResultsToConsole(ctx *AppContext, success bool, archiveVer string
 	if ctx.Config != nil {
 		ip = ctx.Config.RouterIP
 	}
+	luciURL := fmt.Sprintf("http://%s/cgi-bin/luci/admin/services/tachyon", ip)
 	ctx.ConsoleWrite(fmt.Sprintf("  [#22c55e]✅[-] Tachyon Core: [#f8fafc]v%s[-]\n", archiveVer))
-	ctx.ConsoleWrite(fmt.Sprintf("  [#22c55e]✅[-] LuCI Web: [#f8fafc]http://%s/cgi-bin/luci/admin/services/tachyon[-]\n", ip))
+	ctx.ConsoleWrite(fmt.Sprintf("  [#22c55e]✅[-] LuCI Web: [#f8fafc]%s[-]\n", luciURL))
 	ctx.ConsoleWrite(fmt.Sprintf("  [#22c55e]✅[-] SSH: [#f8fafc]ssh root@%s[-]\n\n", ip))
 	if ctx.FirewallNotReady {
 		ctx.ConsoleWrite("  [#eab308]⚠ Правила firewall fw4 не применились: таблица ещё не была загружена.[-]\n")
@@ -187,6 +189,6 @@ func PrintFinalResultsToConsole(ctx *AppContext, success bool, archiveVer string
 	if ctx.LogPath != "" {
 		ctx.ConsoleWrite(fmt.Sprintf("  [#94a3b8]Полный лог установки: %s[-]\n\n", ctx.LogPath))
 	}
-	ctx.ConsoleWrite("  [#cbd5e1]Вы можете закрыть окно (нажмите Esc или Ctrl+C) и открыть веб-интерфейс:[-]\n")
-	ctx.ConsoleWrite(fmt.Sprintf("  [#38bdf8]http://%s/cgi-bin/luci/admin/services/tachyon[-]\n\n", ip))
+	ctx.ConsoleWrite("  [#38bdf8:b]🚀 Нажмите [O] (или выберите в окне), чтобы открыть LuCI в браузере![-]\n")
+	ctx.ConsoleWrite("  [#64748b]Клавиши: [O] открыть браузер · [Enter / Esc / Q] закрыть программу[-]\n\n")
 }

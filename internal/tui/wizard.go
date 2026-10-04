@@ -357,6 +357,14 @@ func ShowOptionsWizard(ctx *AppContext, profile ProfileData) {
 		ShowDiagnosticsWizard(ctx, "options_wizard")
 	}
 
+	optSelector.OnHotSwap = func(engineKey, mirrorKey string) {
+		if ctx.OnHotSwap != nil {
+			ctx.Pages.SwitchToPage("progress")
+			ctx.App.SetFocus(ctx.ConsoleView)
+			ctx.OnHotSwap(engineKey, mirrorKey)
+		}
+	}
+
 	optSelector.OnBack = func() {
 		ctx.Pages.SwitchToPage("password_wizard")
 		ctx.App.SetFocus(ctx.Pages.GetPage("password_wizard"))

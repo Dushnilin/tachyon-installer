@@ -10,6 +10,7 @@ import (
 
 	"tachyon-installer/internal/cli"
 	appconfig "tachyon-installer/internal/config"
+	deploypkg "tachyon-installer/internal/deploy"
 	routerpkg "tachyon-installer/internal/router"
 	sshpkg "tachyon-installer/internal/ssh"
 	"tachyon-installer/internal/tui"
@@ -121,6 +122,96 @@ func main() {
 	ctx.OnStartInstall = func(opts tui.InstallOptions) {
 		ctx.Installing = true
 		tui.RunExpressInstall(ctx, opts)
+	}
+
+	ctx.OnHotSwap = func(engineKey, mirrorKey string) {
+		ctx.Installing = true
+		go func() {
+			ctx.ConsoleWritef("\n[#38bdf8:b]====================================================\n")
+			ctx.ConsoleWritef("⚡ БЫСТРАЯ СМЕНА ЯДРА (HOT-SWAP) НА [%s]\n", engineKey)
+			ctx.ConsoleWritef("====================================================[-]\n\n")
+
+			if ctx.ProgressView != nil {
+				ctx.ProgressView.SetStep(1, "1/3: Подготовка и загрузка ядра")
+				ctx.ProgressView.StartAnimation(ctx.App)
+			}
+
+			client := ctx.SSHClient
+			if client == nil {
+				var err error
+				client, err = ctx.Reconnect()
+				if err != nil {
+					ctx.ConsoleWritef("[#ef5350]❌ Ошибка SSH подключения: %v[-]\n", err)
+					tui.FinishAndExit(ctx, false, "")
+					return
+				}
+				ctx.SSHClient = client
+			}
+
+			isAPK := routerpkg.IsAPKPackage(client)
+			detectedArch := routerpkg.DetectArch(client)
+			distribArch := routerpkg.DetectRawArch(client)
+			if distribArch == "" {
+				distribArch = detectedArch
+			}
+
+			logFn := func(msg string) {
+				ctx.ConsoleWrite(msg)
+			}
+
+			if ctx.ProgressView != nil {
+				ctx.ProgressView.SetStep(2, "2/3: Активация ядра и настройка UCI")
+			}
+
+			err := deploypkg.HotSwapEngine(
+				context.Background(),
+				client,
+				engineKey,
+				mirrorKey,
+				isAPK,
+				distribArch,
+				detectedArch,
+				logFn,
+			)
+
+			if err != nil {
+				ctx.ConsoleWritef("\n[#ef5350]❌ Сбой смены ядра: %v[-]\n", err)
+				tui.FinishAndExit(ctx, false, "")
+				return
+			}
+
+			if ctx.ProgressView != nil {
+				ctx.ProgressView.SetStep(3, "3/3: Проверка службы и сквозного обхода")
+			}
+
+			execFn := func(_ *gossh.Client, cmd string) (string, error) {
+				sess, err := client.NewSession()
+				if err != nil {
+					return "", err
+				}
+				defer sess.Close()
+				out, err := sess.CombinedOutput(cmd)
+				return string(out), err
+			}
+
+			progFn := func(label string, frac float64) {}
+			checkRes := routerpkg.VerifyAndFallback(client, execFn, progFn)
+			if !checkRes.OK {
+				ctx.ConsoleWritef("[#eab308]⚠️ Служба сообщила: %s[-]\n", checkRes.Reason)
+			} else {
+				ctx.ConsoleWrite("[#22c55e]✓ Служба успешно активирована и запущена![-]\n")
+			}
+
+			ctx.ConsoleWrite("[#cbd5e1]⚡ Сквозная проверка обхода блокировок и Fake-IP с роутера...[-]\n")
+			bpReport := routerpkg.TestBypass(client, execFn)
+			if bpReport.Success {
+				ctx.ConsoleWritef("[#22c55e]✓ %s[-]\n", bpReport.Details)
+			} else {
+				ctx.ConsoleWritef("[#eab308]⚠️ %s[-]\n", bpReport.Details)
+			}
+
+			tui.FinishAndExit(ctx, checkRes.OK, "")
+		}()
 	}
 
 	ctx.OnSaveSub = func(url string) {

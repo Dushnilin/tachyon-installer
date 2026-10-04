@@ -17,8 +17,12 @@
   <img src="assets/readme/divider_stream.svg" width="100%" alt="divider" />
 </p>
 
-## 🔍 Key Highlights (v1.4)
+## 🔍 Key Highlights (v1.5)
 
+- **⚡ Instant 1-Line Bootstrap**: Launch directly in console without manual downloading via PowerShell (`irm ... | iex`) or Linux/macOS (`curl | bash`).
+- **⚡ Engine Hot-Swap**: Swap routing engines (`sing-box-extended`, `sing-box-tiny`, `steer`, `steer-extended`) in ~3 seconds without reinstalling LuCI or clearing subscriptions — via `--switch-engine` or hotkey `S` in TUI.
+- **🧪 End-to-End Bypass & Fake-IP Check**: Verifies router Fake-IP DNS interception (`198.18.0.0/15`) and probes `youtube.com` latency (ms) directly through the router proxy pipeline.
+- **🌐 1-Click LuCI Launch**: Completion modal and global hotkey `O` instantly launch the Tachyon LuCI web panel in your default system browser.
 - **🖥️ Dual Mode (Interactive TUI + Headless CLI)**: Beautiful zinc terminal dashboard with mouse & arrow keys support, plus automated unattended CLI execution (`--yes`, `--ip`, `--pass`, `--engine`, `--zram`).
 - **🧠 Hardware-Aware Intelligence**: Real-time evaluation of router RAM/Flash with smart core recommendations; optional automatic activation of **zRAM-swap** for OOM prevention on constrained routers (<128 MB RAM).
 - **⏱️ Router Clock Sync & WAN Health**: Automatically synchronizes router clock with host PC UTC time (`date -u -s`) to prevent TLS/certificate validation failures; tests WAN routing and DNS.
@@ -82,7 +86,25 @@ The installation executes across 5 autonomous stages:
 
 ## 🚀 Quick Start
 
-### 1. Download Pre-Built Binaries
+### ⚡ Instant 1-Line Bootstrap (No Manual Download)
+
+Similar to Microsoft Activation Scripts (MAS), you can launch Tachyon Express Installer with a single command directly inside your terminal. It auto-detects OS and architecture (x64 / arm64 / Apple Silicon), downloads the binary via the nearest reliable mirror, and runs it right in your console:
+
+**Windows (PowerShell):**
+```powershell
+irm https://raw.githubusercontent.com/Dushnilin/tachyon-installer/main/install.ps1 | iex
+```
+*(Fallback mirror if GitHub is blocked:* `irm https://gh-proxy.com/https://raw.githubusercontent.com/Dushnilin/tachyon-installer/main/install.ps1 | iex`*)*
+
+**Linux & macOS (Terminal):**
+```bash
+curl -fsSL https://raw.githubusercontent.com/Dushnilin/tachyon-installer/main/install.sh | bash
+```
+*(Fallback mirror:* `curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/Dushnilin/tachyon-installer/main/install.sh | bash`*)*
+
+---
+
+### 1. Download Pre-Built Binaries Manually (Optional)
 
 Grab the executable for your OS from **[GitHub Releases](https://github.com/Dushnilin/tachyon-installer/releases)**:
 
@@ -114,14 +136,18 @@ Follow the on-screen TUI wizard:
 1. Enter router IP (default `192.168.1.1`), SSH port (`22`), and username (`root`).
 2. Provide your router admin password.
 3. Review the live pre-flight hardware diagnostics summary.
-4. Select your preferred proxy engine, Tachyon version, and mirror on the dashboard.
+4. Select your preferred proxy engine, Tachyon version, and mirror on the dashboard (or press `S` to hot-swap engine only).
 5. Press **«Start Installation»** (`Enter`) to deploy.
+6. Upon completion, press `O` to launch the LuCI panel in your browser!
 
 ### 3. Headless Automation (Unattended CLI)
 
 For script-based automation, CI/CD pipelines, or execution without launching the interactive TUI, use command-line flags:
 
 ```bash
+# Hot-swap routing engine to sing-box-tiny in ~3 seconds (without LuCI reinstallation)
+./tachyon-installer -ip 192.168.1.1 -pass "secret" -switch-engine sing-box-tiny
+
 # Automated express installation with steer engine and zRAM-swap
 ./tachyon-installer -ip 192.168.1.1 -pass "secret" -engine steer -zram -yes
 
