@@ -225,6 +225,12 @@ uci commit dhcp
 
 // ApplyDNSConfig executes DNS configuration directly on the router.
 func ApplyDNSConfig(client *gossh.Client, execFn sshutil.ExecFunc, resolver DNSResolver) error {
+	// 1. If Tachyon is installed on the router, attempt native dns_autotune
+	autotuneCmd := `[ -x /usr/bin/tachyon ] && /usr/bin/tachyon dns_autotune --apply 2>/dev/null && echo "AUTOTUNE_OK" || echo ""`
+	if out, _ := execFn(client, autotuneCmd); strings.Contains(out, "AUTOTUNE_OK") {
+		return nil
+	}
+
 	cmd := GenerateApplyDNSCommand(resolver)
 	_, err := execFn(client, cmd)
 	if err != nil {

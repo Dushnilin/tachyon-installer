@@ -1,10 +1,12 @@
 package router
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	gossh "golang.org/x/crypto/ssh"
 	sshutil "tachyon-installer/internal/ssh"
@@ -95,7 +97,63 @@ func RunDPIFuzzer(client *gossh.Client, execFn sshutil.ExecFunc, progressFn DPIF
 		ActiveEngine: activeEngine,
 	}
 
-	// 2. Fuzzing script executed on the router
+	// 2. Check if Tachyon's native router-side combinatorial fuzzer is available
+	checkNativeCmd := `[ -x /usr/bin/tachyon ] && /usr/bin/tachyon fuzzer_status >/dev/null 2>&1 && echo "NATIVE_FUZZER" || echo ""`
+	if nativeCheck, err := execFn(client, checkNativeCmd); err == nil && strings.Contains(nativeCheck, "NATIVE_FUZZER") {
+		// Trigger native router-side fuzzer
+		_, _ = execFn(client, `/usr/bin/tachyon fuzzer_start zapret2 youtube 2>/dev/null || /usr/bin/tachyon fuzzer_start all 2>/dev/null || true`)
+		for i := 0; i < 5; i++ {
+			time.Sleep(1 * time.Second)
+			rawStatus, err := execFn(client, `/usr/bin/tachyon fuzzer_status 2>/dev/null`)
+			if err == nil && strings.Contains(rawStatus, "best_strategy") {
+				var status struct {
+					BestStrategy *struct {
+						ID        string `json:"id"`
+						Name      string `json:"name"`
+						Args      string `json:"args"`
+						Score     int    `json:"score"`
+						LatencyMs int64  `json:"latency_ms"`
+					} `json:"best_strategy"`
+					Strategies []struct {
+						ID        string `json:"id"`
+						Name      string `json:"name"`
+						Args      string `json:"args"`
+						Score     int    `json:"score"`
+						LatencyMs int64  `json:"latency_ms"`
+					} `json:"strategies"`
+				}
+				if jsonErr := json.Unmarshal([]byte(rawStatus), &status); jsonErr == nil && status.BestStrategy != nil && status.BestStrategy.Args != "" {
+					win := DPIStrategy{
+						ID:           status.BestStrategy.ID,
+						Name:         status.BestStrategy.Name,
+						Badge:        "★ Роутерный фаззер",
+						Description:  "Подобрана встроенным комбинаторным фаззером Tachyon прямо на роутере",
+						TCPArgs:      status.BestStrategy.Args,
+						SuccessRate:  status.BestStrategy.Score,
+						AvgLatencyMs: status.BestStrategy.LatencyMs,
+						YouTubeOK:    true,
+						DiscordOK:    true,
+						DomesticOK:   true,
+					}
+					report.WinningStrategy = &win
+					report.Tested = []DPIStrategy{win}
+					for _, s := range status.Strategies {
+						report.Tested = append(report.Tested, DPIStrategy{
+							ID:           s.ID,
+							Name:         s.Name,
+							TCPArgs:      s.Args,
+							SuccessRate:  s.Score,
+							AvgLatencyMs: s.LatencyMs,
+						})
+					}
+					report.Details = fmt.Sprintf("Родной фаззер Tachyon на роутере: %s (Успех: %d%%, %d мс)", win.Name, win.SuccessRate, win.AvgLatencyMs)
+					return report
+				}
+			}
+		}
+	}
+
+	// 3. Fallback: Fuzzing probe executed directly in shell on the router
 	// Probes YouTube, Discord, and control Russian site
 	fuzzScript := `
 probe_target() {
@@ -258,6 +316,15 @@ fi
 
 // ApplyDPIStrategy applies the chosen DPI strategy on the router.
 func ApplyDPIStrategy(client *gossh.Client, execFn sshutil.ExecFunc, strategy DPIStrategy) error {
+	// 1. If Tachyon is installed and strategy ID is set, attempt native router apply
+	if strategy.ID != "" {
+		nativeApplyCmd := fmt.Sprintf(`[ -x /usr/bin/tachyon ] && /usr/bin/tachyon fuzzer_apply '%s' 2>/dev/null && echo "APPLIED_NATIVE" || echo ""`, strategy.ID)
+		if out, err := execFn(client, nativeApplyCmd); err == nil && strings.Contains(out, "APPLIED_NATIVE") {
+			return nil
+		}
+	}
+
+	// 2. Direct configuration fallback
 	cmd := GenerateApplyDPIStrategyScript(strategy)
 	_, err := execFn(client, cmd)
 	if err != nil {
