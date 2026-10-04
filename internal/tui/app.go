@@ -73,6 +73,8 @@ type AppContext struct {
 	DiagOnly bool
 	// RescueOnly makes the wizard run emergency rescue directly after connecting.
 	RescueOnly bool
+	// GuidedOnly makes the wizard open the hand-in-hand autopilot setup modal directly.
+	GuidedOnly bool
 	// AppVersion is the version of tachyon-installer.
 	AppVersion string
 }

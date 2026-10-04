@@ -87,6 +87,10 @@ The installation executes across 5 autonomous stages:
    - Atomic package installation and placement of the selected routing engine.
    - Validates systemd/procd service status, nftables rules, FakeIP DNS, and leak prevention.
    - Optional 1-click subscription URL testing and configuration.
+6. **✨ Intelligent Autopilot Setup Wizard**:
+   - Automated DNS poisoning detection and fast DoH upstream benchmarking.
+   - Built-in **DPI Fuzzer** testing YouTube & Discord to detect the winning evasion strategy.
+   - 1-click TCP BBR network tuning and end-to-end scorecard verification.
 
 <p align="center">
   <img src="assets/readme/divider_stream.svg" width="100%" alt="divider" />
@@ -158,6 +162,9 @@ For script-based automation, CI/CD pipelines, or execution without launching the
 
 # In-place self-update to the newest release on GitHub
 ./tachyon-installer -self-update
+
+# Intelligent guided autopilot setup (DNS tester + DPI fuzzer + BBR network tuning)
+./tachyon-installer -ip 192.168.1.1 -pass "secret" -wizard
 
 # Emergency rescue: flush interception rules and recover native internet
 ./tachyon-installer -ip 192.168.1.1 -pass "secret" -rescue

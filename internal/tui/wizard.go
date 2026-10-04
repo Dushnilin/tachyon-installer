@@ -76,21 +76,31 @@ func ShowWelcomeWizard(ctx *AppContext) {
 
 	step1Form = tview.NewForm()
 	StyleForm(step1Form)
+	step1Form.AddButton("✨ Мастер (Автопилот)", func() {
+		ctx.DiagOnly = false
+		ctx.RescueOnly = false
+		ctx.GuidedOnly = true
+		ctx.Pages.SwitchToPage("ssh_wizard")
+		ctx.App.SetFocus(step2Form)
+	})
 	step1Form.AddButton("Установить →", func() {
 		ctx.DiagOnly = false
 		ctx.RescueOnly = false
+		ctx.GuidedOnly = false
 		ctx.Pages.SwitchToPage("ssh_wizard")
 		ctx.App.SetFocus(step2Form)
 	})
 	step1Form.AddButton("🔍 Диагностика", func() {
 		ctx.DiagOnly = true
 		ctx.RescueOnly = false
+		ctx.GuidedOnly = false
 		ctx.Pages.SwitchToPage("ssh_wizard")
 		ctx.App.SetFocus(step2Form)
 	})
 	step1Form.AddButton("🚑 Rescue", func() {
 		ctx.DiagOnly = false
 		ctx.RescueOnly = true
+		ctx.GuidedOnly = false
 		ctx.Pages.SwitchToPage("ssh_wizard")
 		ctx.App.SetFocus(step2Form)
 	})
@@ -387,6 +397,10 @@ func ShowOptionsWizard(ctx *AppContext, profile ProfileData) {
 
 	optSelector.OnSelfUpdate = func() {
 		ShowSelfUpdateModal(ctx, "options_wizard", ctx.AppVersion)
+	}
+
+	optSelector.OnGuidedSetup = func() {
+		ShowGuidedSetupModal(ctx, "options_wizard")
 	}
 
 	optSelector.OnHotSwap = func(engineKey, mirrorKey string) {

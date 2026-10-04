@@ -53,6 +53,7 @@ type Options struct {
 	TestSub        string
 	SelfUpdate     bool
 	TuneNetwork    bool
+	GuidedSetup    bool
 	Yes            bool
 	AppVersion     string
 }
@@ -90,6 +91,9 @@ func ParseFlags(args []string, defaultCfg *appconfig.Config, appVersion string) 
 	fs.BoolVar(&opts.CheckUpdate, "check-update", false, "Проверить наличие обновлений программы на GitHub")
 	fs.BoolVar(&opts.SelfUpdate, "self-update", false, "Автоматическое обновление программы установщика до последней версии с GitHub")
 	fs.BoolVar(&opts.TuneNetwork, "tune-network", false, "Оптимизировать сетевой стек роутера (TCP BBR, fq_codel, rmem/wmem, conntrack, offloading)")
+	fs.BoolVar(&opts.GuidedSetup, "wizard", false, "Мастер быстрой первоначальной настройки (автопилот под ключ)")
+	fs.BoolVar(&opts.GuidedSetup, "guided", false, "Алиас для -wizard")
+	fs.BoolVar(&opts.GuidedSetup, "autopilot", false, "Алиас для -wizard")
 	fs.BoolVar(&opts.RunRescue, "rescue", false, "Аварийный сброс правил перехвата и восстановление прямого интернета")
 	fs.BoolVar(&opts.FixConflicts, "fix-conflicts", false, "Отключить конфликтующие прокси-пакеты (passwall, openclash, zapret и др.)")
 	fs.BoolVar(&opts.FullSnapshot, "snapshot", false, "Создать полный бэкап настроек сети, dhcp, firewall и Tachyon")
@@ -108,7 +112,7 @@ func ParseFlags(args []string, defaultCfg *appconfig.Config, appVersion string) 
 
 // ShouldRunHeadless checks if flags request non-interactive execution.
 func (o *Options) ShouldRunHeadless() bool {
-	return o.RunDiag || o.RunUninstall || o.RunRestore != "" || o.ListBackups || o.CheckUpdate || o.SelfUpdate || o.TuneNetwork || o.SwitchEngine != "" || o.RunRescue || o.FixConflicts || o.FullSnapshot || o.OfflineBundle != "" || o.RunMonitor || o.TestSub != "" || o.Yes
+	return o.RunDiag || o.RunUninstall || o.RunRestore != "" || o.ListBackups || o.CheckUpdate || o.SelfUpdate || o.TuneNetwork || o.GuidedSetup || o.SwitchEngine != "" || o.RunRescue || o.FixConflicts || o.FullSnapshot || o.OfflineBundle != "" || o.RunMonitor || o.TestSub != "" || o.Yes
 }
 
 // Run executes non-interactive CLI operations.
@@ -360,7 +364,96 @@ func Run(opts *Options) int {
 		return 0
 	}
 
-	// 10. Uninstall
+	// 10. Guided Autopilot Setup
+	if opts.GuidedSetup {
+		fmt.Printf("==> 🚀 МАСТЕР БЫСТРОЙ НАСТРОЙКИ (АВТОПИЛОТ ПОД КЛЮЧ)\n\n")
+		execCmd := func(_ *gossh.Client, cmd string) (string, error) {
+			sess, err := client.NewSession()
+			if err != nil {
+				return "", err
+			}
+			defer sess.Close()
+			out, err := sess.CombinedOutput(cmd)
+			return string(out), err
+		}
+
+		fmt.Println("⚡ [1/5] Сканирование оборудования и роутера...")
+		profile, err := routerpkg.RunPreConnectionCheck(client)
+		if err == nil {
+			fmt.Printf("  • Модель: %s, Архитектура: %s, ОЗУ: %.0f МБ\n", profile.Model, profile.Arch, profile.RAMTotal)
+		}
+
+		fmt.Println("⚡ [2/5] DNS-тестирование: проверка отравления UDP 53 и подбор резолвера...")
+		dnsReport := routerpkg.RunDNSTest(client, execCmd)
+		if dnsReport.UDPPoisoned {
+			fmt.Printf("  ⚠️ Провайдер подменяет обычный DNS (спуфинг): %s\n", dnsReport.PoisonDetail)
+		} else {
+			fmt.Println("  ✓ Прямой DNS не отравлен провайдером")
+		}
+		var chosenDNS routerpkg.DNSResolver
+		if dnsReport.Fastest != nil {
+			chosenDNS = *dnsReport.Fastest
+			fmt.Printf("  ✓ Выбран быстрейший защищенный DNS: %s (%d мс)\n", chosenDNS.Name, chosenDNS.LatencyMs)
+		} else {
+			chosenDNS = routerpkg.DefaultDNSResolvers()[0]
+			fmt.Printf("  ✓ Выбран DNS по умолчанию: %s\n", chosenDNS.Name)
+		}
+
+		fmt.Println("⚡ [3/5] DPI Fuzzer: подбор оптимальной стратегии обхода YouTube и Discord...")
+		fuzzReport := routerpkg.RunDPIFuzzer(client, execCmd, nil)
+		var chosenStrat routerpkg.DPIStrategy
+		if fuzzReport.WinningStrategy != nil {
+			chosenStrat = *fuzzReport.WinningStrategy
+			fmt.Printf("  ✓ Выбрана победившая стратегия: %s (Успех: %d%%, Задержка: %d мс)\n", chosenStrat.Name, chosenStrat.SuccessRate, chosenStrat.AvgLatencyMs)
+		} else {
+			chosenStrat = routerpkg.DefaultDPIStrategies()[0]
+			fmt.Printf("  ✓ Выбрана базовая стратегия: %s\n", chosenStrat.Name)
+		}
+
+		fmt.Println("⚡ [4/5] Применение конфигурации под ключ и сетевой тюнинг...")
+		plan := routerpkg.GuidedSetupPlan{
+			Mode:           routerpkg.ModeStandaloneDPI,
+			ChosenDNS:      chosenDNS,
+			ChosenStrategy: chosenStrat,
+			SelectedEngine: "steer",
+			EnableTune:     true,
+		}
+		if opts.Subscription != "" {
+			plan.Mode = routerpkg.ModeTunnel
+			plan.SubscriptionURL = opts.Subscription
+			plan.SelectedEngine = "sing-box"
+		}
+
+		res, err := routerpkg.RunGuidedSetup(client, execCmd, plan, func(title string, frac float64) {
+			fmt.Printf("  • %s\n", title)
+		})
+		if err != nil {
+			fmt.Printf("❌ Сбой применения: %v\n", err)
+			return 1
+		}
+
+		fmt.Println("\n⚡ [5/5] Финальный скоркарт результатов:")
+		fmt.Printf("  • DNS: %s (Задержка: %d мс) ✓\n", res.DNSName, res.DNSLatencyMs)
+		if res.StrategyApplied {
+			fmt.Printf("  • DPI-стратегия: %s ✓\n", res.StrategyName)
+		}
+		if res.NetworkTuned {
+			fmt.Println("  • Сетевой стек: TCP BBR + адаптивные буферы + flow offloading ✓")
+		}
+		for _, p := range res.VerifyResult.Probes {
+			if p.Success {
+				fmt.Printf("  • %-16s HTTP %d (%d мс) ✓\n", p.Name+":", p.HTTPStatus, p.LatencyMs)
+			} else {
+				fmt.Printf("  • %-16s HTTP %d\n", p.Name+":", p.HTTPStatus)
+			}
+		}
+
+		fmt.Println("\n🎉 НАСТРОЙКА ПОД КЛЮЧ УСПЕШНО ЗАВЕРШЕНА!")
+		fmt.Printf("Веб-интерфейс LuCI доступен: http://%s\n", opts.RouterIP)
+		return 0
+	}
+
+	// 11. Uninstall
 	if opts.RunUninstall {
 		fmt.Println("⚡ Запуск чистого удаления Tachyon...")
 		out, err := deploypkg.UninstallTachyon(client, isAPK)

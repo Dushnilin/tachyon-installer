@@ -117,5 +117,16 @@ func TestParseFlags_HeadlessTriggers(t *testing.T) {
 	if err != nil || !optsTune.ShouldRunHeadless() || !optsTune.TuneNetwork {
 		t.Errorf("expected -tune-network to trigger headless mode")
 	}
+
+	// 16. -wizard / -guided / -autopilot
+	optsWiz, err := ParseFlags([]string{"-wizard"}, cfg, "v1.6.2")
+	if err != nil || !optsWiz.ShouldRunHeadless() || !optsWiz.GuidedSetup {
+		t.Errorf("expected -wizard to trigger headless mode")
+	}
+
+	optsGuided, err := ParseFlags([]string{"-guided"}, cfg, "v1.6.2")
+	if err != nil || !optsGuided.ShouldRunHeadless() || !optsGuided.GuidedSetup {
+		t.Errorf("expected -guided to trigger headless mode")
+	}
 }
 
