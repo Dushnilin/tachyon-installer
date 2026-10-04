@@ -1,0 +1,30 @@
+# Binaries
+tachyon-installer
+tachyon-installer.exe
+*.exe
+
+# Staging & Temp files
+temp_install/
+temp_*/
+staging/
+*.part
+
+# Local configs with router credentials
+manager_config.json
+tachyon_installer.json
+
+# Backups
+backups/*.tar.gz
+backups/*.zip
+
+# IDE & OS
+.idea/
+.vscode/
+*.swp
+*~
+Thumbs.db
+.DS_Store
+
+
+# Build outputs
+dist/

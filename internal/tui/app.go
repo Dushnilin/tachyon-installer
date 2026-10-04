@@ -1,0 +1,170 @@
+package tui
+
+import (
+	"fmt"
+	"regexp"
+	"strings"
+
+	"github.com/gdamore/tcell/v2"
+	"github.com/rivo/tview"
+	"golang.org/x/crypto/ssh"
+
+	appconfig "tachyon-installer/internal/config"
+	routerpkg "tachyon-installer/internal/router"
+	sshpkg "tachyon-installer/internal/ssh"
+	"tachyon-installer/internal/tui/widgets"
+)
+
+// ansiRegex is compiled once for stripping ANSI escape codes from remote output.
+var ansiRegex = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
+
+// StripANSI removes ANSI escape sequences from a string.
+func StripANSI(str string) string {
+	return ansiRegex.ReplaceAllString(str, "")
+}
+
+// InstallOptions holds the parameters chosen by the user in the wizard.
+type InstallOptions struct {
+	TachyonVersion string
+	SelectedEngine string
+	SelectedMirror string
+	InstallI18n    bool
+}
+
+// AppContext holds all shared state for the TUI application.
+type AppContext struct {
+	App         *tview.Application
+	Pages       *tview.Pages
+	ConsoleView *tview.TextView
+	Config      *appconfig.Config
+	SSHClient   *ssh.Client
+
+	// Callbacks provided by the installer orchestrator.
+	OnProfileReady func(profile *routerpkg.RouterProfile)
+	OnStartInstall func(opts InstallOptions)
+	OnSaveSub      func(subURL string)
+	OnSkipSub      func()
+
+	// Reconnect function for resilient SSH.
+	Reconnect func() (*ssh.Client, error)
+
+	// ProgressView displays the current installation step/progress bar.
+	ProgressView *widgets.ProgressBar
+
+	// CancelModalShown tracks whether the Ctrl+C modal is visible.
+	CancelModalShown bool
+	Installing       bool
+
+	// Final Results for native terminal output
+	HasFinalResult  bool
+	FinalSuccess    bool
+	FinalArchiveVer string
+}
+
+// ExecSSH executes a command on the router with reconnection support.
+func (ctx *AppContext) ExecSSH(cmd string) (string, error) {
+	return sshpkg.Exec(ctx.SSHClient, cmd, ctx.Reconnect)
+}
+
+// ConsoleWrite writes text to the console view (keeps tview color tags).
+func (ctx *AppContext) ConsoleWrite(text string) {
+	clean := strings.ReplaceAll(text, "\r", "")
+	go ctx.App.QueueUpdateDraw(func() {
+		ctx.ConsoleView.Write([]byte(clean))
+		ctx.ConsoleView.ScrollToEnd()
+	})
+}
+
+// ConsoleWritef writes formatted text to the console view (keeps tview color tags).
+func (ctx *AppContext) ConsoleWritef(format string, args ...any) {
+	ctx.ConsoleWrite(fmt.Sprintf(format, args...))
+}
+
+// SetSubTask updates the sub-task progress bar.
+func (ctx *AppContext) SetSubTask(label string, fraction float64) {
+	if ctx.ProgressView != nil {
+		ctx.ProgressView.SetSubTask(label, fraction)
+	}
+}
+
+// SetupGracefulShutdown intercepts Ctrl+C and shows a confirmation modal.
+func SetupGracefulShutdown(ctx *AppContext) {
+	ctx.App.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyCtrlC {
+			if ctx.Installing && !ctx.CancelModalShown {
+				showCancelModal(ctx)
+				return nil
+			}
+			ctx.App.Stop()
+			return nil
+		}
+		return event
+	})
+}
+
+func showCancelModal(ctx *AppContext) {
+	ctx.CancelModalShown = true
+
+	modal := tview.NewFlex().SetDirection(tview.FlexRow)
+	modal.SetBorder(true).
+		SetTitle(" ⚠️  ПРЕДУПРЕЖДЕНИЕ ").
+		SetTitleAlign(tview.AlignCenter).
+		SetTitleColor(tcell.NewRGBColor(234, 179, 8)).
+		SetBorderColor(tcell.NewRGBColor(234, 179, 8))
+	modal.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
+
+	textView := tview.NewTextView().
+		SetDynamicColors(true).
+		SetTextAlign(tview.AlignCenter).
+		SetText("\n[#eab308]Установка ещё не завершена![-]\n[#cbd5e1]Вы уверены, что хотите прервать процесс?[-]\n")
+	textView.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
+
+	form := tview.NewForm()
+	form.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
+	form.SetLabelColor(tview.Styles.SecondaryTextColor)
+	form.SetFieldTextColor(tview.Styles.PrimaryTextColor)
+	form.AddButton("❌ Отменить установку", func() {
+		ctx.Installing = false
+		ctx.App.Stop()
+	})
+	form.AddButton("✅ Продолжить установку", func() {
+		ctx.CancelModalShown = false
+		ctx.Pages.RemovePage("cancel_modal")
+	})
+
+	modal.AddItem(nil, 0, 1, false)
+	modal.AddItem(textView, 5, 1, false)
+	modal.AddItem(nil, 1, 0, false)
+	modal.AddItem(form, 4, 1, true)
+
+	overlay := tview.NewFlex().SetDirection(tview.FlexRow).
+		AddItem(nil, 0, 1, false).
+		AddItem(tview.NewFlex().SetDirection(tview.FlexColumn).
+			AddItem(nil, 0, 1, false).
+			AddItem(modal, 60, 1, true).
+			AddItem(nil, 0, 1, false), 12, 1, true).
+		AddItem(nil, 0, 1, false)
+
+	ctx.Pages.AddPage("cancel_modal", overlay, true, true)
+	ctx.App.SetFocus(form)
+}
+
+func PrintFinalResultsToConsole(ctx *AppContext, success bool, archiveVer string) {
+	ctx.ConsoleWrite("\n[#38bdf8]======================================================[-]\n")
+	if success {
+		ctx.ConsoleWrite("[#22c55e] 🎉 УСТАНОВКА TACHYON УСПЕШНО ЗАВЕРШЕНА[-]\n")
+	} else {
+		ctx.ConsoleWrite("[#eab308] ⚠️ УСТАНОВКА ЗАВЕРШЕНА С ЗАМЕЧАНИЯМИ[-]\n")
+	}
+	ctx.ConsoleWrite("[#38bdf8]======================================================[-]\n\n")
+
+	ip := ""
+	if ctx.Config != nil {
+		ip = ctx.Config.RouterIP
+	}
+	ctx.ConsoleWrite(fmt.Sprintf("  [#22c55e]✅[-] Tachyon Core: [#f8fafc]v%s[-]\n", archiveVer))
+	ctx.ConsoleWrite(fmt.Sprintf("  [#22c55e]✅[-] LuCI Web: [#f8fafc]http://%s/cgi-bin/luci/admin/services/tachyon[-]\n", ip))
+	ctx.ConsoleWrite(fmt.Sprintf("  [#22c55e]✅[-] SSH: [#f8fafc]ssh root@%s[-]\n\n", ip))
+	ctx.ConsoleWrite("  [#cbd5e1]Вы можете закрыть окно (нажмите Esc или Ctrl+C) и открыть веб-интерфейс:[-]\n")
+	ctx.ConsoleWrite(fmt.Sprintf("  [#38bdf8]http://%s/cgi-bin/luci/admin/services/tachyon[-]\n\n", ip))
+}

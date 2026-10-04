@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 380" width="100%" height="100%">
+  <title>Tachyon Installer Pipeline Architecture</title>
+  <defs>
+    <radialGradient id="pipe-bg" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#0F172A" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#030712" stop-opacity="1"/>
+    </radialGradient>
+    <linearGradient id="card-grad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E293B" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#090D16" stop-opacity="0.95"/>
+    </linearGradient>
+    <linearGradient id="pipe-cyan" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00F0FF"/>
+      <stop offset="100%" stop-color="#38BDF8"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="380" rx="14" fill="url(#pipe-bg)"/>
+  <rect x="1" y="1" width="1198" height="378" rx="13" fill="none" stroke="#38BDF8" stroke-width="1" stroke-opacity="0.25"/>
+
+  <!-- Title -->
+  <text x="50" y="42" font-family="'JetBrains Mono', Consolas, monospace" font-size="13" fill="#00F0FF" letter-spacing="1.5">5-STAGE AUTONOMOUS DEPLOYMENT PIPELINE</text>
+  <text x="1150" y="42" text-anchor="end" font-family="system-ui, sans-serif" font-size="12" fill="#64748B">Zero Internet on Router • Instant SSH Transport</text>
+
+  <!-- 5 Pipeline Steps -->
+  
+  <!-- Step 1 -->
+  <g transform="translate(45, 75)">
+    <rect width="205" height="260" rx="10" fill="url(#card-grad2)" stroke="#38BDF8" stroke-width="1" stroke-opacity="0.4"/>
+    <rect x="14" y="16" width="34" height="24" rx="4" fill="#0284C7"/>
+    <text x="31" y="32" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-weight="700" font-size="11" fill="#FFFFFF">01</text>
+    <text x="56" y="33" font-family="system-ui, sans-serif" font-weight="700" font-size="13" fill="#F1F5F9">SSH ДИАГНОСТИКА</text>
+    
+    <text x="16" y="70" font-family="system-ui, sans-serif" font-size="12" fill="#94A3B8">Pre-flight аудит роутера:</text>
+    <text x="16" y="95" font-family="'JetBrains Mono', monospace" font-size="11" fill="#38BDF8">• CPU Arch (arm, mips)</text>
+    <text x="16" y="120" font-family="'JetBrains Mono', monospace" font-size="11" fill="#38BDF8">• ОЗУ (free / total)</text>
+    <text x="16" y="145" font-family="'JetBrains Mono', monospace" font-size="11" fill="#38BDF8">• Flash (свободное место)</text>
+    <text x="16" y="170" font-family="'JetBrains Mono', monospace" font-size="11" fill="#38BDF8">• Пакеты: apk vs opkg</text>
+    <text x="16" y="195" font-family="'JetBrains Mono', monospace" font-size="11" fill="#38BDF8">• Firewall: fw4 / fw3</text>
+    <text x="16" y="220" font-family="'JetBrains Mono', monospace" font-size="11" fill="#38BDF8">• Конфликты софта</text>
+  </g>
+
+  <!-- Step 2 -->
+  <g transform="translate(275, 75)">
+    <rect width="205" height="260" rx="10" fill="url(#card-grad2)" stroke="#818CF8" stroke-width="1" stroke-opacity="0.4"/>
+    <rect x="14" y="16" width="34" height="24" rx="4" fill="#4F46E5"/>
+    <text x="31" y="32" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-weight="700" font-size="11" fill="#FFFFFF">02</text>
+    <text x="56" y="33" font-family="system-ui, sans-serif" font-weight="700" font-size="13" fill="#F1F5F9">ЗАГРУЗКА В ОС</text>
+    
+    <text x="16" y="70" font-family="system-ui, sans-serif" font-size="12" fill="#94A3B8">Скачивание на ПК:</text>
+    <text x="16" y="95" font-family="'JetBrains Mono', monospace" font-size="11" fill="#818CF8">• Пинг зеркал GitHub</text>
+    <text x="16" y="120" font-family="'JetBrains Mono', monospace" font-size="11" fill="#818CF8">• Авто-выбор лучшего</text>
+    <text x="16" y="145" font-family="'JetBrains Mono', monospace" font-size="11" fill="#818CF8">• Сверка SHA256 сумм</text>
+    <text x="16" y="170" font-family="'JetBrains Mono', monospace" font-size="11" fill="#818CF8">• Tachyon core + app</text>
+    <text x="16" y="195" font-family="'JetBrains Mono', monospace" font-size="11" fill="#818CF8">• Ядро прокси (выбор)</text>
+    <text x="16" y="220" font-family="'JetBrains Mono', monospace" font-size="11" fill="#818CF8">• Языковой пакет LuCI</text>
+  </g>
+
+  <!-- Step 3 -->
+  <g transform="translate(505, 75)">
+    <rect width="205" height="260" rx="10" fill="url(#card-grad2)" stroke="#EAB308" stroke-width="1" stroke-opacity="0.4"/>
+    <rect x="14" y="16" width="34" height="24" rx="4" fill="#CA8A04"/>
+    <text x="31" y="32" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-weight="700" font-size="11" fill="#FFFFFF">03</text>
+    <text x="56" y="33" font-family="system-ui, sans-serif" font-weight="700" font-size="13" fill="#F1F5F9">БЭКАП КОНФИГА</text>
+    
+    <text x="16" y="70" font-family="system-ui, sans-serif" font-size="12" fill="#94A3B8">Защита от сбоев:</text>
+    <text x="16" y="95" font-family="'JetBrains Mono', monospace" font-size="11" fill="#EAB308">• Снятие дампа UCI</text>
+    <text x="16" y="120" font-family="'JetBrains Mono', monospace" font-size="11" fill="#EAB308">• /etc/config/tachyon</text>
+    <text x="16" y="145" font-family="'JetBrains Mono', monospace" font-size="11" fill="#EAB308">• Локальное хранение</text>
+    <text x="16" y="170" font-family="'JetBrains Mono', monospace" font-size="11" fill="#EAB308">• Быстрый откат при</text>
+    <text x="16" y="195" font-family="'JetBrains Mono', monospace" font-size="11" fill="#EAB308">  критической ошибке</text>
+    <text x="16" y="220" font-family="'JetBrains Mono', monospace" font-size="11" fill="#EAB308">• Сохранение нод/ключей</text>
+  </g>
+
+  <!-- Step 4 -->
+  <g transform="translate(735, 75)">
+    <rect width="205" height="260" rx="10" fill="url(#card-grad2)" stroke="#00F0FF" stroke-width="1" stroke-opacity="0.4"/>
+    <rect x="14" y="16" width="34" height="24" rx="4" fill="#0E7490"/>
+    <text x="31" y="32" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-weight="700" font-size="11" fill="#FFFFFF">04</text>
+    <text x="56" y="33" font-family="system-ui, sans-serif" font-weight="700" font-size="13" fill="#F1F5F9">tar-over-SSH</text>
+    
+    <text x="16" y="70" font-family="system-ui, sans-serif" font-size="12" fill="#94A3B8">Потоковая заливка:</text>
+    <text x="16" y="95" font-family="'JetBrains Mono', monospace" font-size="11" fill="#00F0FF">• Поток через SSH pipe</text>
+    <text x="16" y="120" font-family="'JetBrains Mono', monospace" font-size="11" fill="#00F0FF">• Распаковка в /tmp</text>
+    <text x="16" y="145" font-family="'JetBrains Mono', monospace" font-size="11" fill="#00F0FF">• 0 износа флеша NAND</text>
+    <text x="16" y="170" font-family="'JetBrains Mono', monospace" font-size="11" fill="#00F0FF">• Установка apk / opkg</text>
+    <text x="16" y="195" font-family="'JetBrains Mono', monospace" font-size="11" fill="#00F0FF">• Размещение ядра</text>
+    <text x="16" y="220" font-family="'JetBrains Mono', monospace" font-size="11" fill="#00F0FF">• Авто-очистка /tmp</text>
+  </g>
+
+  <!-- Step 5 -->
+  <g transform="translate(965, 75)">
+    <rect width="190" height="260" rx="10" fill="url(#card-grad2)" stroke="#10B981" stroke-width="1" stroke-opacity="0.4"/>
+    <rect x="14" y="16" width="34" height="24" rx="4" fill="#059669"/>
+    <text x="31" y="32" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-weight="700" font-size="11" fill="#FFFFFF">05</text>
+    <text x="56" y="33" font-family="system-ui, sans-serif" font-weight="700" font-size="13" fill="#F1F5F9">АКТИВАЦИЯ</text>
+    
+    <text x="16" y="70" font-family="system-ui, sans-serif" font-size="12" fill="#94A3B8">Запуск и валидация:</text>
+    <text x="16" y="95" font-family="'JetBrains Mono', monospace" font-size="11" fill="#10B981">• /etc/init.d/tachyon</text>
+    <text x="16" y="120" font-family="'JetBrains Mono', monospace" font-size="11" fill="#10B981">• Настройка firewall fw4</text>
+    <text x="16" y="145" font-family="'JetBrains Mono', monospace" font-size="11" fill="#10B981">• Проверка DNS FakeIP</text>
+    <text x="16" y="170" font-family="'JetBrains Mono', monospace" font-size="11" fill="#10B981">• Тест утечек DNS</text>
+    <text x="16" y="195" font-family="'JetBrains Mono', monospace" font-size="11" fill="#10B981">• Добавление подписки</text>
+    <text x="16" y="220" font-family="'JetBrains Mono', monospace" font-size="11" fill="#10B981">• LuCI Web Ready ✓</text>
+  </g>
+</svg>

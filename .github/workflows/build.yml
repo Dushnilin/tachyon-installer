@@ -1,0 +1,60 @@
+name: Release Tachyon Installer
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g. 1.0.0)'
+        required: true
+        default: '1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Multi-Platform Desktop Binaries
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+
+      - name: Run Tests
+        run: go test -v ./...
+
+      - name: Determine Version
+        id: vars
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VER="${{ github.event.inputs.version }}"
+          else
+            VER="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=${VER}" >> $GITHUB_OUTPUT
+
+      - name: Build All Desktop Platforms
+        run: |
+          go run scripts/build.go -v "${{ steps.vars.outputs.version }}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        with:
+          name: "Tachyon Installer v${{ steps.vars.outputs.version }}"
+          files: |
+            dist/*.zip
+            dist/*.tar.gz
+            dist/*.exe
+            dist/tachyon-installer_linux_*
+            dist/tachyon-installer_darwin_*
+            dist/sha256sums.txt
+          generate_release_notes: true
