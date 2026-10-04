@@ -70,6 +70,9 @@ type OptionsSelector struct {
 	// Active section focus (0..5)
 	activeSection int
 
+	// clipBottom is the first screen row that must not be drawn on.
+	clipBottom int
+
 	// Callbacks
 	OnSubmit               func(opts InstallOptions)
 	OnBack                 func()
@@ -149,32 +152,37 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 
 	curY := y
 
-	// 1. Hardware Summary Line 1
-	modelStr := opt.Profile.Model
-	if len(modelStr) > 26 {
-		modelStr = modelStr[:24] + ".."
+	// Hardware summary (compact, fits narrow terminals)
+	opt.clipBottom = y + height
+	modelStr := []rune(opt.Profile.Model)
+	if len(modelStr) > 28 {
+		modelStr = append(modelStr[:26], '.', '.')
 	}
-	summaryLine1 := fmt.Sprintf("  [#38bdf8]●[-] [#94a3b8]Модель:[-] [#f1f5f9]%-26s[-]  [#38bdf8]●[-] [#94a3b8]ОС:[-] [#f1f5f9]%s (%s)[-]   %s [#94a3b8]FW:[-] %s",
-		modelStr,
-		opt.Profile.Version, opt.Profile.Arch,
-		opt.Profile.FirewallDot(), opt.Profile.FirewallStatus(),
-	)
-	tview.Print(screen, summaryLine1, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
+	fw := "fw4"
+	if opt.Profile.Firewall == "fw3" {
+		fw = "fw3 (устар.)"
+	}
+	line1 := fmt.Sprintf("  [#94a3b8]Модель:[-] [#f1f5f9]%s[-]  [#94a3b8]ОС:[-] [#f1f5f9]%s %s[-]  [#94a3b8]FW:[-] %s %s",
+		string(modelStr), opt.Profile.Version, opt.Profile.Arch, opt.Profile.FirewallDot(), fw)
+	opt.printClip(screen, line1, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	curY++
 
-	// 2. Hardware Summary Line 2
-	installedBadge := ""
-	if opt.Profile.InstalledTachyonVer != "" {
-		installedBadge = fmt.Sprintf("  [#38bdf8]●[-] [#cbd5e1]Установлен:[-] [#22c55e]Tachyon v%s[-]", opt.Profile.InstalledTachyonVer)
+	conf := "нет"
+	if len(opt.Profile.Conflicts) > 0 {
+		conf = strings.Join(opt.Profile.Conflicts, ", ")
 	}
-	summaryLine2 := fmt.Sprintf("  %s [#94a3b8]ОЗУ:[-] [#cbd5e1]%.0f МБ (своб. %.0f МБ)[-]  %s [#94a3b8]Flash:[-] %s  %s [#94a3b8]Конфликты:[-] %s%s",
-		opt.Profile.RAMDot(), opt.Profile.RAMTotal, opt.Profile.RAMFree,
-		opt.Profile.FlashDot(), opt.Profile.FlashStatus(),
-		opt.Profile.ConflictDot(), opt.Profile.ConflictStatus(),
-		installedBadge,
-	)
-	tview.Print(screen, summaryLine2, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
+	line2 := fmt.Sprintf("  %s [#94a3b8]ОЗУ:[-] [#cbd5e1]%.0f/%.0f МБ[-]  %s [#94a3b8]Flash:[-] [#cbd5e1]%.0f МБ[-]  %s [#94a3b8]Конфликты:[-] [#cbd5e1]%s[-]",
+		opt.Profile.RAMDot(), opt.Profile.RAMFree, opt.Profile.RAMTotal,
+		opt.Profile.FlashDot(), opt.Profile.FlashFree,
+		opt.Profile.ConflictDot(), conf)
+	opt.printClip(screen, line2, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	curY++
+
+	if opt.Profile.InstalledTachyonVer != "" {
+		opt.printClip(screen, fmt.Sprintf("  [#38bdf8]●[-] [#94a3b8]Уже установлено:[-] [#22c55e]Tachyon v%s[-]", opt.Profile.InstalledTachyonVer),
+			x, curY, width, tview.AlignLeft, tcell.ColorDefault)
+		curY++
+	}
 
 	// Thin Divider
 	drawOptionDivider(screen, x, curY, width)
@@ -185,9 +193,9 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 	// -------------------------------------------------------------
 	sec1Header := "  [#94a3b8]⚡ 1. ЯДРО ПРОКСИ:[-]"
 	if opt.activeSection == SectionEngine {
-		sec1Header = "  [#38bdf8:b]▶ 1. ЯДРО ПРОКСИ (выберите движок клавишами [1-5] или ↑↓):[-]"
+		sec1Header = "  [#38bdf8:b]▶ 1. ЯДРО ПРОКСИ[-]  [#64748b]↑↓ или 1-5[-]"
 	}
-	tview.Print(screen, sec1Header, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
+	opt.printClip(screen, sec1Header, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	curY++
 
 	for i, eng := range opt.engines {
@@ -221,6 +229,13 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 			badgeColor = "#94a3b8"
 		}
 
+		desc, badge := eng.Desc, eng.Badge
+		if width < 96 {
+			desc = ""
+		}
+		if width < 56 {
+			badge = ""
+		}
 		line := fmt.Sprintf("%s%s[%d] %s [#f1f5f9]%-18s[-] [%s]%-17s[-] [#94a3b8]%s[-]%s",
 			cursorPrefix,
 			highlightOpen,
@@ -228,11 +243,11 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 			radio,
 			eng.Name,
 			badgeColor,
-			eng.Badge,
-			eng.Desc,
+			badge,
+			desc,
 			highlightClose,
 		)
-		tview.Print(screen, line, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
+		opt.printClip(screen, line, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 		curY++
 	}
 
@@ -245,9 +260,9 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 	// -------------------------------------------------------------
 	sec2Header := "  [#94a3b8]📦 2. ВЕРСИЯ TACHYON:[-]"
 	if opt.activeSection == SectionVersion {
-		sec2Header = "  [#38bdf8:b]▶ 2. ВЕРСИЯ TACHYON (клавиши цифр или ←→):[-]"
+		sec2Header = "  [#38bdf8:b]▶ 2. ВЕРСИЯ TACHYON[-]  [#64748b]←→ или цифры, Enter на «Вручную»[-]"
 	}
-	tview.Print(screen, sec2Header, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
+	opt.printClip(screen, sec2Header, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	curY++
 
 	const verPerRow = 4
@@ -274,7 +289,7 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 		} else {
 			cell = fmt.Sprintf("  [%d] %s [#94a3b8]%s[-] ", i+1, radio, name)
 		}
-		tview.Print(screen, cell, x+2+(i%verPerRow)*colW, curY+i/verPerRow, colW, tview.AlignLeft, tcell.ColorDefault)
+		opt.printClip(screen, cell, x+2+(i%verPerRow)*colW, curY+i/verPerRow, colW, tview.AlignLeft, tcell.ColorDefault)
 	}
 	curY += (len(opt.versions) + verPerRow - 1) / verPerRow
 
@@ -287,9 +302,9 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 	// -------------------------------------------------------------
 	sec3Header := "  [#94a3b8]🌐 3. ЗЕРКАЛО ЗАГРУЗКИ GITHUB:[-]"
 	if opt.activeSection == SectionMirror {
-		sec3Header = "  [#38bdf8:b]▶ 3. ЗЕРКАЛО ЗАГРУЗКИ GITHUB (клавиши [1-6] или стрелки):[-]"
+		sec3Header = "  [#38bdf8:b]▶ 3. ЗЕРКАЛО ЗАГРУЗКИ GITHUB[-]  [#64748b]стрелки или 1-6[-]"
 	}
-	tview.Print(screen, sec3Header, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
+	opt.printClip(screen, sec3Header, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	curY++
 
 	renderMirrorRow := func(startIdx, endIdx int) {
@@ -309,11 +324,11 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 
 			cellX := x + 3 + (i-startIdx)*colWidth
 			if isFocused {
-				tview.Print(screen, fmt.Sprintf("[#ffffff:#1e293b:b]▶ [%d] %s %s[-] ", i+1, radio, m.Name), cellX, curY, colWidth, tview.AlignLeft, tcell.ColorDefault)
+				opt.printClip(screen, fmt.Sprintf("[#ffffff:#1e293b:b]▶ [%d] %s %s[-] ", i+1, radio, m.Name), cellX, curY, colWidth, tview.AlignLeft, tcell.ColorDefault)
 			} else if isSelected {
-				tview.Print(screen, fmt.Sprintf("  [%d] %s [#38bdf8:b]%s[-] ", i+1, radio, m.Name), cellX, curY, colWidth, tview.AlignLeft, tcell.ColorDefault)
+				opt.printClip(screen, fmt.Sprintf("  [%d] %s [#38bdf8:b]%s[-] ", i+1, radio, m.Name), cellX, curY, colWidth, tview.AlignLeft, tcell.ColorDefault)
 			} else {
-				tview.Print(screen, fmt.Sprintf("  [%d] %s [#94a3b8]%s[-] ", i+1, radio, m.Name), cellX, curY, colWidth, tview.AlignLeft, tcell.ColorDefault)
+				opt.printClip(screen, fmt.Sprintf("  [%d] %s [#94a3b8]%s[-] ", i+1, radio, m.Name), cellX, curY, colWidth, tview.AlignLeft, tcell.ColorDefault)
 			}
 		}
 		curY++
@@ -335,10 +350,10 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 	}
 	sec4Header := "  [#94a3b8]🌍 4. ЛОКАЛИЗАЦИЯ:[-]"
 	if opt.activeSection == SectionLang {
-		sec4Header = "  [#38bdf8:b]▶ 4. ЛОКАЛИЗАЦИЯ (Space/Enter переключить):[-]"
-		tview.Print(screen, fmt.Sprintf("%s [#ffffff:#1e293b:b]▶ %s Установить русский языковой пакет LuCI (luci-i18n-tachyon-ru)[-] ", sec4Header, checkIcon), x, curY, width, tview.AlignLeft, tcell.ColorDefault)
+		sec4Header = "  [#38bdf8:b]▶ 4. ЛОКАЛИЗАЦИЯ[-]"
+		opt.printClip(screen, fmt.Sprintf("%s [#ffffff:#1e293b:b]▶ %s Установить русский языковой пакет LuCI (luci-i18n-tachyon-ru)[-] ", sec4Header, checkIcon), x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	} else {
-		tview.Print(screen, fmt.Sprintf("%s   %s [#cbd5e1]Установить русский языковой пакет LuCI (luci-i18n-tachyon-ru)[-] ", sec4Header, checkIcon), x, curY, width, tview.AlignLeft, tcell.ColorDefault)
+		opt.printClip(screen, fmt.Sprintf("%s   %s [#cbd5e1]Установить русский языковой пакет LuCI (luci-i18n-tachyon-ru)[-] ", sec4Header, checkIcon), x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	}
 	curY++
 	curY++ // breathing room
@@ -356,13 +371,13 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 	}
 
 	buttonsLine := fmt.Sprintf("        %s        %s", btnInstall, btnBack)
-	tview.Print(screen, buttonsLine, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
+	opt.printClip(screen, buttonsLine, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	curY++
 	curY++
 
 	// Navigation Footer
-	footer := "  [#64748b]Навигация: [Tab/Shift+Tab] Разделы | [↑↓/←→] Выбор | [1-6] Цифры | [Space] Переключить | [Enter] Пуск | [Esc] Назад[-]"
-	tview.Print(screen, footer, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
+	footer := "  [#64748b]Tab разделы · ↑↓←→ выбор · Space переключить · Enter далее · Esc назад[-]"
+	opt.printClip(screen, footer, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 }
 
 func drawOptionDivider(screen tcell.Screen, x, y, width int) {
@@ -569,4 +584,12 @@ func (opt *OptionsSelector) submit() {
 	if opt.OnSubmit != nil {
 		opt.OnSubmit(opt.GetInstallOptions())
 	}
+}
+
+// printClip prints like tview.Print but never below the widget's bottom edge.
+func (opt *OptionsSelector) printClip(screen tcell.Screen, text string, x, y, maxWidth, align int, color tcell.Color) {
+	if opt.clipBottom > 0 && y >= opt.clipBottom {
+		return
+	}
+	tview.Print(screen, text, x, y, maxWidth, align, color)
 }

@@ -59,6 +59,11 @@ type AppContext struct {
 	HasFinalResult  bool
 	FinalSuccess    bool
 	FinalArchiveVer string
+
+	// FirewallNotReady is set when the router reported fw4 rule errors during install.
+	FirewallNotReady bool
+	// LogPath is the file with the full raw installer output.
+	LogPath string
 }
 
 // ExecSSH executes a command on the router with reconnection support.
@@ -165,6 +170,14 @@ func PrintFinalResultsToConsole(ctx *AppContext, success bool, archiveVer string
 	ctx.ConsoleWrite(fmt.Sprintf("  [#22c55e]✅[-] Tachyon Core: [#f8fafc]v%s[-]\n", archiveVer))
 	ctx.ConsoleWrite(fmt.Sprintf("  [#22c55e]✅[-] LuCI Web: [#f8fafc]http://%s/cgi-bin/luci/admin/services/tachyon[-]\n", ip))
 	ctx.ConsoleWrite(fmt.Sprintf("  [#22c55e]✅[-] SSH: [#f8fafc]ssh root@%s[-]\n\n", ip))
+	if ctx.FirewallNotReady {
+		ctx.ConsoleWrite("  [#eab308]⚠ Правила firewall fw4 не применились: таблица ещё не была загружена.[-]\n")
+		ctx.ConsoleWrite("  [#cbd5e1]Это не ломает установку. Если прокси не заработает, выполните на роутере:[-]\n")
+		ctx.ConsoleWrite("  [#38bdf8]/etc/init.d/firewall restart && /etc/init.d/tachyon restart[-]\n\n")
+	}
+	if ctx.LogPath != "" {
+		ctx.ConsoleWrite(fmt.Sprintf("  [#94a3b8]Полный лог установки: %s[-]\n\n", ctx.LogPath))
+	}
 	ctx.ConsoleWrite("  [#cbd5e1]Вы можете закрыть окно (нажмите Esc или Ctrl+C) и открыть веб-интерфейс:[-]\n")
 	ctx.ConsoleWrite(fmt.Sprintf("  [#38bdf8]http://%s/cgi-bin/luci/admin/services/tachyon[-]\n\n", ip))
 }

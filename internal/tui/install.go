@@ -239,8 +239,12 @@ func RunExpressInstall(ctx *AppContext, opts InstallOptions) {
 			return
 		}
 
-		consoleWriter := &tviewWriter{textView: ctx.ConsoleView, app: ctx.App}
+		consoleWriter := newTviewWriter(ctx.ConsoleView, ctx.App)
+		defer consoleWriter.Close()
 		err = deploypkg.UploadStagingAndExecute(sshClient, staging.Dir, consoleWriter, ctx.ConsoleWrite)
+		consoleWriter.Flush()
+		ctx.FirewallNotReady = consoleWriter.hinted
+		ctx.LogPath = consoleWriter.path
 		if err != nil {
 			ctx.ConsoleWritef("\n[#ef5350]❌ Ошибка при установке пакетов на роутер: %v[-]\n", err)
 			return

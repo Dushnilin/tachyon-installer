@@ -117,16 +117,37 @@ func ShowWelcomeWizard(ctx *AppContext) {
 		SetText(step2Text)
 	step2TextView.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
 
+	step2Err := tview.NewTextView().SetDynamicColors(true)
+	step2Err.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
+
 	step2Form = tview.NewForm()
 	StyleForm(step2Form)
 	step2Form.AddFormItem(ipInput).
 		AddFormItem(portInput).
 		AddFormItem(userInput)
 
-	step2Form.AddButton("Продолжить →", func() {
+	goStep3 := func() {
+		field, msg := validateSSHInput(ipInput.GetText(), portInput.GetText(), userInput.GetText())
+		if msg != "" {
+			step2Err.SetText("  [#ef5350]✗ " + msg + "[-]")
+			switch field {
+			case 0:
+				ctx.App.SetFocus(step2Form)
+				step2Form.SetFocus(0)
+			case 1:
+				ctx.App.SetFocus(step2Form)
+				step2Form.SetFocus(1)
+			default:
+				ctx.App.SetFocus(step2Form)
+				step2Form.SetFocus(2)
+			}
+			return
+		}
+		step2Err.SetText("")
 		ctx.Pages.SwitchToPage("password_wizard")
 		ctx.App.SetFocus(step3Form)
-	})
+	}
+	step2Form.AddButton("Продолжить →", goStep3)
 	step2Form.AddButton("← Назад", func() {
 		ctx.Pages.SwitchToPage("welcome_wizard")
 		ctx.App.SetFocus(step1Form)
@@ -134,7 +155,7 @@ func ShowWelcomeWizard(ctx *AppContext) {
 	EnableFormArrowNavigation(step2Form)
 
 	step2Panel.AddItem(textViewLayout(step2TextView), 6, 1, false)
-	step2Panel.AddItem(nil, 1, 0, false)
+	step2Panel.AddItem(step2Err, 1, 0, false)
 	step2Panel.AddItem(formLayout(step2Form), 10, 1, true)
 
 	step2Modal := CreateWizardModal(step2Panel)
@@ -201,8 +222,7 @@ func ShowWelcomeWizard(ctx *AppContext) {
 	})
 	userInput.SetDoneFunc(func(key tcell.Key) {
 		if key == tcell.KeyEnter {
-			ctx.Pages.SwitchToPage("password_wizard")
-			ctx.App.SetFocus(passInput)
+			goStep3()
 		}
 	})
 	passInput.SetDoneFunc(func(key tcell.Key) {
@@ -486,4 +506,24 @@ func showManualVersionModal(ctx *AppContext, current string, callback func(newVe
 
 	ctx.Pages.AddPage("manual_version_modal", modal, true, true)
 	ctx.App.SetFocus(input)
+}
+
+// validateSSHInput checks the SSH connection fields. It returns the index of the
+// offending field (0 host, 1 port, 2 user) and a message, or an empty message if valid.
+func validateSSHInput(host, port, user string) (int, string) {
+	host = strings.TrimSpace(host)
+	if host == "" {
+		return 0, "Укажите IP-адрес или имя роутера"
+	}
+	if strings.ContainsAny(host, " \t/\\") {
+		return 0, "Адрес не должен содержать пробелов и слэшей"
+	}
+	p, err := strconv.Atoi(strings.TrimSpace(port))
+	if err != nil || p < 1 || p > 65535 {
+		return 1, "Порт SSH должен быть числом от 1 до 65535"
+	}
+	if strings.TrimSpace(user) == "" {
+		return 2, "Укажите имя пользователя (обычно root)"
+	}
+	return 0, ""
 }
