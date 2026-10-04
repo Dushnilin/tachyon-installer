@@ -17,22 +17,22 @@ func ShowFleetModal(ctx *AppContext, returnPage string) {
 	statusView := tview.NewTextView().
 		SetDynamicColors(true).
 		SetScrollable(false)
-	statusView.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
-	statusView.SetText("  [#38bdf8:b]⚡ Поиск поддерживаемых OpenWrt роутеров в локальной сети... Пожалуйста, подождите[-]")
+	statusView.SetBackgroundColor(ColorBgSpace)
+	statusView.SetText(fmt.Sprintf("  %s⚡ Поиск поддерживаемых OpenWrt роутеров в локальной сети... Пожалуйста, подождите%s", TagCyanBold, TagReset))
 
 	hintView := tview.NewTextView().
 		SetDynamicColors(true).
 		SetScrollable(false)
-	hintView.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
-	hintView.SetText("  [#94a3b8][Space] Выбрать  [A] Все  [U] Устаревшие  [C] Чистые  [S] Пересканировать  [Enter] Запуск[-]")
+	hintView.SetBackgroundColor(ColorBgSpace)
+	hintView.SetText("  " + FormatHotkey("Space", "Выбрать") + "  " + FormatHotkey("A", "Все") + "  " + FormatHotkey("U", "Устаревшие") + "  " + FormatHotkey("C", "Чистые") + "  " + FormatHotkey("S", "Перескан") + "  " + FormatVioletHotkey("Enter", "Запуск"))
 
 	table := tview.NewTable().
 		SetBorders(false).
 		SetSelectable(true, false)
-	table.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
+	table.SetBackgroundColor(ColorBgSpace)
 	table.SetSelectedStyle(tcell.StyleDefault.
-		Background(tcell.NewRGBColor(2, 132, 199)). // Sky 600
-		Foreground(tcell.ColorWhite).
+		Background(ColorBgInputFocus).
+		Foreground(ColorTextPure).
 		Bold(true))
 
 	form := tview.NewForm()
@@ -51,7 +51,7 @@ func ShowFleetModal(ctx *AppContext, returnPage string) {
 		}
 	}
 
-	form.AddButton("Отмена (Esc)", closeModal)
+	form.AddButton("🚪 Назад (Esc)", closeModal)
 	form.SetCancelFunc(closeModal)
 	EnableFormArrowNavigation(form)
 
@@ -81,7 +81,7 @@ func ShowFleetModal(ctx *AppContext, returnPage string) {
 		widths := []int{5, 16, 22, 12, 12, 22, 12}
 		for col, h := range headers {
 			table.SetCell(0, col, tview.NewTableCell(" "+h).
-				SetTextColor(tcell.NewRGBColor(56, 189, 248)). // Sky 400
+				SetTextColor(ColorCyanElectric).
 				SetSelectable(false).
 				SetMaxWidth(widths[col]))
 		}
@@ -111,24 +111,22 @@ func ShowFleetModal(ctx *AppContext, returnPage string) {
 			}
 
 			chkText := " [ ]"
-			chkColor := tcell.NewRGBColor(148, 163, 184)
+			chkColor := ColorTextMuted
 			if n.Selected {
-				chkText = " [#22c55e][✓][-]"
-				chkColor = tcell.NewRGBColor(34, 197, 94)
+				chkText = fmt.Sprintf(" %s[✓]%s", TagGreenBold, TagReset)
+				chkColor = ColorStatusSuccess
 			}
 
-			statusColColor := tcell.NewRGBColor(203, 213, 225)
+			statusColColor := ColorTextSecondary
 			switch n.Status {
 			case fleet.StatusUpToDate:
-				statusColColor = tcell.NewRGBColor(34, 197, 94) // Green
+				statusColColor = ColorStatusSuccess
 			case fleet.StatusOutdated:
-				statusColColor = tcell.NewRGBColor(234, 179, 8) // Yellow
+				statusColColor = ColorStatusWarning
 			case fleet.StatusClean:
-				statusColColor = tcell.NewRGBColor(56, 189, 248) // Sky
-			case fleet.StatusLowResources:
-				statusColColor = tcell.NewRGBColor(239, 68, 68) // Red
-			case fleet.StatusAuthFailed:
-				statusColColor = tcell.NewRGBColor(148, 163, 184) // Slate
+				statusColColor = ColorCyanElectric
+			case fleet.StatusLowResources, fleet.StatusAuthFailed:
+				statusColColor = ColorStatusError
 			}
 
 			statusText := n.StatusText
@@ -152,17 +150,21 @@ func ShowFleetModal(ctx *AppContext, returnPage string) {
 			}
 
 			table.SetCell(row, 0, tview.NewTableCell(chkText).SetTextColor(chkColor))
-			table.SetCell(row, 1, tview.NewTableCell(" "+n.IP).SetTextColor(tcell.ColorWhite))
-			table.SetCell(row, 2, tview.NewTableCell(" "+modelStr).SetTextColor(tcell.NewRGBColor(241, 245, 249)))
-			table.SetCell(row, 3, tview.NewTableCell(" "+archStr).SetTextColor(tcell.NewRGBColor(125, 211, 252)))
-			table.SetCell(row, 4, tview.NewTableCell(" "+ramStr).SetTextColor(tcell.NewRGBColor(203, 213, 225)))
+			table.SetCell(row, 1, tview.NewTableCell(" "+n.IP).SetTextColor(ColorTextPure))
+			table.SetCell(row, 2, tview.NewTableCell(" "+modelStr).SetTextColor(ColorTextPrimary))
+			table.SetCell(row, 3, tview.NewTableCell(" "+archStr).SetTextColor(ColorSkyCyber))
+			table.SetCell(row, 4, tview.NewTableCell(" "+ramStr).SetTextColor(ColorTextSecondary))
 			table.SetCell(row, 5, tview.NewTableCell(" "+statusText).SetTextColor(statusColColor))
-			table.SetCell(row, 6, tview.NewTableCell(" "+n.RecommendedEngine).SetTextColor(tcell.NewRGBColor(56, 189, 248)))
+			table.SetCell(row, 6, tview.NewTableCell(" "+n.RecommendedEngine).SetTextColor(ColorVioletHolo))
 		}
 
 		statusView.SetText(fmt.Sprintf(
-			"  [#38bdf8:b]Найдено роутеров:[-] [#f1f5f9]%d[-]  •  [#eab308]Обновить:[-] [#f1f5f9]%d[-]  •  [#38bdf8]Чистые:[-] [#f1f5f9]%d[-]  •  [#22c55e]Актуальны:[-] [#f1f5f9]%d[-]  •  [#f1f5f9:b]Выбрано: %d[-]",
-			len(discoveredNodes), outdatedCnt, cleanCnt, upToDateCnt, selectedCnt,
+			"  %sНайдено:%s %s%d%s  •  %sОбновить:%s %s%d%s  •  %sЧистые:%s %s%d%s  •  %sАктуальны:%s %s%d%s  •  %sВыбрано: %d%s",
+			TagCyanBold, TagReset, TagTextBold, len(discoveredNodes), TagReset,
+			TagAmberBold, TagReset, TagTextBold, outdatedCnt, TagReset,
+			TagCyanBold, TagReset, TagTextBold, cleanCnt, TagReset,
+			TagGreenBold, TagReset, TagTextBold, upToDateCnt, TagReset,
+			TagWhiteBold, selectedCnt, TagReset,
 		))
 	}
 

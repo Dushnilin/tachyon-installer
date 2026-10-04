@@ -43,19 +43,19 @@ func confirmText(routerIP string, profile ProfileData, opts InstallOptions) stri
 	}
 	var b strings.Builder
 	b.WriteString("\n")
-	fmt.Fprintf(&b, "  [#94a3b8]Роутер:[-]          [#f1f5f9]%s[-]  [#64748b](%s)[-]\n", tview.Escape(routerIP), tview.Escape(profile.Model))
-	fmt.Fprintf(&b, "  [#94a3b8]Система:[-]         [#f1f5f9]OpenWrt %s, %s[-]\n", tview.Escape(profile.Version), tview.Escape(profile.Arch))
-	fmt.Fprintf(&b, "  [#94a3b8]Ядро прокси:[-]     [#f1f5f9]%s[-]\n", engineLabel(opts.SelectedEngine))
-	fmt.Fprintf(&b, "  [#94a3b8]Версия Tachyon:[-]  [#f1f5f9]%s[-]\n", tview.Escape(opts.TachyonVersion))
-	fmt.Fprintf(&b, "  [#94a3b8]Зеркало:[-]         [#f1f5f9]%s[-]\n", tview.Escape(mirrorLabel(opts.SelectedMirror)))
-	fmt.Fprintf(&b, "  [#94a3b8]Русский LuCI:[-]    [#f1f5f9]%s[-]\n", lang)
-	b.WriteString("\n  [#38bdf8]Что произойдёт:[-]\n")
-	b.WriteString("  [#cbd5e1]1. Файлы скачаются на этот компьютер и проверятся[-]\n")
-	b.WriteString("  [#cbd5e1]2. Конфиг роутера сохранится в резервную копию[-]\n")
-	b.WriteString("  [#cbd5e1]3. Пакеты зальются в /tmp роутера и установятся[-]\n")
-	b.WriteString("  [#cbd5e1]4. Служба запустится и пройдёт диагностику[-]\n")
+	fmt.Fprintf(&b, "  %sРоутер:%s          %s%s%s  %s(%s)%s\n", TagMuted, TagReset, TagTextBold, tview.Escape(routerIP), TagReset, TagMuted, tview.Escape(profile.Model), TagReset)
+	fmt.Fprintf(&b, "  %sСистема:%s         %sOpenWrt %s, %s%s\n", TagMuted, TagReset, TagText, tview.Escape(profile.Version), tview.Escape(profile.Arch), TagReset)
+	fmt.Fprintf(&b, "  %sЯдро прокси:%s     %s%s%s\n", TagMuted, TagReset, TagCyanBold, engineLabel(opts.SelectedEngine), TagReset)
+	fmt.Fprintf(&b, "  %sВерсия Tachyon:%s  %s%s%s\n", TagMuted, TagReset, TagVioletBold, tview.Escape(opts.TachyonVersion), TagReset)
+	fmt.Fprintf(&b, "  %sЗеркало:%s         %s%s%s\n", TagMuted, TagReset, TagSubText, tview.Escape(mirrorLabel(opts.SelectedMirror)), TagReset)
+	fmt.Fprintf(&b, "  %sРусский LuCI:%s    %s%s%s\n", TagMuted, TagReset, TagSubText, lang, TagReset)
+	b.WriteString(fmt.Sprintf("\n  %sЧто произойдёт:%s\n", TagCyanBold, TagReset))
+	b.WriteString(fmt.Sprintf("  %s1. Файлы скачаются на этот компьютер и проверятся%s\n", TagSubText, TagReset))
+	b.WriteString(fmt.Sprintf("  %s2. Конфиг роутера сохранится в резервную копию%s\n", TagSubText, TagReset))
+	b.WriteString(fmt.Sprintf("  %s3. Пакеты зальются в /tmp роутера и установятся%s\n", TagSubText, TagReset))
+	b.WriteString(fmt.Sprintf("  %s4. Служба запустится и пройдёт диагностику%s\n", TagSubText, TagReset))
 	if w := profile.Warnings(); len(w) > 0 {
-		fmt.Fprintf(&b, "\n  [#eab308]⚠ Предупреждений о роутере: %d (см. диагностику, клавиша D на прошлом экране)[-]\n", len(w))
+		fmt.Fprintf(&b, "\n  %s⚠ Предупреждений о роутере: %d (см. диагностику, клавиша D на прошлом экране)%s\n", TagAmberBold, len(w), TagReset)
 	}
 	return b.String()
 }
@@ -69,7 +69,7 @@ func showConfirmModal(ctx *AppContext, profile ProfileData, opts InstallOptions,
 		routerIP = ctx.Config.RouterIP
 	}
 	tv := tview.NewTextView().SetDynamicColors(true).SetText(confirmText(routerIP, profile, opts))
-	tv.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
+	tv.SetBackgroundColor(ColorBgSpace)
 
 	form := tview.NewForm()
 	StyleForm(form)

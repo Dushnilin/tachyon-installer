@@ -74,7 +74,7 @@ func main() {
 	header := tview.NewTextView().
 		SetDynamicColors(true).
 		SetTextAlign(tview.AlignCenter).
-		SetText("[#38bdf8]🛰️  TACHYON ONE-CLICK EXPRESS INSTALLER & DIAGNOSTIC WIZARD[-] [#64748b]" + AppVersion + "[-]")
+		SetText(tui.TagCyanBold + "⚡ TACHYON" + tui.TagReset + " " + tui.TagSkyBold + "ONE-CLICK EXPRESS INSTALLER & FLEET ORCHESTRATOR" + tui.TagReset + "  " + tui.TagVioletBold + AppVersion + tui.TagReset)
 
 	// Console view
 	consoleView := tview.NewTextView().
@@ -84,8 +84,10 @@ func main() {
 		consoleView.ScrollToEnd()
 		app.Draw()
 	})
-	consoleView.SetBorder(true).SetTitle(" 📊 Лог установки и диагностики ")
-	consoleView.SetBorderColor(tui.ZincColor(70))
+	consoleView.SetBorder(true).
+		SetTitle(" 📊 Лог установки и диагностики ").
+		SetTitleColor(tui.ColorCyanElectric).
+		SetBorderColor(tui.ColorBorderNormal)
 
 	// Progress view — custom animated progress bar widget
 	progressView := widgets.NewProgressBar(7)

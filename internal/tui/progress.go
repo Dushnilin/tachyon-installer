@@ -127,33 +127,6 @@ func (tw *tviewWriter) emit(text string) {
 	})
 }
 
-// ZincColor returns a tcell color from the Slate palette to match our theme.
-func ZincColor(level int) tcell.Color {
-	if level >= 70 {
-		return tcell.NewRGBColor(51, 65, 85) // Slate 700
-	}
-	return tcell.NewRGBColor(15, 23, 42) // Slate 950
-}
-
-// InitTheme applies the Slate and Sky-blue dark theme to tview global styles.
-func InitTheme() {
-	// Backgrounds
-	tview.Styles.PrimitiveBackgroundColor = tcell.NewRGBColor(15, 23, 42)    // Slate 950
-	tview.Styles.ContrastBackgroundColor = tcell.NewRGBColor(30, 41, 59)     // Slate 800 (inputs, buttons)
-	tview.Styles.MoreContrastBackgroundColor = tcell.NewRGBColor(15, 23, 42) // Slate 950 (popups)
-
-	// Borders & Titles
-	tview.Styles.BorderColor = tcell.NewRGBColor(51, 65, 85)     // Slate 700
-	tview.Styles.TitleColor = tcell.NewRGBColor(56, 189, 248)    // Sky 400
-	tview.Styles.GraphicsColor = tcell.NewRGBColor(56, 189, 248) // Sky 400
-
-	// Text colors
-	tview.Styles.PrimaryTextColor = tcell.NewRGBColor(241, 245, 249)           // Slate 100
-	tview.Styles.SecondaryTextColor = tcell.NewRGBColor(203, 213, 225)         // Slate 300
-	tview.Styles.TertiaryTextColor = tcell.NewRGBColor(148, 163, 184)          // Slate 400
-	tview.Styles.InverseTextColor = tcell.NewRGBColor(255, 255, 255)           // White (text on focused blue buttons/options)
-	tview.Styles.ContrastSecondaryTextColor = tcell.NewRGBColor(125, 211, 252) // Sky 300
-}
 
 // adaptiveModal centers its content and shrinks it to fit the terminal.
 type adaptiveModal struct {

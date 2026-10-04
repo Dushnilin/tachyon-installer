@@ -228,8 +228,11 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 	if opt.Profile.DistribArch != "" && opt.Profile.DistribArch != opt.Profile.Arch && width >= 84 {
 		archStr = fmt.Sprintf("%s (%s)", opt.Profile.Arch, opt.Profile.DistribArch)
 	}
-	line1 := fmt.Sprintf("  [#94a3b8]Модель:[-] [#f1f5f9]%s[-]  [#94a3b8]ОС:[-] [#f1f5f9]%s[-]  [#94a3b8]Arch:[-] [#38bdf8]%s[-]  [#94a3b8]FW:[-] %s %s",
-		string(modelStr), opt.Profile.Version, archStr, opt.Profile.FirewallDot(), fw)
+	line1 := fmt.Sprintf("  %sМодель:%s %s%s%s  %sОС:%s %s%s%s  %sArch:%s %s%s%s  %sFW:%s %s %s",
+		TagMuted, TagReset, TagTextBold, string(modelStr), TagReset,
+		TagMuted, TagReset, TagText, opt.Profile.Version, TagReset,
+		TagMuted, TagReset, TagCyanBold, archStr, TagReset,
+		TagMuted, TagReset, opt.Profile.FirewallDot(), fw)
 	opt.printClip(screen, line1, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	curY++
 
@@ -237,22 +240,22 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 	if len(opt.Profile.Conflicts) > 0 {
 		conf = strings.Join(opt.Profile.Conflicts, ", ")
 	}
-	line2 := fmt.Sprintf("  %s [#94a3b8]ОЗУ:[-] [#cbd5e1]%.0f/%.0f МБ[-]  %s [#94a3b8]Flash:[-] [#cbd5e1]%.0f МБ[-]  %s [#94a3b8]Конфликты:[-] [#cbd5e1]%s[-]",
-		opt.Profile.RAMDot(), opt.Profile.RAMFree, opt.Profile.RAMTotal,
-		opt.Profile.FlashDot(), opt.Profile.FlashFree,
-		opt.Profile.ConflictDot(), conf)
+	line2 := fmt.Sprintf("  %s %sОЗУ:%s %s%.0f/%.0f МБ%s  %s %sFlash:%s %s%.0f МБ%s  %s %sКонфликты:%s %s%s%s",
+		opt.Profile.RAMDot(), TagMuted, TagReset, TagSubText, opt.Profile.RAMFree, opt.Profile.RAMTotal, TagReset,
+		opt.Profile.FlashDot(), TagMuted, TagReset, TagSubText, opt.Profile.FlashFree, TagReset,
+		opt.Profile.ConflictDot(), TagMuted, TagReset, TagSubText, conf, TagReset)
 	opt.printClip(screen, line2, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	curY++
 
 	_, recHint := routerpkg.HardwareRecommendation(opt.Profile.RAMTotal, opt.Profile.RAMFree, opt.Profile.FlashFree)
 	if recHint != "" {
-		opt.printClip(screen, fmt.Sprintf("  [#eab308]💡 Совет:[-] [#cbd5e1]%s[-]", recHint),
+		opt.printClip(screen, fmt.Sprintf("  %s💡 Совет:%s %s%s%s", TagAmberBold, TagReset, TagSubText, recHint, TagReset),
 			x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 		curY++
 	}
 
 	if opt.Profile.InstalledTachyonVer != "" {
-		opt.printClip(screen, fmt.Sprintf("  [#38bdf8]●[-] [#94a3b8]Уже установлено:[-] [#22c55e]Tachyon v%s[-]", opt.Profile.InstalledTachyonVer),
+		opt.printClip(screen, fmt.Sprintf("  %s●%s %sУже установлено:%s %sTachyon v%s%s", TagCyan, TagReset, TagMuted, TagReset, TagGreenBold, opt.Profile.InstalledTachyonVer, TagReset),
 			x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 		curY++
 	}
@@ -264,9 +267,9 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 	// -------------------------------------------------------------
 	// SECTION 1: PROXY ENGINE
 	// -------------------------------------------------------------
-	sec1Header := "  [#94a3b8]⚡ 1. ЯДРО ПРОКСИ:[-]"
+	sec1Header := fmt.Sprintf("  %s⚡ 1. ЯДРО ПРОКСИ%s  %s↑↓ или 1-%d%s", TagMuted, TagReset, TagDark, len(opt.engines), TagReset)
 	if opt.activeSection == SectionEngine {
-		sec1Header = fmt.Sprintf("  [#38bdf8:b]▶ 1. ЯДРО ПРОКСИ[-]  [#64748b]↑↓ или 1-%d[-]", len(opt.engines))
+		sec1Header = fmt.Sprintf("  %s▶ 1. ЯДРО ПРОКСИ%s  %s↑↓ или 1-%d%s", TagCyanBold, TagReset, TagSubText, len(opt.engines), TagReset)
 	}
 	opt.printClip(screen, sec1Header, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	curY++
@@ -275,29 +278,29 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 		isSelected := (opt.selectedEngine == i)
 		isFocused := (opt.activeSection == SectionEngine && opt.engineCursor == i)
 
-		radio := "[#64748b]( )[-]"
+		radio := fmt.Sprintf("%s( )%s", TagDark, TagReset)
 		if isSelected {
-			radio = "[#38bdf8:b](•)[-]"
+			radio = fmt.Sprintf("%s(•)%s", TagCyanBold, TagReset)
 		}
 
 		cursorPrefix := "    "
 		highlightOpen := ""
 		highlightClose := ""
 		if isFocused {
-			cursorPrefix = "  [#38bdf8]▶[-] "
-			highlightOpen = "[#ffffff:#1e293b:b]"
+			cursorPrefix = fmt.Sprintf("  %s▶%s ", TagCyanBold, TagReset)
+			highlightOpen = "[#ffffff:#0284c7:b]"
 			highlightClose = "[-]"
 		}
 
-		badgeColor := "#94a3b8"
+		badgeColor := TagMuted
 		if strings.Contains(eng.Badge, "xHTTP") {
-			badgeColor = "#38bdf8"
+			badgeColor = TagSkyBold
 		} else if strings.Contains(eng.Badge, "C-движок") {
-			badgeColor = "#10b981"
+			badgeColor = TagGreenBold
 		} else if strings.Contains(eng.Badge, "Tiny") {
-			badgeColor = "#22c55e"
+			badgeColor = TagGreen
 		} else if strings.Contains(eng.Badge, "Leadaxe") {
-			badgeColor = "#a855f7"
+			badgeColor = TagVioletBold
 		}
 
 		desc, badge := eng.Desc, eng.Badge
@@ -307,15 +310,14 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 		if width < 56 {
 			badge = ""
 		}
-		line := fmt.Sprintf("%s%s[%d] %s [#f1f5f9]%-25s[-] [%s]%-15s[-] [#94a3b8]%s[-]%s",
+		line := fmt.Sprintf("%s%s[%d] %s %s%-25s%s %s%-15s%s %s%s%s%s",
 			cursorPrefix,
 			highlightOpen,
 			i+1,
 			radio,
-			eng.Name,
-			badgeColor,
-			badge,
-			desc,
+			TagText, eng.Name, TagReset,
+			badgeColor, badge, TagReset,
+			TagSubText, desc, TagReset,
 			highlightClose,
 		)
 		opt.printClip(screen, line, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
@@ -338,9 +340,9 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 	// -------------------------------------------------------------
 	// SECTION 2: TACHYON VERSION (Prominent latest + sub-grid)
 	// -------------------------------------------------------------
-	sec2Header := "  [#94a3b8]📦 2. ВЕРСИЯ TACHYON:[-]"
+	sec2Header := fmt.Sprintf("  %s📦 2. ВЕРСИЯ TACHYON%s", TagMuted, TagReset)
 	if opt.activeSection == SectionVersion {
-		sec2Header = "  [#38bdf8:b]▶ 2. ВЕРСИЯ TACHYON[-]  [#64748b]↑↓←→ выбор, Space/цифры 1-7, Enter на «Вручную»[-]"
+		sec2Header = fmt.Sprintf("  %s▶ 2. ВЕРСИЯ TACHYON%s  %s↑↓←→ выбор, Space/цифры 1-7, Enter на «Вручную»%s", TagCyanBold, TagReset, TagSubText, TagReset)
 	}
 	opt.printClip(screen, sec2Header, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	curY++
@@ -351,30 +353,30 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 		isZeroSelected := (opt.selectedVersion == 0)
 		isZeroFocused := (opt.activeSection == SectionVersion && opt.versionCursor == 0)
 
-		radio0 := "[#64748b]( )[-]"
+		radio0 := fmt.Sprintf("%s( )%s", TagDark, TagReset)
 		if isZeroSelected {
-			radio0 = "[#38bdf8:b](•)[-]"
+			radio0 = fmt.Sprintf("%s(•)%s", TagCyanBold, TagReset)
 		}
 
 		cursor0 := "  "
 		highlightOpen0 := ""
 		highlightClose0 := ""
 		if isZeroFocused {
-			cursor0 = "[#ffffff:#1e293b:b]▶ "
-			highlightOpen0 = "[#ffffff:#1e293b:b]"
+			cursor0 = fmt.Sprintf("[#ffffff:#0284c7:b]▶ ")
+			highlightOpen0 = "[#ffffff:#0284c7:b]"
 			highlightClose0 = "[-]"
 		}
 
 		badge0 := ""
 		if ver0.Badge != "" {
-			badge0 = fmt.Sprintf(" [#38bdf8]%s[-]", ver0.Badge)
+			badge0 = fmt.Sprintf(" %s%s%s", TagVioletBold, ver0.Badge, TagReset)
 		} else if strings.Contains(ver0.Name, "★") {
-			badge0 = " [#38bdf8]★ Рекомендуется[-]"
+			badge0 = fmt.Sprintf(" %s★ Рекомендуется%s", TagVioletBold, TagReset)
 		}
 
 		desc0 := ""
 		if width >= 80 {
-			desc0 = " [#64748b](актуальный стабильный релиз)[-]"
+			desc0 = fmt.Sprintf(" %s(актуальный стабильный релиз)%s", TagMuted, TagReset)
 		}
 
 		verName0 := strings.TrimSpace(strings.ReplaceAll(ver0.Name, "★", ""))
@@ -412,9 +414,9 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 				isSelected := (opt.selectedVersion == i)
 				isFocused := (opt.activeSection == SectionVersion && opt.versionCursor == i)
 
-				radio := "[#64748b]( )[-]"
+				radio := fmt.Sprintf("%s( )%s", TagDark, TagReset)
 				if isSelected {
-					radio = "[#38bdf8:b](•)[-]"
+					radio = fmt.Sprintf("%s(•)%s", TagCyanBold, TagReset)
 				}
 
 				name := ver.Name
@@ -429,11 +431,11 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 
 				var cell string
 				if isFocused {
-					cell = fmt.Sprintf("[#ffffff:#1e293b:b]▶ [%d] %s %s[-] ", i+1, radio, name)
+					cell = fmt.Sprintf("[#ffffff:#0284c7:b]▶ [%d] %s %s[-] ", i+1, radio, name)
 				} else if isSelected {
-					cell = fmt.Sprintf("  [%d] %s [#38bdf8:b]%s[-] ", i+1, radio, name)
+					cell = fmt.Sprintf("  [%d] %s %s%s%s ", i+1, radio, TagCyanBold, name, TagReset)
 				} else {
-					cell = fmt.Sprintf("  [%d] %s [#94a3b8]%s[-] ", i+1, radio, name)
+					cell = fmt.Sprintf("  [%d] %s %s%s%s ", i+1, radio, TagSubText, name, TagReset)
 				}
 				cellX := x + 2 + col*colW
 				opt.printClip(screen, cell, cellX, curY+row, cellW, tview.AlignLeft, tcell.ColorDefault)
@@ -458,53 +460,59 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 	curY++
 
 	// -------------------------------------------------------------
-	// SECTION 3: DOWNLOAD MIRRORS (6 options in 2 rows of 3)
+	// SECTION 3: DOWNLOAD MIRRORS (Adaptive Grid)
 	// -------------------------------------------------------------
-	sec3Header := "  [#94a3b8]🌐 3. ЗЕРКАЛО ЗАГРУЗКИ GITHUB:[-]"
+	sec3Header := fmt.Sprintf("  %s🌐 3. ЗЕРКАЛО ЗАГРУЗКИ GITHUB%s", TagMuted, TagReset)
 	if opt.activeSection == SectionMirror {
-		sec3Header = "  [#38bdf8:b]▶ 3. ЗЕРКАЛО ЗАГРУЗКИ GITHUB[-]  [#64748b]стрелки или 1-6[-]"
+		sec3Header = fmt.Sprintf("  %s▶ 3. ЗЕРКАЛО ЗАГРУЗКИ GITHUB%s  %sстрелки или 1-6%s", TagCyanBold, TagReset, TagSubText, TagReset)
 	}
 	opt.printClip(screen, sec3Header, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	curY++
 
-	renderMirrorRow := func(startIdx, endIdx int) {
-		colWidth := (width - 6) / 3
-		if colWidth < 26 {
-			colWidth = 26
-		}
-		for i := startIdx; i < endIdx && i < len(opt.mirrors); i++ {
-			m := opt.mirrors[i]
-			isSelected := (opt.selectedMirror == i)
-			isFocused := (opt.activeSection == SectionMirror && opt.mirrorCursor == i)
-
-			radio := "[#64748b]( )[-]"
-			if isSelected {
-				radio = "[#38bdf8:b](•)[-]"
-			}
-
-			cellX := x + 3 + (i-startIdx)*colWidth
-			if isFocused {
-				opt.printClip(screen, fmt.Sprintf("[#ffffff:#1e293b:b]▶ [%d] %s %s[-] ", i+1, radio, m.Name), cellX, curY, colWidth, tview.AlignLeft, tcell.ColorDefault)
-			} else if isSelected {
-				opt.printClip(screen, fmt.Sprintf("  [%d] %s [#38bdf8:b]%s[-] ", i+1, radio, m.Name), cellX, curY, colWidth, tview.AlignLeft, tcell.ColorDefault)
-			} else {
-				opt.printClip(screen, fmt.Sprintf("  [%d] %s [#94a3b8]%s[-] ", i+1, radio, m.Name), cellX, curY, colWidth, tview.AlignLeft, tcell.ColorDefault)
-			}
-			mIdx := i
-			opt.clickTargets = append(opt.clickTargets, optClickTarget{
-				x1: cellX, y1: curY, x2: cellX + colWidth, y2: curY,
-				onClick: func() {
-					opt.activeSection = SectionMirror
-					opt.mirrorCursor = mIdx
-					opt.selectedMirror = mIdx
-				},
-			})
-		}
-		curY++
+	mirrorCols := opt.mirrorGridCols(width)
+	mirrorColW := (width - 6) / mirrorCols
+	if mirrorColW < 18 {
+		mirrorColW = 18
 	}
 
-	renderMirrorRow(0, 3)
-	renderMirrorRow(3, 6)
+	for i := 0; i < len(opt.mirrors); i++ {
+		m := opt.mirrors[i]
+		row := i / mirrorCols
+		col := i % mirrorCols
+
+		isSelected := (opt.selectedMirror == i)
+		isFocused := (opt.activeSection == SectionMirror && opt.mirrorCursor == i)
+
+		radio := fmt.Sprintf("%s( )%s", TagDark, TagReset)
+		if isSelected {
+			radio = fmt.Sprintf("%s(•)%s", TagCyanBold, TagReset)
+		}
+
+		cellX := x + 3 + col*mirrorColW
+		cellW := mirrorColW
+		if col == mirrorCols-1 {
+			cellW = width - 6 - col*mirrorColW
+		}
+
+		if isFocused {
+			opt.printClip(screen, fmt.Sprintf("[#ffffff:#0284c7:b]▶ [%d] %s %s[-] ", i+1, radio, m.Name), cellX, curY+row, cellW, tview.AlignLeft, tcell.ColorDefault)
+		} else if isSelected {
+			opt.printClip(screen, fmt.Sprintf("  [%d] %s %s%s%s ", i+1, radio, TagCyanBold, m.Name, TagReset), cellX, curY+row, cellW, tview.AlignLeft, tcell.ColorDefault)
+		} else {
+			opt.printClip(screen, fmt.Sprintf("  [%d] %s %s%s%s ", i+1, radio, TagSubText, m.Name, TagReset), cellX, curY+row, cellW, tview.AlignLeft, tcell.ColorDefault)
+		}
+		mIdx := i
+		opt.clickTargets = append(opt.clickTargets, optClickTarget{
+			x1: cellX, y1: curY + row, x2: cellX + cellW, y2: curY + row,
+			onClick: func() {
+				opt.activeSection = SectionMirror
+				opt.mirrorCursor = mIdx
+				opt.selectedMirror = mIdx
+			},
+		})
+	}
+	mirrorRows := (len(opt.mirrors) + mirrorCols - 1) / mirrorCols
+	curY += mirrorRows
 
 	// Thin Divider
 	drawOptionDivider(screen, x, curY, width)
@@ -513,28 +521,28 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 	// -------------------------------------------------------------
 	// SECTION 4: LOCALIZATION & SYSTEM
 	// -------------------------------------------------------------
-	sec4Header := "  [#94a3b8]⚙️ 4. СИСТЕМА И ЛОКАЛИЗАЦИЯ:[-]"
+	sec4Header := fmt.Sprintf("  %s⚙️ 4. СИСТЕМА И ЛОКАЛИЗАЦИЯ%s", TagMuted, TagReset)
 	if opt.activeSection == SectionLang {
-		sec4Header = "  [#38bdf8:b]▶ 4. СИСТЕМА И ЛОКАЛИЗАЦИЯ[-]  [#64748b]↑↓ выбор, Space/Enter переключение[-]"
+		sec4Header = fmt.Sprintf("  %s▶ 4. СИСТЕМА И ЛОКАЛИЗАЦИЯ%s  %s↑↓ выбор, Space/Enter переключение%s", TagCyanBold, TagReset, TagSubText, TagReset)
 	}
 	opt.printClip(screen, sec4Header, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	curY++
 
 	// 4.1 Russian language
-	ruCheck := "[#64748b][ ][-]"
+	ruCheck := fmt.Sprintf("%s[ ]%s", TagDark, TagReset)
 	if opt.installRussian {
-		ruCheck = "[#22c55e:b][✓][-]"
+		ruCheck = fmt.Sprintf("%s[✓]%s", TagGreenBold, TagReset)
 	}
 	ruCursorPrefix := "    "
 	ruHighlightOpen := ""
 	ruHighlightClose := ""
 	if opt.activeSection == SectionLang && opt.langCursor == 0 {
-		ruCursorPrefix = "  [#38bdf8]▶[-] "
-		ruHighlightOpen = "[#ffffff:#1e293b:b]"
+		ruCursorPrefix = fmt.Sprintf("  %s▶%s ", TagCyanBold, TagReset)
+		ruHighlightOpen = "[#ffffff:#0284c7:b]"
 		ruHighlightClose = "[-]"
 	}
-	opt.printClip(screen, fmt.Sprintf("%s%s%s [#cbd5e1]Установить русский языковой пакет LuCI (luci-i18n-tachyon-ru)[-]%s",
-		ruCursorPrefix, ruHighlightOpen, ruCheck, ruHighlightClose), x, curY, width, tview.AlignLeft, tcell.ColorDefault)
+	opt.printClip(screen, fmt.Sprintf("%s%s%s %sУстановить русский языковой пакет LuCI (luci-i18n-tachyon-ru)%s%s",
+		ruCursorPrefix, ruHighlightOpen, ruCheck, TagSubText, TagReset, ruHighlightClose), x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	opt.clickTargets = append(opt.clickTargets, optClickTarget{
 		x1: x, y1: curY, x2: x + width, y2: curY,
 		onClick: func() {
@@ -546,20 +554,20 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 	curY++
 
 	// 4.2 zRAM swap
-	zramCheck := "[#64748b][ ][-]"
+	zramCheck := fmt.Sprintf("%s[ ]%s", TagDark, TagReset)
 	if opt.installZRAM {
-		zramCheck = "[#22c55e:b][✓][-]"
+		zramCheck = fmt.Sprintf("%s[✓]%s", TagGreenBold, TagReset)
 	}
 	zramCursorPrefix := "    "
 	zramHighlightOpen := ""
 	zramHighlightClose := ""
 	if opt.activeSection == SectionLang && opt.langCursor == 1 {
-		zramCursorPrefix = "  [#38bdf8]▶[-] "
-		zramHighlightOpen = "[#ffffff:#1e293b:b]"
+		zramCursorPrefix = fmt.Sprintf("  %s▶%s ", TagCyanBold, TagReset)
+		zramHighlightOpen = "[#ffffff:#0284c7:b]"
 		zramHighlightClose = "[-]"
 	}
-	opt.printClip(screen, fmt.Sprintf("%s%s%s [#cbd5e1]Включить zRAM-swap (сжатый SWAP в RAM для защиты от OOM)[-]%s",
-		zramCursorPrefix, zramHighlightOpen, zramCheck, zramHighlightClose), x, curY, width, tview.AlignLeft, tcell.ColorDefault)
+	opt.printClip(screen, fmt.Sprintf("%s%s%s %sВключить zRAM-swap (сжатый SWAP в RAM для защиты от OOM)%s%s",
+		zramCursorPrefix, zramHighlightOpen, zramCheck, TagSubText, TagReset, zramHighlightClose), x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	opt.clickTargets = append(opt.clickTargets, optClickTarget{
 		x1: x, y1: curY, x2: x + width, y2: curY,
 		onClick: func() {
@@ -574,13 +582,13 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 	// SECTION 5 & 6: ACTION BUTTONS
 	// -------------------------------------------------------------
 	if opt.hasInstalledTachyon() {
-		btnInstall := " [#38bdf8:#1e293b] 🚀 Полная установка [-] "
+		btnInstall := " [#f8fafc:#1e293b] 🚀 Полная установка [-] "
 		if opt.activeSection == SectionBtnInstall {
 			btnInstall = " [#ffffff:#0284c7:b] ▶ 🚀 Полная установка (Enter) [-] "
 		}
-		btnSwap := " [#eab308:#1e293b] ⚡ Сменить ядро (S) [-] "
+		btnSwap := " [#f8fafc:#1e293b] ⚡ Сменить ядро (S) [-] "
 		if opt.activeSection == SectionBtnHotSwap {
-			btnSwap = " [#ffffff:#ca8a04:b] ▶ ⚡ Сменить ядро (Enter) [-] "
+			btnSwap = " [#ffffff:#d97706:b] ▶ ⚡ Сменить ядро (Enter) [-] "
 		}
 		btnBack := " [#94a3b8:#1e293b] ← Назад к SSH [-] "
 		if opt.activeSection == SectionBtnBack {
@@ -616,10 +624,15 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 		})
 		curY++
 
-		footer := "  [#64748b]↑↓←→ навигация · Enter выбор · A автопилот · F флот · D диаг · M монитор · T тюнинг · R rescue · S сменить ядро · Esc назад[-]"
+		var footer string
+		if width < 80 {
+			footer = "  " + FormatHotkey("Enter", "Выбор") + " · " + FormatVioletHotkey("F", "Флот") + " · " + FormatHotkey("A", "Авто") + " · " + FormatExitHotkey("Esc", "Назад")
+		} else {
+			footer = "  " + FormatHotkey("Enter", "Выбор") + " · " + FormatHotkey("A", "Авто") + " · " + FormatVioletHotkey("F", "Флот") + " · " + FormatHotkey("D", "Диаг") + " · " + FormatHotkey("M", "Монитор") + " · " + FormatHotkey("T", "Тюнинг") + " · " + FormatHotkey("R", "Rescue") + " · " + FormatHotkey("S", "Ядро") + " · " + FormatExitHotkey("Esc", "Назад")
+		}
 		opt.printClip(screen, footer, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	} else {
-		btnInstall := "  [#38bdf8:#1e293b]  🚀  Начать установку  [-]  "
+		btnInstall := "  [#f8fafc:#1e293b]  🚀  Начать установку  [-]  "
 		if opt.activeSection == SectionBtnInstall {
 			btnInstall = "  [#ffffff:#0284c7:b] ▶ 🚀  Начать установку (Enter)  [-]  "
 		}
@@ -649,13 +662,18 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 		})
 		curY++
 
-		footer := "  [#64748b]↑↓←→ навигация · Enter выбор · A автопилот · F флот · D диаг · M монитор · T тюнинг · R rescue · C конфликты · Esc назад[-]"
+		var footer string
+		if width < 80 {
+			footer = "  " + FormatHotkey("Enter", "Выбор") + " · " + FormatVioletHotkey("F", "Флот") + " · " + FormatHotkey("A", "Авто") + " · " + FormatExitHotkey("Esc", "Назад")
+		} else {
+			footer = "  " + FormatHotkey("Enter", "Выбор") + " · " + FormatHotkey("A", "Авто") + " · " + FormatVioletHotkey("F", "Флот") + " · " + FormatHotkey("D", "Диаг") + " · " + FormatHotkey("M", "Монитор") + " · " + FormatHotkey("T", "Тюнинг") + " · " + FormatHotkey("R", "Rescue") + " · " + FormatHotkey("C", "Конфликты") + " · " + FormatExitHotkey("Esc", "Назад")
+		}
 		opt.printClip(screen, footer, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	}
 }
 
 func drawOptionDivider(screen tcell.Screen, x, y, width int) {
-	style := tcell.StyleDefault.Foreground(tcell.NewRGBColor(51, 65, 85)) // Slate 700
+	style := tcell.StyleDefault.Foreground(ColorBorderNormal)
 	for col := x + 1; col < x+width-1; col++ {
 		screen.SetContent(col, y, '─', nil, style)
 	}
@@ -1070,11 +1088,25 @@ func (opt *OptionsSelector) triggerManualVersionPrompt() {
 }
 
 func (opt *OptionsSelector) versionGridCols(width int) int {
-	if width > 0 && width < 60 {
+	if width > 0 && width < 45 {
+		return 1
+	}
+	if width > 0 && width < 75 {
 		return 2
 	}
 	return 3
 }
+
+func (opt *OptionsSelector) mirrorGridCols(width int) int {
+	if width > 0 && width < 56 {
+		return 1
+	}
+	if width < 84 {
+		return 2
+	}
+	return 3
+}
+
 
 // SetReleases replaces the version list with fetched release tags (newest first).
 // Must be called from the UI goroutine.

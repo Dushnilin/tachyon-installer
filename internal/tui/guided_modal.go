@@ -109,13 +109,13 @@ func (c *cycleSelectorItem) Draw(screen tcell.Screen) {
 	var style tcell.Style
 	if c.HasFocus() {
 		style = tcell.StyleDefault.
-			Background(tcell.NewRGBColor(2, 132, 199)). // Sky 600
-			Foreground(tcell.ColorWhite).
+			Background(ColorBgInputFocus).
+			Foreground(ColorTextPure).
 			Bold(true)
 	} else {
 		style = tcell.StyleDefault.
-			Background(tcell.NewRGBColor(30, 41, 59)).  // Slate 800
-			Foreground(tcell.NewRGBColor(241, 245, 249)) // Slate 100
+			Background(ColorBgInput).
+			Foreground(ColorTextPrimary)
 	}
 
 	// Fill background of the field
@@ -200,16 +200,16 @@ func ShowGuidedSetupModal(ctx *AppContext, returnPage string) {
 	infoView := tview.NewTextView().
 		SetDynamicColors(true).
 		SetScrollable(true)
-	infoView.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
+	infoView.SetBackgroundColor(ColorBgSpace)
 
 	infoView.SetText("\n" +
-		"  [#38bdf8:b]🚀 Запуск интеллектуального автопилота настройки роутера...[-]\n\n" +
-		"  [#cbd5e1]1. Подключение по SSH и сканирование оборудования[-]\n" +
-		"  [#cbd5e1]2. DNS-тестирование: проверка отравления UDP 53 и подбор быстрого резолвера[-]\n" +
-		"  [#cbd5e1]3. DPI Fuzzer: подбор лучшей стратегии обхода для YouTube и Discord[-]\n" +
-		"  [#cbd5e1]4. Автоматическая оптимизация сетевого стека (BBR, conntrack, сокеты)[-]\n" +
-		"  [#cbd5e1]5. Сквозная валидация результата[-]\n\n" +
-		"  [#eab308]⚡ Выполняется экспресс-диагностика роутера и провайдера, подождите...[-]\n")
+		fmt.Sprintf("  %s🚀 Запуск интеллектуального автопилота настройки роутера...%s\n\n", TagCyanBold, TagReset) +
+		fmt.Sprintf("  %s1. Подключение по SSH и сканирование оборудования%s\n", TagSubText, TagReset) +
+		fmt.Sprintf("  %s2. DNS-тестирование: проверка отравления UDP 53 и подбор быстрого резолвера%s\n", TagSubText, TagReset) +
+		fmt.Sprintf("  %s3. DPI Fuzzer: подбор лучшей стратегии обхода для YouTube и Discord%s\n", TagSubText, TagReset) +
+		fmt.Sprintf("  %s4. Автоматическая оптимизация сетевого стека (BBR, conntrack, сокеты)%s\n", TagSubText, TagReset) +
+		fmt.Sprintf("  %s5. Сквозная валидация результата%s\n\n", TagSubText, TagReset) +
+		fmt.Sprintf("  %s⚡ Выполняется экспресс-диагностика роутера и провайдера, подождите...%s\n", TagAmberBold, TagReset))
 
 	form := tview.NewForm()
 	StyleForm(form)
@@ -227,7 +227,7 @@ func ShowGuidedSetupModal(ctx *AppContext, returnPage string) {
 		}
 	}
 
-	form.AddButton("Отмена (Esc)", closeModal)
+	form.AddButton("🚪 Назад (Esc)", closeModal)
 	form.SetCancelFunc(closeModal)
 	EnableFormArrowNavigation(form)
 

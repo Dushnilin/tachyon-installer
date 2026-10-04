@@ -553,12 +553,12 @@ func (p ProfileData) Warnings() []string {
 func buildStepPanel(title string) *SolidFlex {
 	panel := NewSolidFlex()
 	panel.SetDirection(tview.FlexRow)
-	panel.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
+	panel.SetBackgroundColor(ColorBgSpace)
 	panel.SetBorder(true).
-		SetTitle(fmt.Sprintf(" 🛰️ TACHYON SETUP: %s ", title)).
+		SetTitle(FormatStepTitle(title)).
 		SetTitleAlign(tview.AlignCenter).
-		SetTitleColor(tcell.NewRGBColor(56, 189, 248)).
-		SetBorderColor(tcell.NewRGBColor(56, 189, 248))
+		SetTitleColor(ColorCyanElectric).
+		SetBorderColor(ColorBorderFocused)
 	return panel
 }
 
@@ -580,20 +580,6 @@ func EnableFormArrowNavigation(form *tview.Form) {
 	})
 }
 
-// StyleForm applies custom dark Slate and Sky-600 styling to forms and buttons,
-// eliminating glaring white inverted boxes on focus.
-func StyleForm(form *tview.Form) {
-	form.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
-	form.SetLabelColor(tview.Styles.SecondaryTextColor)
-	form.SetFieldTextColor(tview.Styles.PrimaryTextColor)
-	form.SetFieldBackgroundColor(tcell.NewRGBColor(30, 41, 59))  // Slate 800
-	form.SetButtonBackgroundColor(tcell.NewRGBColor(30, 41, 59)) // Slate 800
-	form.SetButtonTextColor(tcell.NewRGBColor(241, 245, 249))    // Slate 100
-	form.SetButtonActivatedStyle(tcell.StyleDefault.
-		Background(tcell.NewRGBColor(2, 132, 199)). // Sky 600
-		Foreground(tcell.ColorWhite).
-		Bold(true))
-}
 
 // showManualVersionModal displays a prompt modal to enter a custom Tachyon git tag or version.
 func showManualVersionModal(ctx *AppContext, current string, callback func(newVer string), onClose func()) {

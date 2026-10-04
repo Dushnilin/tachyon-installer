@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -86,3 +87,44 @@ func TestModalMouseClickPropagation(t *testing.T) {
 		t.Errorf("expected button action to be triggered by mouse click")
 	}
 }
+
+func TestAdaptiveModalsAcrossResolutions(t *testing.T) {
+	resolutions := [][2]int{
+		{140, 45}, // 4K / Ultrawide / Large terminal
+		{100, 30}, // Standard desktop terminal
+		{80, 24},  // Traditional 80x24 standard
+		{70, 20},  // Compact split-pane
+		{60, 18},  // Small mobile / embed terminal
+	}
+
+	InitTheme()
+
+	for _, res := range resolutions {
+		w, h := res[0], res[1]
+		t.Run(fmt.Sprintf("%dx%d", w, h), func(t *testing.T) {
+			screen := tcell.NewSimulationScreen("UTF-8")
+			if err := screen.Init(); err != nil {
+				t.Fatal(err)
+			}
+			defer screen.Fini()
+			screen.SetSize(w, h)
+
+			// 1. Test buildStepPanel
+			panel := buildStepPanel(" ТЕСТ АДАПТИВНОСТИ ")
+			panel.AddItem(tview.NewTextView().SetText("Test Content"), 0, 1, false)
+			modal := CreateWizardModalCustom(panel, 90, 26)
+			modal.SetRect(0, 0, w, h)
+			modal.Draw(screen)
+			screen.Show()
+
+			cells, cw, _ := screen.GetContents()
+			if cw != w {
+				t.Errorf("%dx%d: expected width %d, got %d", w, h, w, cw)
+			}
+			if len(cells) != w*h {
+				t.Errorf("%dx%d: cells count %d != w*h %d", w, h, len(cells), w*h)
+			}
+		})
+	}
+}
+

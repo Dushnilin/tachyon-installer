@@ -160,11 +160,11 @@ func (ls *LoadingSpinner) Draw(screen tcell.Screen) {
 		var iconColor tcell.Color
 		if item.Checked {
 			icon = '✓'
-			iconColor = tcell.NewRGBColor(34, 197, 94) // green-500
+			iconColor = tcell.NewRGBColor(16, 185, 129) // emerald-500
 		} else {
 			// Use a subtle dot for pending items.
 			icon = '○'
-			iconColor = tcell.NewRGBColor(113, 113, 122) // zinc-500
+			iconColor = tcell.NewRGBColor(148, 163, 184) // slate-400
 		}
 
 		lineX := centerX - 18
@@ -178,9 +178,9 @@ func (ls *LoadingSpinner) Draw(screen tcell.Screen) {
 			if sx >= x && sx < x+w {
 				var textColor tcell.Color
 				if item.Checked {
-					textColor = tcell.NewRGBColor(228, 228, 231) // zinc-200
+					textColor = tcell.NewRGBColor(248, 250, 252) // slate-50
 				} else {
-					textColor = tcell.NewRGBColor(113, 113, 122) // zinc-500
+					textColor = tcell.NewRGBColor(148, 163, 184) // slate-400
 				}
 				screen.SetContent(sx, itemY, r, nil, tcell.StyleDefault.
 					Foreground(textColor).Background(bg))

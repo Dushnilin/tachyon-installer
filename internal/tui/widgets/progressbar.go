@@ -16,19 +16,19 @@ var blockChars = []rune{'▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'}
 // Braille spinner frames for animation.
 var spinnerFrames = []rune{'⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'}
 
-// Color palette.
+// Color palette matching Tachyon Core design language.
 var (
-	gradientStart = tcell.NewRGBColor(14, 165, 233)  // #0ea5e9 sky-500
-	gradientEnd   = tcell.NewRGBColor(99, 102, 241)  // #6366f1 indigo-500
-	subGradStart  = tcell.NewRGBColor(99, 102, 241)  // #6366f1 indigo-500
-	subGradEnd    = tcell.NewRGBColor(168, 85, 247)  // #a855f7 purple-500
-	spinnerColor  = tcell.NewRGBColor(56, 189, 248)  // #38bdf8 sky-400
-	subSpinColor  = tcell.NewRGBColor(167, 139, 250) // #a78bfa violet-400
-	labelColor    = tcell.NewRGBColor(228, 228, 231) // zinc-200
-	subLabelColor = tcell.NewRGBColor(196, 181, 253) // violet-300
+	gradientStart = tcell.NewRGBColor(0, 240, 255)   // #00f0ff - Tachyon Neon Cyan
+	gradientEnd   = tcell.NewRGBColor(56, 189, 248)  // #38bdf8 - Cyber Sky
+	subGradStart  = tcell.NewRGBColor(129, 140, 248) // #818cf8 - Tachyon Indigo
+	subGradEnd    = tcell.NewRGBColor(168, 85, 247)  // #a855f7 - Quantum Violet
+	spinnerColor  = tcell.NewRGBColor(0, 240, 255)   // #00f0ff - Neon Cyan
+	subSpinColor  = tcell.NewRGBColor(192, 132, 252) // #c084fc - Holographic Lilac
+	labelColor    = tcell.NewRGBColor(248, 250, 252) // #f8fafc - Crisp White (Slate 50)
+	subLabelColor = tcell.NewRGBColor(226, 232, 240) // #e2e8f0 - Readable Secondary (Slate 200)
 	percentColor  = tcell.NewRGBColor(255, 255, 255) // white
-	trackColor    = tcell.NewRGBColor(39, 39, 42)    // zinc-800
-	sepColor      = tcell.NewRGBColor(51, 65, 85)    // slate-700
+	trackColor    = tcell.NewRGBColor(30, 41, 59)    // #1e293b - Slate 800
+	sepColor      = tcell.NewRGBColor(51, 65, 85)    // #334155 - Slate 700
 )
 
 // ProgressBar renders an animated dual progress bar:
