@@ -12,6 +12,7 @@ import (
 	backuppkg "tachyon-installer/internal/backup"
 	routerpkg "tachyon-installer/internal/router"
 	sshpkg "tachyon-installer/internal/ssh"
+	"tachyon-installer/internal/updater"
 )
 
 // ShowMonitorModal displays a real-time live performance monitor for the connected router.
@@ -392,6 +393,174 @@ func ShowSnapshotModal(ctx *AppContext, returnPage string) {
 
 	modal := CreateWizardModalCustom(panel, 82, 18)
 	ctx.Pages.AddPage("snapshot_modal", modal, true, true)
+	ctx.App.SetFocus(form)
+}
+
+// ShowNetworkTuneModal optimizes router TCP parameters, buffer sizes, and flow offloading.
+func ShowNetworkTuneModal(ctx *AppContext, returnPage string) {
+	panel := buildStepPanel(" 🚀 ОПТИМИЗАЦИЯ СЕТЕВОГО СТЕКА (SYSCTL & BBR) ")
+
+	infoView := tview.NewTextView().
+		SetDynamicColors(true)
+	infoView.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
+
+	initialText := "\n" +
+		"  [#38bdf8:b]Тонкая настройка сетевого стека ядра OpenWrt:[-]\n\n" +
+		"  [#cbd5e1]• Контроль перегрузки:[-] TCP BBR + fq_codel (борьба с bufferbloat)\n" +
+		"  [#cbd5e1]• Буферы сокетов:[-] rmem/wmem адаптивно под объем памяти роутера\n" +
+		"  [#cbd5e1]• TCP Fast Open (TFO):[-] ускорение повторных рукопожатий\n" +
+		"  [#cbd5e1]• Таблица conntrack:[-] увеличение лимита сессий и быстрая очистка\n" +
+		"  [#cbd5e1]• Flow Offloading:[-] программное/аппаратное ускорение в firewall\n\n" +
+		"  [#94a3b8]Настройки сохраняются в /etc/sysctl.d/99-tachyon-tune.conf[-]\n"
+
+	infoView.SetText(initialText)
+
+	form := tview.NewForm()
+	StyleForm(form)
+
+	closeModal := func() {
+		ctx.Pages.RemovePage("tune_modal")
+		if returnPage != "" {
+			ctx.Pages.SwitchToPage(returnPage)
+			page := ctx.Pages.GetPage(returnPage)
+			if page != nil {
+				ctx.App.SetFocus(page)
+			}
+		}
+	}
+
+	reconnectFn := func() (*gossh.Client, error) {
+		if ctx.Config == nil {
+			return nil, fmt.Errorf("no router config")
+		}
+		return sshpkg.Connect(ctx.Config.RouterIP, ctx.Config.SSHPort, ctx.Config.Username, ctx.Config.Password)
+	}
+
+	execFn := func(_ *gossh.Client, cmd string) (string, error) {
+		return sshpkg.Exec(ctx.SSHClient, cmd, reconnectFn)
+	}
+
+	runTune := func() {
+		infoView.SetText("\n  [#38bdf8]⚡ Применение параметров ядра и оптимизация сети...[-]\n")
+		form.Clear(true)
+		form.AddButton("⏳ Выполняется...", nil)
+
+		go func() {
+			rep := routerpkg.TuneNetwork(ctx.SSHClient, execFn)
+
+			ctx.App.QueueUpdateDraw(func() {
+				var sb strings.Builder
+				sb.WriteString("\n")
+				if rep.Success {
+					sb.WriteString("  [#22c55e:b]✓ Оптимизация сети успешно применена![-]\n\n")
+					for _, r := range rep.AppliedRules {
+						sb.WriteString(fmt.Sprintf("    [#22c55e]✓[-] [#f1f5f9]%s[-]\n", r))
+					}
+					sb.WriteString(fmt.Sprintf("\n  [#94a3b8]Конфигурация сохранена в:[-] [#38bdf8]%s[-]\n", rep.PersistPath))
+				} else {
+					sb.WriteString(fmt.Sprintf("  [#ef5350:b]❌ Ошибка оптимизации:[-] %s\n", rep.Details))
+				}
+
+				infoView.SetText(sb.String())
+
+				form.Clear(true)
+				form.AddButton("✅ Закрыть", closeModal)
+				ctx.App.SetFocus(form)
+			})
+		}()
+	}
+
+	form.AddButton("🚀 Применить оптимизацию", runTune)
+	form.AddButton("Отмена", closeModal)
+	form.SetCancelFunc(closeModal)
+	EnableFormArrowNavigation(form)
+
+	panel.AddItem(infoView, 12, 1, false)
+	panel.AddItem(nil, 1, 0, false)
+	panel.AddItem(formLayout(form), 4, 1, true)
+
+	modal := CreateWizardModalCustom(panel, 82, 19)
+	ctx.Pages.AddPage("tune_modal", modal, true, true)
+	ctx.App.SetFocus(form)
+}
+
+// ShowSelfUpdateModal checks and downloads the newest installer release in-place.
+func ShowSelfUpdateModal(ctx *AppContext, returnPage, currentVersion string) {
+	panel := buildStepPanel(" 🔄 ОБНОВЛЕНИЕ TACHYON INSTALLER ")
+
+	infoView := tview.NewTextView().
+		SetDynamicColors(true)
+	infoView.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
+
+	initialText := fmt.Sprintf("\n"+
+		"  [#38bdf8:b]Автоматическое самообновление программы Tachyon Installer:[-]\n\n"+
+		"  [#cbd5e1]Текущая версия:[-] [#f1f5f9]%s[-]\n"+
+		"  [#cbd5e1]Утилита скачает официальный релиз с GitHub, проверит хэш SHA256[-]\n"+
+		"  [#cbd5e1]и безопасно заменит исполняемый файл на диске без потери данных.[-]\n", currentVersion)
+
+	infoView.SetText(initialText)
+
+	form := tview.NewForm()
+	StyleForm(form)
+
+	closeModal := func() {
+		ctx.Pages.RemovePage("self_update_modal")
+		if returnPage != "" {
+			ctx.Pages.SwitchToPage(returnPage)
+			page := ctx.Pages.GetPage(returnPage)
+			if page != nil {
+				ctx.App.SetFocus(page)
+			}
+		}
+	}
+
+	runUpdate := func() {
+		infoView.SetText("\n  [#38bdf8]⚡ Поиск и загрузка обновления... Подождите[-]\n")
+		form.Clear(true)
+		form.AddButton("⏳ Выполняется...", nil)
+
+		go func() {
+			var logLines []string
+			logFn := func(msg string) {
+				ctx.App.QueueUpdateDraw(func() {
+					logLines = append(logLines, "  "+msg)
+					infoView.SetText("\n" + strings.Join(logLines, ""))
+				})
+			}
+
+			updated, newVer, err := updater.SelfUpdate(context.Background(), currentVersion, logFn)
+
+			ctx.App.QueueUpdateDraw(func() {
+				var sb strings.Builder
+				sb.WriteString("\n")
+				if err != nil {
+					sb.WriteString(fmt.Sprintf("  [#ef5350:b]❌ Ошибка обновления:[-] %v\n", err))
+				} else if updated {
+					sb.WriteString(fmt.Sprintf("  [#22c55e:b]🎉 Успешно обновлено до версии %s![-]\n\n", newVer))
+					sb.WriteString("  [#f1f5f9]Пожалуйста, закройте и перезапустите установщик.[-]\n")
+				} else {
+					sb.WriteString(fmt.Sprintf("  [#22c55e:b]✓ У вас уже установлена актуальная версия (%s)[-]\n", currentVersion))
+				}
+				infoView.SetText(sb.String())
+
+				form.Clear(true)
+				form.AddButton("✅ Закрыть", closeModal)
+				ctx.App.SetFocus(form)
+			})
+		}()
+	}
+
+	form.AddButton("🔄 Обновить сейчас", runUpdate)
+	form.AddButton("Отмена", closeModal)
+	form.SetCancelFunc(closeModal)
+	EnableFormArrowNavigation(form)
+
+	panel.AddItem(infoView, 11, 1, false)
+	panel.AddItem(nil, 1, 0, false)
+	panel.AddItem(formLayout(form), 4, 1, true)
+
+	modal := CreateWizardModalCustom(panel, 80, 18)
+	ctx.Pages.AddPage("self_update_modal", modal, true, true)
 	ctx.App.SetFocus(form)
 }
 

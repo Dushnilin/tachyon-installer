@@ -73,6 +73,8 @@ type AppContext struct {
 	DiagOnly bool
 	// RescueOnly makes the wizard run emergency rescue directly after connecting.
 	RescueOnly bool
+	// AppVersion is the version of tachyon-installer.
+	AppVersion string
 }
 
 // ExecSSH executes a command on the router with reconnection support.

@@ -51,6 +51,8 @@ type Options struct {
 	OfflineBundle  string
 	RunMonitor     bool
 	TestSub        string
+	SelfUpdate     bool
+	TuneNetwork    bool
 	Yes            bool
 	AppVersion     string
 }
@@ -86,6 +88,8 @@ func ParseFlags(args []string, defaultCfg *appconfig.Config, appVersion string) 
 	fs.StringVar(&opts.RunRestore, "restore", "", "Восстановить настройки из файла бэкапа или 'latest'")
 	fs.BoolVar(&opts.ListBackups, "list-backups", false, "Показать список доступных локальных бэкапов")
 	fs.BoolVar(&opts.CheckUpdate, "check-update", false, "Проверить наличие обновлений программы на GitHub")
+	fs.BoolVar(&opts.SelfUpdate, "self-update", false, "Автоматическое обновление программы установщика до последней версии с GitHub")
+	fs.BoolVar(&opts.TuneNetwork, "tune-network", false, "Оптимизировать сетевой стек роутера (TCP BBR, fq_codel, rmem/wmem, conntrack, offloading)")
 	fs.BoolVar(&opts.RunRescue, "rescue", false, "Аварийный сброс правил перехвата и восстановление прямого интернета")
 	fs.BoolVar(&opts.FixConflicts, "fix-conflicts", false, "Отключить конфликтующие прокси-пакеты (passwall, openclash, zapret и др.)")
 	fs.BoolVar(&opts.FullSnapshot, "snapshot", false, "Создать полный бэкап настроек сети, dhcp, firewall и Tachyon")
@@ -104,7 +108,7 @@ func ParseFlags(args []string, defaultCfg *appconfig.Config, appVersion string) 
 
 // ShouldRunHeadless checks if flags request non-interactive execution.
 func (o *Options) ShouldRunHeadless() bool {
-	return o.RunDiag || o.RunUninstall || o.RunRestore != "" || o.ListBackups || o.CheckUpdate || o.SwitchEngine != "" || o.RunRescue || o.FixConflicts || o.FullSnapshot || o.OfflineBundle != "" || o.RunMonitor || o.TestSub != "" || o.Yes
+	return o.RunDiag || o.RunUninstall || o.RunRestore != "" || o.ListBackups || o.CheckUpdate || o.SelfUpdate || o.TuneNetwork || o.SwitchEngine != "" || o.RunRescue || o.FixConflicts || o.FullSnapshot || o.OfflineBundle != "" || o.RunMonitor || o.TestSub != "" || o.Yes
 }
 
 // Run executes non-interactive CLI operations.
@@ -123,6 +127,20 @@ func Run(opts *Options) int {
 			fmt.Printf("💡 Доступна новая версия: %s (текущая: %s)\nСсылка для загрузки: %s\n", latestVer, opts.AppVersion, relURL)
 		} else {
 			fmt.Printf("✓ У вас установлена актуальная версия Tachyon Installer (%s)\n", opts.AppVersion)
+		}
+		return 0
+	}
+
+	// In-Place Self-Update
+	if opts.SelfUpdate {
+		logFn := func(msg string) { fmt.Print(msg) }
+		updated, newVer, err := updater.SelfUpdate(context.Background(), opts.AppVersion, logFn)
+		if err != nil {
+			fmt.Printf("❌ Ошибка самообновления: %v\n", err)
+			return 1
+		}
+		if updated {
+			fmt.Printf("✓ Программа успешно обновлена до %s. Пожалуйста, перезапустите установщик.\n", newVer)
 		}
 		return 0
 	}
@@ -317,7 +335,32 @@ func Run(opts *Options) int {
 		}
 	}
 
-	// 9. Uninstall
+	// 9. Network Optimization & Sysctl Tuning
+	if opts.TuneNetwork {
+		fmt.Println("⚡ ОПТИМИЗАЦИЯ СЕТЕВОГО СТЕКА И SYSCTL РОУТЕРА...")
+		execCmd := func(_ *gossh.Client, cmd string) (string, error) {
+			sess, err := client.NewSession()
+			if err != nil {
+				return "", err
+			}
+			defer sess.Close()
+			out, err := sess.CombinedOutput(cmd)
+			return string(out), err
+		}
+		rep := routerpkg.TuneNetwork(client, execCmd)
+		if !rep.Success {
+			fmt.Printf("❌ Сбой оптимизации: %s\n", rep.Details)
+			return 1
+		}
+		for _, r := range rep.AppliedRules {
+			fmt.Printf("  • %s\n", r)
+		}
+		fmt.Printf("\n✓ Конфигурация сохранена в %s\n", rep.PersistPath)
+		fmt.Printf("✓ %s\n", rep.Details)
+		return 0
+	}
+
+	// 10. Uninstall
 	if opts.RunUninstall {
 		fmt.Println("⚡ Запуск чистого удаления Tachyon...")
 		out, err := deploypkg.UninstallTachyon(client, isAPK)

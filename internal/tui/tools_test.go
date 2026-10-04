@@ -76,4 +76,16 @@ func TestToolsModalsCreation(t *testing.T) {
 	if !pages.HasPage("snapshot_modal") {
 		t.Errorf("expected snapshot_modal page to be created")
 	}
+
+	// Test creation of tune modal
+	ShowNetworkTuneModal(ctx, "")
+	if !pages.HasPage("tune_modal") {
+		t.Errorf("expected tune_modal page to be created")
+	}
+
+	// Test creation of self update modal
+	ShowSelfUpdateModal(ctx, "", "v1.6.0")
+	if !pages.HasPage("self_update_modal") {
+		t.Errorf("expected self_update_modal page to be created")
+	}
 }

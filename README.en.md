@@ -20,6 +20,8 @@
 ## 🔍 Key Highlights (v1.6)
 
 - **⚡ Instant 1-Line Bootstrap**: Launch directly in console without manual downloading via PowerShell (`irm ... | iex`) or Linux/macOS (`curl | bash`).
+- **🚀 Kernel & Network Optimization (BBR & Sysctl Tuning)**: Fine-tunes OpenWrt networking stack (TCP BBR + fq_codel queue, adaptive socket buffers based on router RAM, TCP Fast Open, faster conntrack cleanup, and Firewall Flow Offloading) persisted in `/etc/sysctl.d/99-tachyon-tune.conf` (`-tune-network` flag in CLI or `T` hotkey in TUI).
+- **🔄 In-Place Self-Update**: Automatically checks, downloads newer releases, verifies SHA256 integrity, and atomically swaps the running installer executable in 1 command (`-self-update` flag or `U` hotkey in TUI).
 - **🚑 Emergency Network Rescue**: Safely flushes deadlocked nftables/iptables interception rules, clears TProxy routes, restarts dnsmasq/firewall, and restores native internet access instantly (`-rescue` flag in CLI or `🚑 Rescue` button / `R` hotkey in TUI).
 - **🛡️ Conflict Auto-Fix**: Automatically detects, stops, and disables conflicting proxy/DNS tools (`passwall`, `openclash`, `zapret`, `xray`, `shadowsocksr`, etc.) via `-fix-conflicts` flag or `C` hotkey in TUI.
 - **📊 Real-Time Live Monitor**: Interactive telemetry dashboard displaying CPU loadavg, RAM usage (with visual bar), system uptime, active proxy core (PID, memory), open conntrack connections, and LAN RX/TX traffic live (`-monitor` flag in CLI or `M` hotkey in TUI).
@@ -151,6 +153,12 @@ Follow the on-screen TUI wizard:
 For script-based automation, CI/CD pipelines, or execution without launching the interactive TUI, use command-line flags:
 
 ```bash
+# Network & kernel optimization (TCP BBR, fq_codel, adaptive socket buffers)
+./tachyon-installer -ip 192.168.1.1 -pass "secret" -tune-network
+
+# In-place self-update to the newest release on GitHub
+./tachyon-installer -self-update
+
 # Emergency rescue: flush interception rules and recover native internet
 ./tachyon-installer -ip 192.168.1.1 -pass "secret" -rescue
 

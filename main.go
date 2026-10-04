@@ -101,6 +101,7 @@ func main() {
 		ConsoleView:  consoleView,
 		ProgressView: progressView,
 		Config:       cfg,
+		AppVersion:   AppVersion,
 		Reconnect: func() (*gossh.Client, error) {
 			return sshpkg.Connect(cfg.RouterIP, cfg.SSHPort, cfg.Username, cfg.Password)
 		},

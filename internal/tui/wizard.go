@@ -381,6 +381,14 @@ func ShowOptionsWizard(ctx *AppContext, profile ProfileData) {
 		ShowSnapshotModal(ctx, "options_wizard")
 	}
 
+	optSelector.OnTuneNetwork = func() {
+		ShowNetworkTuneModal(ctx, "options_wizard")
+	}
+
+	optSelector.OnSelfUpdate = func() {
+		ShowSelfUpdateModal(ctx, "options_wizard", ctx.AppVersion)
+	}
+
 	optSelector.OnHotSwap = func(engineKey, mirrorKey string) {
 		if ctx.OnHotSwap != nil {
 			ctx.Pages.SwitchToPage("progress")

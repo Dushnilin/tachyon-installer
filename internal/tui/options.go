@@ -91,6 +91,8 @@ type OptionsSelector struct {
 	OnRescue               func()
 	OnFixConflicts         func()
 	OnSnapshot             func()
+	OnTuneNetwork          func()
+	OnSelfUpdate           func()
 
 	prefVersion string
 }
@@ -612,7 +614,7 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 		})
 		curY++
 
-		footer := "  [#64748b]↑↓←→ навигация · Enter выбор · D диаг · M монитор · R rescue · S сменить ядро · Esc назад[-]"
+		footer := "  [#64748b]↑↓←→ навигация · Enter выбор · D диаг · M монитор · T тюнинг · R rescue · S сменить ядро · Esc назад[-]"
 		opt.printClip(screen, footer, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	} else {
 		btnInstall := "  [#38bdf8:#1e293b]  🚀  Начать установку  [-]  "
@@ -645,7 +647,7 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 		})
 		curY++
 
-		footer := "  [#64748b]↑↓←→ навигация · Enter/Space выбор · D диаг · M монитор · R rescue · C конфликты · Esc назад[-]"
+		footer := "  [#64748b]↑↓←→ навигация · Enter выбор · D диаг · M монитор · T тюнинг · R rescue · C конфликты · Esc назад[-]"
 		opt.printClip(screen, footer, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	}
 }
@@ -744,6 +746,16 @@ func (opt *OptionsSelector) InputHandler() func(event *tcell.EventKey, setFocus 
 			case 'b', 'B', 'и', 'И':
 				if opt.OnSnapshot != nil {
 					opt.OnSnapshot()
+				}
+				return
+			case 't', 'T', 'е', 'Е':
+				if opt.OnTuneNetwork != nil {
+					opt.OnTuneNetwork()
+				}
+				return
+			case 'u', 'U', 'г', 'Г':
+				if opt.OnSelfUpdate != nil {
+					opt.OnSelfUpdate()
 				}
 				return
 			case 's', 'S', 'ы', 'Ы':

@@ -105,5 +105,17 @@ func TestParseFlags_HeadlessTriggers(t *testing.T) {
 	if err != nil || !optsSub.ShouldRunHeadless() || optsSub.TestSub != "vless://test" {
 		t.Errorf("expected -test-sub to trigger headless mode")
 	}
+
+	// 14. -self-update
+	optsSelfUpd, err := ParseFlags([]string{"-self-update"}, cfg, "v1.6.0")
+	if err != nil || !optsSelfUpd.ShouldRunHeadless() || !optsSelfUpd.SelfUpdate {
+		t.Errorf("expected -self-update to trigger headless mode")
+	}
+
+	// 15. -tune-network
+	optsTune, err := ParseFlags([]string{"-tune-network"}, cfg, "v1.6.0")
+	if err != nil || !optsTune.ShouldRunHeadless() || !optsTune.TuneNetwork {
+		t.Errorf("expected -tune-network to trigger headless mode")
+	}
 }
 
