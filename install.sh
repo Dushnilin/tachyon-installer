@@ -6,7 +6,7 @@
 
 set -e
 
-printf "\033[1;36m🛰️  Инициализация Tachyon Express Installer...\033[0m\n"
+printf "\033[1;36m==> Initializing Tachyon Express Installer...\033[0m\n"
 
 # 1. Detect OS
 OS_RAW=$(uname -s | tr '[:upper:]' '[:lower:]')
@@ -18,7 +18,7 @@ case "$OS_RAW" in
         OS="linux"
         ;;
     *)
-        printf "\033[1;31m❌ Неподдерживаемая ОС: %s\033[0m\n" "$OS_RAW"
+        printf "\033[1;31m[ERROR] Unsupported operating system: %s\033[0m\n" "$OS_RAW"
         exit 1
         ;;
 esac
@@ -33,13 +33,13 @@ case "$ARCH_RAW" in
         ARCH="arm64"
         ;;
     *)
-        printf "\033[1;31m❌ Неподдерживаемая архитектура процессора: %s\033[0m\n" "$ARCH_RAW"
+        printf "\033[1;31m[ERROR] Unsupported CPU architecture: %s\033[0m\n" "$ARCH_RAW"
         exit 1
         ;;
 esac
 
 BINARY_NAME="tachyon-installer-${OS}-${ARCH}"
-printf "\033[0;37m   Обнаружена платформа: %s (%s)\033[0m\n" "$OS" "$ARCH"
+printf "\033[0;37m    Platform detected: %s (%s)\033[0m\n" "$OS" "$ARCH"
 
 # 3. Target Path
 TEMP_DIR="/tmp/tachyon-installer"
@@ -57,7 +57,7 @@ https://gh.ddlc.top/https://github.com/Dushnilin/tachyon-installer/releases/late
 DOWNLOADED=0
 for url in $MIRRORS; do
     [ -z "$url" ] && continue
-    printf "\033[0;36m⚡ Загрузка с: %s ...\033[0m\n" "$url"
+    printf "\033[0;36m    Downloading from: %s ...\033[0m\n" "$url"
     if command -v curl >/dev/null 2>&1; then
         if curl -fSL --connect-timeout 8 -o "$TARGET_PATH" "$url" 2>/dev/null; then
             DOWNLOADED=1
@@ -69,18 +69,18 @@ for url in $MIRRORS; do
             break
         fi
     fi
-    printf "\033[0;33m   Сбой зеркала, пробуем следующее...\033[0m\n"
+    printf "\033[0;33m    [Warning] Mirror failed, trying next...\033[0m\n"
 done
 
 if [ "$DOWNLOADED" -ne 1 ] || [ ! -f "$TARGET_PATH" ] || [ $(wc -c < "$TARGET_PATH" 2>/dev/null || stat -c%s "$TARGET_PATH" 2>/dev/null || echo 0) -lt 1048576 ]; then
-    printf "\033[1;31m❌ Ошибка: не удалось скачать исполняемый файл ни с одного зеркала.\033[0m\n"
-    printf "\033[1;31m   Скачайте файл вручную со страницы: https://github.com/Dushnilin/tachyon-installer/releases\033[0m\n"
+    printf "\033[1;31m[ERROR] Could not download installer binary from any mirror.\033[0m\n"
+    printf "\033[1;31m        Please download manually from: https://github.com/Dushnilin/tachyon-installer/releases\033[0m\n"
     exit 1
 fi
 
 chmod +x "$TARGET_PATH"
-printf "\033[1;32m✓ Файл успешно загружен!\033[0m\n"
-printf "\033[1;36m🚀 Запуск Tachyon Installer...\033[0m\n"
+printf "\033[1;32m    [OK] Download completed successfully!\033[0m\n"
+printf "\033[1;36m==> Launching Tachyon Installer...\033[0m\n"
 
 # 5. Execute in place
 exec "$TARGET_PATH" "$@"
