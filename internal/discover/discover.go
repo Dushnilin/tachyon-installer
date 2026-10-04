@@ -65,8 +65,8 @@ func HostsInCIDR(cidr string) []string {
 	return hosts
 }
 
-// localCIDRs returns the IPv4 networks of active non-loopback interfaces.
-func localCIDRs() []string {
+// LocalCIDRs returns the IPv4 networks of active non-loopback, non-APIPA interfaces.
+func LocalCIDRs() []string {
 	var out []string
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
@@ -77,6 +77,10 @@ func localCIDRs() []string {
 		if !ok || ipnet.IP.IsLoopback() || ipnet.IP.To4() == nil {
 			continue
 		}
+		// Skip link-local APIPA (169.254.0.0/16) and multicast
+		if ipnet.IP.IsLinkLocalUnicast() || ipnet.IP.IsLinkLocalMulticast() || ipnet.IP.IsMulticast() || ipnet.IP.IsUnspecified() {
+			continue
+		}
 		ones, bits := ipnet.Mask.Size()
 		if bits-ones > 8 { // scan at most a /24 around the host
 			ones = bits - 8
@@ -85,6 +89,11 @@ func localCIDRs() []string {
 		out = append(out, fmt.Sprintf("%s/%d", network.String(), ones))
 	}
 	return out
+}
+
+// localCIDRs is an alias kept for internal compatibility.
+func localCIDRs() []string {
+	return LocalCIDRs()
 }
 
 // Scan probes the gateway, common router addresses and the local subnets.
@@ -102,7 +111,23 @@ func Scan(ctx context.Context, port int, gateway string) []Host {
 	for _, ip := range commonRouterIPs {
 		add(ip)
 	}
-	for _, c := range localCIDRs() {
+
+	cidrs := LocalCIDRs()
+	// Prioritize CIDR that contains the gateway
+	if gwIP := net.ParseIP(gateway); gwIP != nil {
+		sort.SliceStable(cidrs, func(i, j int) bool {
+			_, netI, errI := net.ParseCIDR(cidrs[i])
+			_, netJ, errJ := net.ParseCIDR(cidrs[j])
+			matchI := errI == nil && netI.Contains(gwIP)
+			matchJ := errJ == nil && netJ.Contains(gwIP)
+			if matchI != matchJ {
+				return matchI
+			}
+			return false
+		})
+	}
+
+	for _, c := range cidrs {
 		for _, ip := range HostsInCIDR(c) {
 			add(ip)
 		}
@@ -128,7 +153,7 @@ func scanList(ctx context.Context, port int, gateway string, candidates []string
 		go func(ip string) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			if h, ok := ProbeHost(ip, port, 600*time.Millisecond); ok {
+			if h, ok := ProbeHost(ip, port, 1200*time.Millisecond); ok {
 				mu.Lock()
 				found = append(found, h)
 				mu.Unlock()

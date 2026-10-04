@@ -32,6 +32,23 @@ type InstallOptions struct {
 	InstallZRAM    bool
 }
 
+// Central Control Hub actions for main menu navigation.
+const (
+	ActionNone       = ""
+	ActionInstall    = "install"
+	ActionGuided     = "guided"
+	ActionFleet      = "fleet"
+	ActionSpeed      = "speed"
+	ActionDiag       = "diag"
+	ActionMonitor    = "monitor"
+	ActionTune       = "tune"
+	ActionRescue     = "rescue"
+	ActionConflicts  = "conflicts"
+	ActionSnapshot   = "snapshot"
+	ActionHotSwap    = "hot_swap"
+	ActionSelfUpdate = "self_update"
+)
+
 // AppContext holds all shared state for the TUI application.
 type AppContext struct {
 	App         *tview.Application
@@ -68,6 +85,9 @@ type AppContext struct {
 	LogPath string
 	// ReportPath is the saved post-install diagnostics report.
 	ReportPath string
+
+	// PendingAction tracks which tool/action to open after connecting to the router.
+	PendingAction string
 
 	// DiagOnly makes the wizard run diagnostics instead of an installation.
 	DiagOnly bool

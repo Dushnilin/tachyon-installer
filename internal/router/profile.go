@@ -45,9 +45,9 @@ df -k /overlay 2>/dev/null | awk 'END{print $2"|"$4}' || df -k / 2>/dev/null | a
 (opkg list-installed 2>/dev/null | grep -E "nextdns|https-dns-proxy|passwall|bypass|shadowsocksr|openclash|forkop|podkop|netshift" || apk info 2>/dev/null | grep -E "nextdns|https-dns-proxy|passwall|bypass|shadowsocksr|openclash|forkop|podkop|netshift" || echo "none") | tr '\n' ' ' && echo ""
 command -v apk >/dev/null 2>&1 && echo "apk" || echo "opkg"
 [ -x /sbin/fw4 ] && echo "fw4" || echo "fw3"
-uci -q get tachyon.settings.engine || echo "none"
-opkg status tachyon 2>/dev/null | awk -F': ' '/Version:/{print $2; exit}' || apk info -e tachyon 2>/dev/null || echo ""
-opkg status sing-box-extended 2>/dev/null | awk -F': ' '/Version:/{print $2; exit}' || opkg status sing-box 2>/dev/null | awk -F': ' '/Version:/{print $2; exit}' || apk info -e sing-box-extended 2>/dev/null || apk info -e sing-box 2>/dev/null || echo ""`
+( uci -q get tachyon.settings.engine 2>/dev/null || uci -q get tachyon.main.engine 2>/dev/null || ( pgrep -f "sing-box" >/dev/null 2>&1 && echo "sing-box" ) || ( pgrep -f "steer" >/dev/null 2>&1 && echo "steer" ) || echo "none" )
+( for p in luci-app-tachyon tachyon; do V=$(opkg status "$p" 2>/dev/null | awk -F': ' '/Version:/{print $2; exit}'); [ -n "$V" ] && { echo "$V"; break; }; V=$(opkg list-installed "$p" 2>/dev/null | awk '{print $3; exit}'); [ -n "$V" ] && { echo "$V"; break; }; done; [ -z "$V" ] && command -v apk >/dev/null 2>&1 && { V=$(apk list -I 'luci-app-tachyon*' 2>/dev/null | head -1 | awk -F'-' '{print $(NF-1)}'); [ -z "$V" ] && V=$(apk list -I 'tachyon*' 2>/dev/null | head -1 | awk -F'-' '{print $(NF-1)}'); [ -z "$V" ] && V=$(apk info -e luci-app-tachyon 2>/dev/null); [ -z "$V" ] && V=$(apk info -e tachyon 2>/dev/null); [ -n "$V" ] && echo "$V"; }; [ -z "$V" ] && { V=$(uci -q get tachyon.settings.version 2>/dev/null || uci -q get tachyon.main.version 2>/dev/null || cat /etc/tachyon_version 2>/dev/null || cat /usr/share/tachyon/version 2>/dev/null); [ -n "$V" ] && echo "$V"; }; [ -z "$V" ] && ( [ -f /etc/config/tachyon ] || [ -f /etc/init.d/tachyon ] || [ -x /usr/bin/tachyon ] ) && echo "installed" || true )
+( for p in sing-box-extended sing-box-lx sing-box-tiny sing-box steer steer-extended; do V=$(opkg status "$p" 2>/dev/null | awk -F': ' '/Version:/{print $2; exit}'); [ -n "$V" ] && { echo "$V"; break; }; done; [ -z "$V" ] && command -v apk >/dev/null 2>&1 && { V=$(apk list -I 'sing-box*' 2>/dev/null | head -1 | awk '{print $1}'); [ -n "$V" ] && echo "$V"; }; [ -z "$V" ] && [ -x /usr/bin/sing-box ] && /usr/bin/sing-box version 2>/dev/null | head -1 | awk '{print $3}' || true )`
 
 	session, err := client.NewSession()
 	if err != nil {
@@ -61,6 +61,32 @@ opkg status sing-box-extended 2>/dev/null | awk -F': ' '/Version:/{print $2; exi
 	}
 
 	return ParseProfile(string(outBytes))
+}
+
+// CleanPackageVersion normalizes package versions like "luci-app-tachyon-1.4.9-r1" to "1.4.9".
+func CleanPackageVersion(v string) string {
+	v = strings.TrimSpace(v)
+	if v == "" || v == "none" {
+		return ""
+	}
+	if v == "installed" {
+		return "installed"
+	}
+	v = strings.TrimPrefix(v, "luci-app-tachyon-")
+	v = strings.TrimPrefix(v, "luci-app-tachyon_")
+	v = strings.TrimPrefix(v, "tachyon-")
+	v = strings.TrimPrefix(v, "tachyon_")
+	v = strings.TrimPrefix(v, "v")
+
+	if idx := strings.Index(v, "-r"); idx != -1 {
+		v = v[:idx]
+	} else if strings.Count(v, "-") == 1 {
+		parts := strings.Split(v, "-")
+		if len(parts) == 2 && len(parts[0]) > 0 {
+			v = parts[0]
+		}
+	}
+	return strings.TrimSpace(v)
 }
 
 // ParseProfile parses the raw SSH output into a RouterProfile struct.
@@ -94,7 +120,7 @@ func ParseProfile(out string) (*RouterProfile, error) {
 
 	var tachyonVer, engineVer string
 	if len(lines) > profileStart+11 {
-		tachyonVer = strings.TrimSpace(lines[profileStart+11])
+		tachyonVer = CleanPackageVersion(lines[profileStart+11])
 	}
 	if len(lines) > profileStart+12 {
 		engineVer = strings.TrimSpace(lines[profileStart+12])

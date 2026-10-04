@@ -88,7 +88,7 @@ func TestDefaultScanConfig(t *testing.T) {
 	if cfg.Port != 22 {
 		t.Errorf("expected port 22, got %d", cfg.Port)
 	}
-	if len(cfg.Passwords) != 2 || cfg.Passwords[0] != "secret123" || cfg.Passwords[1] != "" {
-		t.Errorf("expected password sequence [secret123, ''], got %v", cfg.Passwords)
+	if len(cfg.Passwords) < 2 || cfg.Passwords[0] != "secret123" || cfg.Passwords[1] != "" {
+		t.Errorf("expected password sequence starting with [secret123, ''], got %v", cfg.Passwords)
 	}
 }

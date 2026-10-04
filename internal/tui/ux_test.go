@@ -3,6 +3,8 @@ package tui
 import (
 	"strings"
 	"testing"
+
+	"github.com/rivo/tview"
 )
 
 func TestValidateSSHInput(t *testing.T) {
@@ -71,5 +73,26 @@ func TestRouterNoiseFilter(t *testing.T) {
 	out := w.filterLine("Installing tachyon [5/5]")
 	if !strings.Contains(out, "Installing tachyon") || !strings.HasSuffix(out, "\n") {
 		t.Errorf("normal line mangled: %q", out)
+	}
+}
+
+func TestShowWelcomeWizard(t *testing.T) {
+	app := tview.NewApplication()
+	pages := tview.NewPages()
+	ctx := &AppContext{
+		App:   app,
+		Pages: pages,
+	}
+
+	ShowWelcomeWizard(ctx)
+
+	if !pages.HasPage("welcome_wizard") {
+		t.Errorf("expected welcome_wizard page to be registered")
+	}
+	if !pages.HasPage("ssh_wizard") {
+		t.Errorf("expected ssh_wizard page to be registered")
+	}
+	if !pages.HasPage("password_wizard") {
+		t.Errorf("expected password_wizard page to be registered")
 	}
 }

@@ -74,9 +74,12 @@ func (n *FleetNode) ComputeRecommendations(targetVersion string) {
 	cleanInstalled := strings.TrimPrefix(n.InstalledVersion, "v")
 
 	if n.InstalledVersion != "" && n.InstalledVersion != "none" {
-		if cleanTarget != "" && cleanInstalled == cleanTarget {
+		if cleanTarget != "" && (cleanInstalled == cleanTarget || strings.HasPrefix(cleanInstalled, cleanTarget)) {
 			n.Status = StatusUpToDate
 			n.StatusText = fmt.Sprintf("Актуален (v%s)", cleanInstalled)
+		} else if cleanInstalled == "installed" {
+			n.Status = StatusOutdated
+			n.StatusText = "Установлен (Tachyon активен)"
 		} else {
 			n.Status = StatusOutdated
 			if cleanTarget != "" {

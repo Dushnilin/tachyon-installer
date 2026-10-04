@@ -250,30 +250,58 @@ func handleProfileReady(ctx *tui.AppContext) {
 	}
 	ctx.SSHClient = client
 
-	if ctx.DiagOnly {
+	if ctx.DiagOnly || ctx.PendingAction == tui.ActionDiag {
 		ctx.App.QueueUpdateDraw(func() {
 			tui.ShowDiagnosticsWizard(ctx, "welcome_wizard")
 		})
 		return
 	}
 
-	if ctx.RescueOnly {
+	if ctx.RescueOnly || ctx.PendingAction == tui.ActionRescue {
 		ctx.App.QueueUpdateDraw(func() {
 			tui.ShowRescueModal(ctx, "welcome_wizard")
 		})
 		return
 	}
 
-	if ctx.GuidedOnly {
+	if ctx.GuidedOnly || ctx.PendingAction == tui.ActionGuided {
 		ctx.App.QueueUpdateDraw(func() {
 			tui.ShowGuidedSetupModal(ctx, "welcome_wizard")
 		})
 		return
 	}
 
-	if ctx.SpeedDoctorOnly {
+	if ctx.SpeedDoctorOnly || ctx.PendingAction == tui.ActionSpeed {
 		ctx.App.QueueUpdateDraw(func() {
 			tui.ShowSpeedDoctorModal(ctx, "welcome_wizard")
+		})
+		return
+	}
+
+	if ctx.PendingAction == tui.ActionMonitor {
+		ctx.App.QueueUpdateDraw(func() {
+			tui.ShowMonitorModal(ctx, "welcome_wizard")
+		})
+		return
+	}
+
+	if ctx.PendingAction == tui.ActionTune {
+		ctx.App.QueueUpdateDraw(func() {
+			tui.ShowNetworkTuneModal(ctx, "welcome_wizard")
+		})
+		return
+	}
+
+	if ctx.PendingAction == tui.ActionConflicts {
+		ctx.App.QueueUpdateDraw(func() {
+			tui.ShowConflictFixModal(ctx, "welcome_wizard")
+		})
+		return
+	}
+
+	if ctx.PendingAction == tui.ActionSnapshot {
+		ctx.App.QueueUpdateDraw(func() {
+			tui.ShowSnapshotModal(ctx, "welcome_wizard")
 		})
 		return
 	}

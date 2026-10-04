@@ -106,6 +106,17 @@ func StyleForm(form *tview.Form) {
 		Bold(true))
 }
 
+// StyleList applies uniform Tachyon Cyber styling to interactive menu lists.
+func StyleList(list *tview.List) {
+	list.SetBackgroundColor(ColorBgSpace)
+	list.SetMainTextColor(ColorTextPrimary)
+	list.SetSecondaryTextColor(ColorTextMuted)
+	list.SetShortcutColor(ColorCyanElectric)
+	list.SetSelectedBackgroundColor(ColorBgInputFocus)
+	list.SetSelectedTextColor(ColorTextPure)
+	list.SetHighlightFullLine(true)
+}
+
 // FormatHotkey builds a unified, high-contrast hotkey helper chip.
 // Example: "[Enter] Выбор" -> "[#00f0ff:b][Enter][-] [#e2e8f0]Выбор[-]"
 func FormatHotkey(key, action string) string {

@@ -14,12 +14,12 @@ import (
 	"tachyon-installer/internal/discover"
 	dlpkg "tachyon-installer/internal/downloader"
 	sshpkg "tachyon-installer/internal/ssh"
-	"tachyon-installer/internal/tui/widgets"
 )
 
 // ShowWelcomeWizard initializes and displays the 4-step installation wizard.
 func ShowWelcomeWizard(ctx *AppContext) {
-	var step1Form, step2Form, step3Form *tview.Form
+	var step2Form, step3Form *tview.Form
+	var menuList *tview.List
 
 	defaultIP := "192.168.1.1"
 	defaultPort := "22"
@@ -60,90 +60,135 @@ func ShowWelcomeWizard(ctx *AppContext) {
 		SetFieldWidth(22)
 
 	// ==========================================
-	// --- ШАГ 1: ПРИВЕТСТВИЕ И ОБЗОР ---
+	// --- ШАГ 1: TACHYON CONTROL CENTER & MENU ---
 	// ==========================================
-	step1Panel := buildStepPanel(" ШАГ 1/4 ")
+	step1Panel := buildStepPanel(" ⚡ TACHYON CONTROL CENTER & INSTALLER ⚡ ")
 
-	logoWidget := widgets.NewLogoText()
-	logoWidget.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
+	welcomeInfoView := tview.NewTextView().
+		SetDynamicColors(true).
+		SetScrollable(false)
+	welcomeInfoView.SetBackgroundColor(ColorBgSpace)
+	welcomeInfoView.SetText(fmt.Sprintf("  %s🛰️  Tachyon Express Hub%s  •  %sВыберите действие стрелками [↑/↓] или нажав цифру/клавишу%s\n",
+		TagCyanBold, TagReset, TagSubText, TagReset))
 
-	welcomeText := "\n" +
-		"  [#38bdf8]🛰️  Добро пожаловать в установщик Tachyon![-]\n\n" +
-		"  [#cbd5e1]Этот мастер автоматически скачает дистрибутив Tachyon и ядро прокси[-]\n" +
-		"  [#cbd5e1]на вашем ПК через быстрые зеркала GitHub и установит их на роутер OpenWrt.[-]\n\n" +
-		"  [#94a3b8]⚠️  Перед началом убедитесь, что ваш ПК подключен к сети роутера[-]\n" +
-		"  [#94a3b8](LAN-порт или домашний Wi-Fi).[-]"
+	menuList = tview.NewList()
+	StyleList(menuList)
+	menuList.ShowSecondaryText(true)
 
-	step1Form = tview.NewForm()
-	StyleForm(step1Form)
-	step1Form.AddButton("✨ Мастер (Автопилот)", func() {
-		ctx.DiagOnly = false
-		ctx.RescueOnly = false
-		ctx.GuidedOnly = true
-		ctx.SpeedDoctorOnly = false
+	startAction := func(action string) {
+		ctx.PendingAction = action
+		ctx.DiagOnly = (action == ActionDiag)
+		ctx.RescueOnly = (action == ActionRescue)
+		ctx.GuidedOnly = (action == ActionGuided)
+		ctx.SpeedDoctorOnly = (action == ActionSpeed)
+
+		switch action {
+		case ActionFleet:
+			ShowFleetModal(ctx, "welcome_wizard")
+			return
+		case ActionSelfUpdate:
+			ShowSelfUpdateModal(ctx, "welcome_wizard", ctx.AppVersion)
+			return
+		}
+
+		if ctx.SSHClient != nil {
+			switch action {
+			case ActionInstall:
+				go ctx.OnProfileReady(nil)
+			case ActionGuided:
+				ShowGuidedSetupModal(ctx, "welcome_wizard")
+			case ActionSpeed:
+				ShowSpeedDoctorModal(ctx, "welcome_wizard")
+			case ActionDiag:
+				ShowDiagnosticsWizard(ctx, "welcome_wizard")
+			case ActionMonitor:
+				ShowMonitorModal(ctx, "welcome_wizard")
+			case ActionTune:
+				ShowNetworkTuneModal(ctx, "welcome_wizard")
+			case ActionRescue:
+				ShowRescueModal(ctx, "welcome_wizard")
+			case ActionConflicts:
+				ShowConflictFixModal(ctx, "welcome_wizard")
+			case ActionSnapshot:
+				ShowSnapshotModal(ctx, "welcome_wizard")
+			}
+			return
+		}
+
 		ctx.Pages.SwitchToPage("ssh_wizard")
 		ctx.App.SetFocus(step2Form)
+	}
+
+	menuList.AddItem("🚀 [1] Экспресс-установка Tachyon", "Выбор ядра (sing-box / steer), версии, зеркал и параметров установки", '1', func() {
+		startAction(ActionInstall)
 	})
-	step1Form.AddButton("Установить →", func() {
-		ctx.DiagOnly = false
-		ctx.RescueOnly = false
-		ctx.GuidedOnly = false
-		ctx.SpeedDoctorOnly = false
-		ctx.Pages.SwitchToPage("ssh_wizard")
-		ctx.App.SetFocus(step2Form)
+	menuList.AddItem("✨ [2] Авто-мастер (Настройка под ключ)", "Полный автопилот: аудит роутера, установка и конфигурация в 1 клик", '2', func() {
+		startAction(ActionGuided)
 	})
-	step1Form.AddButton("🚀 Скорость & CPU", func() {
-		ctx.DiagOnly = false
-		ctx.RescueOnly = false
-		ctx.GuidedOnly = false
-		ctx.SpeedDoctorOnly = true
-		ctx.Pages.SwitchToPage("ssh_wizard")
-		ctx.App.SetFocus(step2Form)
+	menuList.AddItem("🌐 [3] Флот роутеров (Multi-Router Fleet)", "Массовый поиск роутеров в сети, аудит версий и параллельная установка", '3', func() {
+		startAction(ActionFleet)
 	})
-	step1Form.AddButton("🔍 Диагностика", func() {
-		ctx.DiagOnly = true
-		ctx.RescueOnly = false
-		ctx.GuidedOnly = false
-		ctx.SpeedDoctorOnly = false
-		ctx.Pages.SwitchToPage("ssh_wizard")
-		ctx.App.SetFocus(step2Form)
+	menuList.AddItem("⚡ [4] Скорость & Bufferbloat Doctor", "Замер задержки в покое/нагрузке, Bufferbloat Grade и троттлинг CPU", '4', func() {
+		startAction(ActionSpeed)
 	})
-	step1Form.AddButton("🚑 Rescue", func() {
-		ctx.DiagOnly = false
-		ctx.RescueOnly = true
-		ctx.GuidedOnly = false
-		ctx.SpeedDoctorOnly = false
-		ctx.Pages.SwitchToPage("ssh_wizard")
-		ctx.App.SetFocus(step2Form)
+	menuList.AddItem("🔍 [5] Расширенная диагностика", "Анализ служб, firewall (fw4/fw3), DNS перехвата и маршрутизации", '5', func() {
+		startAction(ActionDiag)
 	})
-	step1Form.AddButton("🌐 Флот роутеров", func() {
-		ShowFleetModal(ctx, "welcome_wizard")
+	menuList.AddItem("📊 [6] Мониторинг в реальном времени", "Живой монитор нагрузки CPU, памяти, сетевых соединений и ячеек", '6', func() {
+		startAction(ActionMonitor)
 	})
-	step1Form.AddButton("Выход", func() {
+	menuList.AddItem("🚀 [7] Оптимизация сети (BBR & fq_codel)", "Тюнинг сетевого стека, очередей fq_codel, TCP BBR и сокетов", '7', func() {
+		startAction(ActionTune)
+	})
+	menuList.AddItem("🚑 [8] Аварийный Rescue (Сброс сети)", "Экстренное восстановление прямого интернета и сброс правил перехвата", '8', func() {
+		startAction(ActionRescue)
+	})
+	menuList.AddItem("🛡️ [9] Устранение конфликтов", "Поиск и отключение Passwall, OpenClash, Zapret и дублирующих DNS", '9', func() {
+		startAction(ActionConflicts)
+	})
+	menuList.AddItem("💾 [B] Полный бэкап и снимки (Snapshot)", "Резервная копия настроек сети, dhcp, firewall и конфигурации Tachyon", 'b', func() {
+		startAction(ActionSnapshot)
+	})
+	menuList.AddItem("🆙 [U] Обновление установщика", "Проверка новых версий на GitHub и самообновление программы", 'u', func() {
+		startAction(ActionSelfUpdate)
+	})
+	menuList.AddItem("🚪 [Q] Выход из программы", "Завершить работу Tachyon Express Installer", 'q', func() {
 		ctx.App.Stop()
 	})
-	EnableFormArrowNavigation(step1Form)
 
-	step1InfoView := tview.NewTextView().
+	menuList.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyEscape {
+			ctx.App.Stop()
+			return nil
+		}
+		if event.Key() == tcell.KeyRune {
+			switch event.Rune() {
+			case 'q', 'Q', 'й', 'Й':
+				ctx.App.Stop()
+				return nil
+			case 'b', 'B', 'и', 'И':
+				startAction(ActionSnapshot)
+				return nil
+			case 'u', 'U', 'г', 'Г':
+				startAction(ActionSelfUpdate)
+				return nil
+			}
+		}
+		return event
+	})
+
+	footerView := tview.NewTextView().
 		SetDynamicColors(true).
-		SetTextAlign(tview.AlignCenter)
-	step1InfoView.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
-	step1InfoView.SetText("")
+		SetScrollable(false)
+	footerView.SetBackgroundColor(ColorBgSpace)
+	footerView.SetText("  " + FormatHotkey("↑/↓", "Навигация") + " · " + FormatHotkey("Enter/Цифра", "Запуск") + " · " + FormatExitHotkey("Esc/Q", "Выход"))
 
-	logoWidget.OnComplete = func() {
-		ctx.App.QueueUpdateDraw(func() {
-			step1InfoView.SetText(welcomeText)
-			ctx.App.SetFocus(step1Form)
-		})
-	}
-	logoWidget.StartAnimation(ctx.App)
-
-	step1Panel.AddItem(logoWidget, 6, 1, false)
-	step1Panel.AddItem(step1InfoView, 0, 1, false)
+	step1Panel.AddItem(welcomeInfoView, 2, 0, false)
+	step1Panel.AddItem(menuList, 0, 1, true)
 	step1Panel.AddItem(nil, 1, 0, false)
-	step1Panel.AddItem(formLayout(step1Form), 5, 1, true)
+	step1Panel.AddItem(footerView, 1, 0, false)
 
-	step1Modal := CreateWizardModal(step1Panel)
+	step1Modal := CreateWizardModalCustom(step1Panel, 96, 28)
 
 	// ==========================================
 	// --- ШАГ 2: НАСТРОЙКА SSH ПОДКЛЮЧЕНИЯ ---
@@ -226,7 +271,7 @@ func ShowWelcomeWizard(ctx *AppContext) {
 	})
 	step2Form.AddButton("← Назад", func() {
 		ctx.Pages.SwitchToPage("welcome_wizard")
-		ctx.App.SetFocus(step1Form)
+		ctx.App.SetFocus(menuList)
 	})
 	EnableFormArrowNavigation(step2Form)
 

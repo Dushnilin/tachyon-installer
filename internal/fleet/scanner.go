@@ -33,8 +33,12 @@ func DefaultScanConfig(userPass string, targetVersion string) ScanConfig {
 	if userPass != "" {
 		passwords = append(passwords, userPass)
 	}
-	// Always try empty password as fallback (standard fresh OpenWrt)
-	passwords = append(passwords, "")
+	// Standard OpenWrt fallback passwords
+	for _, p := range []string{"", "root", "admin", "password"} {
+		if p != userPass {
+			passwords = append(passwords, p)
+		}
+	}
 
 	return ScanConfig{
 		Port:          22,
@@ -78,9 +82,27 @@ func ScanFleet(ctx context.Context, cfg ScanConfig, progressCb func(done, total 
 
 	// If no custom subnets, use auto-discovery from local network
 	if len(cfg.Subnets) == 0 {
-		discoveredHosts := discover.Scan(ctx, cfg.Port, cfg.Gateway)
-		for _, h := range discoveredHosts {
-			addIP(h.IP)
+		cidrs := discover.LocalCIDRs()
+		if gwIP := net.ParseIP(cfg.Gateway); gwIP != nil {
+			sort.SliceStable(cidrs, func(i, j int) bool {
+				_, netI, errI := net.ParseCIDR(cidrs[i])
+				_, netJ, errJ := net.ParseCIDR(cidrs[j])
+				matchI := errI == nil && netI.Contains(gwIP)
+				matchJ := errJ == nil && netJ.Contains(gwIP)
+				if matchI != matchJ {
+					return matchI
+				}
+				return false
+			})
+		}
+		// Also add common router addresses
+		for _, ip := range []string{"192.168.1.1", "192.168.0.1", "192.168.31.1", "192.168.1.205", "192.168.2.1"} {
+			addIP(ip)
+		}
+		for _, c := range cidrs {
+			for _, ip := range discover.HostsInCIDR(c) {
+				addIP(ip)
+			}
 		}
 	}
 
@@ -94,7 +116,7 @@ func ScanFleet(ctx context.Context, cfg ScanConfig, progressCb func(done, total 
 		mu      sync.Mutex
 		results []*FleetNode
 		wg      sync.WaitGroup
-		sem     = make(chan struct{}, 8) // Limit concurrent SSH handshakes
+		sem     = make(chan struct{}, 16) // Limit concurrent SSH handshakes
 		doneCnt int
 	)
 
@@ -156,8 +178,8 @@ func ScanFleet(ctx context.Context, cfg ScanConfig, progressCb func(done, total 
 
 // probeNode tests port 22 and attempts SSH authentication on a single host.
 func probeNode(ctx context.Context, ip string, cfg ScanConfig) *FleetNode {
-	// First check if port is open with quick timeout
-	_, ok := discover.ProbeHost(ip, cfg.Port, 800*time.Millisecond)
+	// First check if port is open with sufficient timeout
+	_, ok := discover.ProbeHost(ip, cfg.Port, 1500*time.Millisecond)
 	if !ok {
 		return nil
 	}
