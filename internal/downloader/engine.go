@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -15,11 +16,14 @@ import (
 type EngineType string
 
 const (
-	EngineSingBoxExtended EngineType = "sing-box-extended"
-	EngineSteerExtended   EngineType = "steer-extended"
-	EngineSteer           EngineType = "steer"
-	EngineSingBoxLX       EngineType = "sing-box-lx"
-	EngineSkip            EngineType = "skip"
+	EngineSingBoxExtended           EngineType = "sing-box-extended"
+	EngineSingBoxExtendedCompressed EngineType = "sing-box-extended-compressed"
+	EngineSingBoxTiny               EngineType = "sing-box-tiny"
+	EngineSingBoxLX                 EngineType = "sing-box-lx"
+	EngineSingBoxStable             EngineType = "sing-box"
+	EngineSteerExtended             EngineType = "steer-extended"
+	EngineSteer                     EngineType = "steer"
+	EngineSkip                      EngineType = "skip"
 )
 
 // EngineDownload holds resolved information for an engine asset.
@@ -31,17 +35,18 @@ type EngineDownload struct {
 	IsPackage  bool // true if .ipk or .apk, false if tar.gz binary archive
 }
 
-// ResolveEngineAsset finds the best matching asset for the router architecture.
-func ResolveEngineAsset(
+// ResolveEngineAssets finds all matching assets for the router architecture.
+// For modular engines like Steer 2.0+, this returns the core package and all protocol modules.
+func ResolveEngineAssets(
 	ctx context.Context,
 	client *Client,
 	engine EngineType,
 	distribArch string,
 	rawArch string,
 	isAPK bool,
-) (*EngineDownload, error) {
+) ([]*EngineDownload, error) {
 	if engine == EngineSkip || engine == "" {
-		return &EngineDownload{EngineType: EngineSkip}, nil
+		return []*EngineDownload{{EngineType: EngineSkip}}, nil
 	}
 
 	ext := "ipk"
@@ -51,11 +56,17 @@ func ResolveEngineAsset(
 
 	switch engine {
 	case EngineSingBoxExtended:
-		return resolveSingBoxExtended(ctx, client, distribArch, rawArch, ext)
+		return resolveSingBoxExtended(ctx, client, distribArch, rawArch, ext, false)
+	case EngineSingBoxExtendedCompressed:
+		return resolveSingBoxExtended(ctx, client, distribArch, rawArch, ext, true)
+	case EngineSingBoxTiny:
+		return resolveSingBoxTiny(ctx, client, distribArch, rawArch, ext)
+	case EngineSingBoxStable:
+		return resolveSingBoxStable(ctx, client, distribArch, rawArch, ext)
 	case EngineSteerExtended:
-		return resolveSteer(ctx, client, true, distribArch, ext)
+		return resolveSteer(ctx, client, true, distribArch, rawArch, ext)
 	case EngineSteer:
-		return resolveSteer(ctx, client, false, distribArch, ext)
+		return resolveSteer(ctx, client, false, distribArch, rawArch, ext)
 	case EngineSingBoxLX:
 		return resolveSingBoxLX(ctx, client, distribArch, rawArch, ext)
 	default:
@@ -63,7 +74,103 @@ func ResolveEngineAsset(
 	}
 }
 
-func resolveSingBoxExtended(ctx context.Context, client *Client, distribArch, rawArch, ext string) (*EngineDownload, error) {
+// ResolveEngineAsset finds the best matching asset for the router architecture (returns the primary asset).
+func ResolveEngineAsset(
+	ctx context.Context,
+	client *Client,
+	engine EngineType,
+	distribArch string,
+	rawArch string,
+	isAPK bool,
+) (*EngineDownload, error) {
+	assets, err := ResolveEngineAssets(ctx, client, engine, distribArch, rawArch, isAPK)
+	if err != nil {
+		return nil, err
+	}
+	if len(assets) == 0 {
+		return nil, fmt.Errorf("no engine assets found for engine: %s", engine)
+	}
+	return assets[0], nil
+}
+
+func getArchCandidates(distribArch, normArch string) []string {
+	var candidates []string
+	cleanDist := strings.ToLower(strings.TrimSpace(distribArch))
+	if cleanDist != "" {
+		candidates = append(candidates, cleanDist)
+	}
+
+	switch normArch {
+	case "arm64":
+		genericList := []string{"aarch64_generic", "aarch64_cortex-a53", "aarch64_cortex-a72", "aarch64_cortex-a76"}
+		for _, c := range genericList {
+			if !slices.Contains(candidates, c) {
+				candidates = append(candidates, c)
+			}
+		}
+	case "amd64":
+		if !slices.Contains(candidates, "x86_64") {
+			candidates = append(candidates, "x86_64")
+		}
+	case "mipsle":
+		genericList := []string{"mipsel_24kc", "mipsel_24kf", "mipsel_74kc", "mipsel_mips32", "mipsel"}
+		for _, c := range genericList {
+			if !slices.Contains(candidates, c) {
+				candidates = append(candidates, c)
+			}
+		}
+	case "mips":
+		genericList := []string{"mips_24kc", "mips_4kec", "mips_mips32", "mips"}
+		for _, c := range genericList {
+			if !slices.Contains(candidates, c) {
+				candidates = append(candidates, c)
+			}
+		}
+	case "armv7", "arm":
+		genericList := []string{"arm_cortex-a7_neon-vfpv4", "arm_cortex-a9_neon", "arm_cortex-a7", "arm_cortex-a9", "arm_cortex-a15_neon-vfpv4"}
+		for _, c := range genericList {
+			if !slices.Contains(candidates, c) {
+				candidates = append(candidates, c)
+			}
+		}
+	case "386":
+		genericList := []string{"i386_pentium4", "x86"}
+		for _, c := range genericList {
+			if !slices.Contains(candidates, c) {
+				candidates = append(candidates, c)
+			}
+		}
+	}
+	return candidates
+}
+
+func isLinuxBinaryArchiveMatch(name, normArch string) bool {
+	n := strings.ToLower(name)
+	if !strings.HasSuffix(n, ".tar.gz") && !strings.HasSuffix(n, ".tgz") {
+		return false
+	}
+	if !strings.Contains(n, "linux") {
+		return false
+	}
+
+	switch normArch {
+	case "arm64":
+		return strings.Contains(n, "linux-arm64") || strings.Contains(n, "linux-aarch64")
+	case "amd64":
+		return strings.Contains(n, "linux-amd64") || strings.Contains(n, "linux-x86_64")
+	case "mipsle":
+		return strings.Contains(n, "linux-mipsle") || strings.Contains(n, "linux-mipsel")
+	case "mips":
+		return strings.Contains(n, "linux-mips") && !strings.Contains(n, "mipsle") && !strings.Contains(n, "mipsel")
+	case "armv7", "arm":
+		return strings.Contains(n, "linux-armv7") || strings.Contains(n, "linux-armhf") || strings.Contains(n, "linux-arm")
+	case "386":
+		return strings.Contains(n, "linux-386") || strings.Contains(n, "linux-x86")
+	}
+	return false
+}
+
+func resolveSingBoxExtended(ctx context.Context, client *Client, distribArch, rawArch, ext string, compressedOnly bool) ([]*EngineDownload, error) {
 	repo := "shtorm-7/sing-box-extended"
 	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", repo)
 
@@ -93,58 +200,97 @@ func resolveSingBoxExtended(ctx context.Context, client *Client, distribArch, ra
 	}
 
 	normArch := NormalizeArch(rawArch)
-	// Try matching OpenWrt package:
-	// 1. Exact distribArch: sing-box-extended_.*_openwrt_<distribArch>.<ext>
-	for _, a := range rel.Assets {
-		if strings.HasPrefix(a.Name, "sing-box-extended_") &&
-			strings.HasSuffix(a.Name, "."+ext) &&
-			strings.Contains(a.Name, "_openwrt_"+distribArch+".") {
-			return &EngineDownload{
-				EngineType: EngineSingBoxExtended,
-				Version:    rel.TagName,
-				URL:        a.BrowserDownloadURL,
-				Filename:   a.Name,
-				IsPackage:  true,
-			}, nil
+	if normArch == "" {
+		normArch = NormalizeArch(distribArch)
+	}
+
+	if compressedOnly {
+		// Priority: compressed tar.gz binary archive
+		for _, a := range rel.Assets {
+			if strings.HasPrefix(a.Name, "sing-box-") &&
+				strings.Contains(a.Name, "-compressed") &&
+				isLinuxBinaryArchiveMatch(a.Name, normArch) {
+				return []*EngineDownload{{
+					EngineType: EngineSingBoxExtendedCompressed,
+					Version:    rel.TagName,
+					URL:        a.BrowserDownloadURL,
+					Filename:   a.Name,
+					IsPackage:  false,
+				}}, nil
+			}
+		}
+		return nil, fmt.Errorf("sing-box-extended-compressed archive not found for arch %s / %s", distribArch, normArch)
+	}
+
+	candidates := getArchCandidates(distribArch, normArch)
+
+	// 1. Try matching OpenWrt package: sing-box-extended_.*_openwrt_<arch>.<ext>
+	for _, cand := range candidates {
+		suffix := "_openwrt_" + cand + "." + ext
+		for _, a := range rel.Assets {
+			if strings.HasPrefix(a.Name, "sing-box-extended_") && strings.HasSuffix(a.Name, suffix) {
+				return []*EngineDownload{{
+					EngineType: EngineSingBoxExtended,
+					Version:    rel.TagName,
+					URL:        a.BrowserDownloadURL,
+					Filename:   a.Name,
+					IsPackage:  true,
+				}}, nil
+			}
 		}
 	}
 
-	// 2. Normalized arch in openwrt package name (e.g. openwrt_x86_64 or aarch64_generic)
+	// 2. Fallback: compressed tar.gz binary archive
 	for _, a := range rel.Assets {
-		if strings.HasPrefix(a.Name, "sing-box-extended_") &&
-			strings.HasSuffix(a.Name, "."+ext) &&
-			strings.Contains(a.Name, "_openwrt_") &&
-			archMatches(a.Name, distribArch, normArch) {
-			return &EngineDownload{
-				EngineType: EngineSingBoxExtended,
-				Version:    rel.TagName,
-				URL:        a.BrowserDownloadURL,
-				Filename:   a.Name,
-				IsPackage:  true,
-			}, nil
-		}
-	}
-
-	// 3. Fallback: compressed tar.gz binary archive
-	// e.g. sing-box-extended_.*_linux-<normArch>-compressed.tar.gz
-	for _, a := range rel.Assets {
-		if strings.HasPrefix(a.Name, "sing-box-extended_") &&
-			strings.Contains(a.Name, "linux-"+normArch) &&
-			strings.HasSuffix(a.Name, ".tar.gz") {
-			return &EngineDownload{
+		if strings.HasPrefix(a.Name, "sing-box-") &&
+			strings.Contains(a.Name, "-compressed") &&
+			isLinuxBinaryArchiveMatch(a.Name, normArch) {
+			return []*EngineDownload{{
 				EngineType: EngineSingBoxExtended,
 				Version:    rel.TagName,
 				URL:        a.BrowserDownloadURL,
 				Filename:   a.Name,
 				IsPackage:  false,
-			}, nil
+			}}, nil
+		}
+	}
+	for _, a := range rel.Assets {
+		if strings.HasPrefix(a.Name, "sing-box-") &&
+			isLinuxBinaryArchiveMatch(a.Name, normArch) {
+			return []*EngineDownload{{
+				EngineType: EngineSingBoxExtended,
+				Version:    rel.TagName,
+				URL:        a.BrowserDownloadURL,
+				Filename:   a.Name,
+				IsPackage:  false,
+			}}, nil
 		}
 	}
 
 	return nil, fmt.Errorf("sing-box-extended package not found for arch %s / %s", distribArch, normArch)
 }
 
-func resolveSteer(ctx context.Context, client *Client, extended bool, distribArch, ext string) (*EngineDownload, error) {
+func resolveSingBoxTiny(ctx context.Context, client *Client, distribArch, rawArch, ext string) ([]*EngineDownload, error) {
+	return []*EngineDownload{{
+		EngineType: EngineSingBoxTiny,
+		Version:    "openwrt",
+		URL:        "",
+		Filename:   "sing-box-tiny (через менеджер пакетов роутера)",
+		IsPackage:  true,
+	}}, nil
+}
+
+func resolveSingBoxStable(ctx context.Context, client *Client, distribArch, rawArch, ext string) ([]*EngineDownload, error) {
+	return []*EngineDownload{{
+		EngineType: EngineSingBoxStable,
+		Version:    "openwrt",
+		URL:        "",
+		Filename:   "sing-box (через менеджер пакетов роутера)",
+		IsPackage:  true,
+	}}, nil
+}
+
+func resolveSteer(ctx context.Context, client *Client, extended bool, distribArch, rawArch, ext string) ([]*EngineDownload, error) {
 	repo := "xyzmean/steer"
 	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", repo)
 
@@ -172,53 +318,132 @@ func resolveSteer(ctx context.Context, client *Client, extended bool, distribArc
 		}
 	}
 
-	prefix := "steer-"
+	var assets []ReleaseAsset
+	for _, a := range rel.Assets {
+		assets = append(assets, ReleaseAsset{
+			Name:               a.Name,
+			BrowserDownloadURL: a.BrowserDownloadURL,
+		})
+	}
+
+	return FilterSteerAssets(assets, extended, distribArch, rawArch, ext, rel.TagName)
+}
+
+// ReleaseAsset represents a GitHub release asset or scraped asset.
+type ReleaseAsset struct {
+	Name               string `json:"name"`
+	BrowserDownloadURL string `json:"browser_download_url"`
+}
+
+// FilterSteerAssets matches and collects all required Steer packages for an architecture.
+// In Steer 2.0+, packages are modular (steer-core, steer-vless, steer-hysteria2, etc.).
+func FilterSteerAssets(assets []ReleaseAsset, extended bool, distribArch, rawArch, ext, tagName string) ([]*EngineDownload, error) {
 	targetEngine := EngineSteer
 	if extended {
-		prefix = "steer-extended-"
 		targetEngine = EngineSteerExtended
 	}
 
-	suffix := "_" + distribArch + "." + ext
+	normArch := NormalizeArch(rawArch)
+	if normArch == "" {
+		normArch = NormalizeArch(distribArch)
+	}
+	candidates := getArchCandidates(distribArch, normArch)
 
-	for _, a := range rel.Assets {
-		name := a.Name
-		if !extended && strings.HasPrefix(name, "steer-extended-") {
-			continue // skip extended when looking for standard
+	// 1. Find the best matching architecture candidate that exists in release assets
+	var matchedCand string
+	for _, cand := range candidates {
+		suffix := "_" + cand + "." + ext
+		for _, a := range assets {
+			name := a.Name
+			// Matches steer-core (2.0+) or steer- (1.x / monolithic)
+			if (strings.HasPrefix(name, "steer-core-") || strings.HasPrefix(name, "steer-")) &&
+				strings.HasSuffix(name, suffix) {
+				if !extended && strings.HasPrefix(name, "steer-extended-") {
+					continue
+				}
+				matchedCand = cand
+				break
+			}
 		}
-		if strings.HasPrefix(name, prefix) && strings.HasSuffix(name, suffix) {
-			return &EngineDownload{
-				EngineType: targetEngine,
-				Version:    rel.TagName,
-				URL:        a.BrowserDownloadURL,
-				Filename:   name,
-				IsPackage:  true,
-			}, nil
+		if matchedCand != "" {
+			break
 		}
 	}
 
-	// Fallback: match without exact sub-arch if generic
-	for _, a := range rel.Assets {
+	if matchedCand == "" {
+		return nil, fmt.Errorf("steer package not found for arch %s (candidates: %s, ext: .%s)",
+			distribArch, strings.Join(candidates, ", "), ext)
+	}
+
+	suffix := "_" + matchedCand + "." + ext
+	var results []*EngineDownload
+
+	isModular := false
+	for _, a := range assets {
+		if strings.HasPrefix(a.Name, "steer-core-") && strings.HasSuffix(a.Name, suffix) {
+			isModular = true
+			break
+		}
+	}
+
+	for _, a := range assets {
 		name := a.Name
-		if !extended && strings.HasPrefix(name, "steer-extended-") {
+		if !strings.HasSuffix(name, suffix) {
 			continue
 		}
-		if strings.HasPrefix(name, prefix) && strings.HasSuffix(name, "."+ext) &&
-			archMatches(name, distribArch, NormalizeArch(distribArch)) {
-			return &EngineDownload{
-				EngineType: targetEngine,
-				Version:    rel.TagName,
-				URL:        a.BrowserDownloadURL,
-				Filename:   name,
-				IsPackage:  true,
-			}, nil
+		if !strings.HasPrefix(name, "steer-") {
+			continue
 		}
+
+		if isModular {
+			// Steer 2.0+: modular suite
+			if !extended && strings.HasPrefix(name, "steer-extended-") {
+				continue
+			}
+		} else {
+			// Steer 1.x: monolithic packages
+			if extended && !strings.HasPrefix(name, "steer-extended-") {
+				continue
+			}
+			if !extended && strings.HasPrefix(name, "steer-extended-") {
+				continue
+			}
+		}
+
+		results = append(results, &EngineDownload{
+			EngineType: targetEngine,
+			Version:    tagName,
+			URL:        a.BrowserDownloadURL,
+			Filename:   name,
+			IsPackage:  true,
+		})
 	}
 
-	return nil, fmt.Errorf("%s package not found for arch %s (OpenWrt .%s)", prefix, distribArch, ext)
+	if len(results) == 0 {
+		return nil, fmt.Errorf("steer packages not found for arch %s (suffix %s)", distribArch, suffix)
+	}
+
+	// Sort so steer-core is first, modules alphabetically, and steer-extended last
+	slices.SortStableFunc(results, func(a, b *EngineDownload) int {
+		if strings.HasPrefix(a.Filename, "steer-core-") {
+			return -1
+		}
+		if strings.HasPrefix(b.Filename, "steer-core-") {
+			return 1
+		}
+		if strings.HasPrefix(a.Filename, "steer-extended-") {
+			return 1
+		}
+		if strings.HasPrefix(b.Filename, "steer-extended-") {
+			return -1
+		}
+		return strings.Compare(a.Filename, b.Filename)
+	})
+
+	return results, nil
 }
 
-func resolveSingBoxLX(ctx context.Context, client *Client, distribArch, rawArch, ext string) (*EngineDownload, error) {
+func resolveSingBoxLX(ctx context.Context, client *Client, distribArch, rawArch, ext string) ([]*EngineDownload, error) {
 	repo := "Leadaxe/sing-box-lx"
 	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", repo)
 
@@ -247,16 +472,37 @@ func resolveSingBoxLX(ctx context.Context, client *Client, distribArch, rawArch,
 	}
 
 	normArch := NormalizeArch(rawArch)
+	if normArch == "" {
+		normArch = NormalizeArch(distribArch)
+	}
+
+	// 1. Check OpenWrt packages if any exist
+	candidates := getArchCandidates(distribArch, normArch)
+	for _, cand := range candidates {
+		suffix := "_" + cand + "." + ext
+		for _, a := range rel.Assets {
+			if strings.HasSuffix(a.Name, suffix) {
+				return []*EngineDownload{{
+					EngineType: EngineSingBoxLX,
+					Version:    rel.TagName,
+					URL:        a.BrowserDownloadURL,
+					Filename:   a.Name,
+					IsPackage:  true,
+				}}, nil
+			}
+		}
+	}
+
+	// 2. Binary archive match:
 	for _, a := range rel.Assets {
-		if archMatches(a.Name, distribArch, normArch) {
-			isPkg := strings.HasSuffix(a.Name, "."+ext)
-			return &EngineDownload{
+		if strings.HasPrefix(a.Name, "sing-box-") && isLinuxBinaryArchiveMatch(a.Name, normArch) {
+			return []*EngineDownload{{
 				EngineType: EngineSingBoxLX,
 				Version:    rel.TagName,
 				URL:        a.BrowserDownloadURL,
 				Filename:   a.Name,
-				IsPackage:  isPkg,
-			}, nil
+				IsPackage:  false,
+			}}, nil
 		}
 	}
 
@@ -265,7 +511,7 @@ func resolveSingBoxLX(ctx context.Context, client *Client, distribArch, rawArch,
 
 // NormalizeArch converts OpenWrt architecture variations to common linux GOARCH names.
 func NormalizeArch(arch string) string {
-	a := strings.ToLower(arch)
+	a := strings.ToLower(strings.TrimSpace(arch))
 	if strings.Contains(a, "x86_64") || strings.Contains(a, "amd64") {
 		return "amd64"
 	}
@@ -281,7 +527,7 @@ func NormalizeArch(arch string) string {
 	if strings.Contains(a, "arm_cortex") || strings.Contains(a, "armv7") || strings.Contains(a, "arm") {
 		return "armv7"
 	}
-	if strings.Contains(a, "i386") || strings.Contains(a, "x86") {
+	if strings.Contains(a, "i386") || strings.Contains(a, "i686") || strings.Contains(a, "x86") {
 		return "386"
 	}
 	return a
@@ -300,11 +546,13 @@ func archMatches(name, distribArch, normArch string) bool {
 	case "arm64":
 		return strings.Contains(n, "aarch64") || strings.Contains(n, "arm64")
 	case "mipsle":
-		return strings.Contains(n, "mipsel") || strings.Contains(n, "mipsle") || strings.Contains(n, "24kc")
+		return strings.Contains(n, "mipsel") || strings.Contains(n, "mipsle")
 	case "mips":
-		return strings.Contains(n, "mips_24kc") || (strings.Contains(n, "mips") && !strings.Contains(n, "mipsel") && !strings.Contains(n, "mipsle"))
-	case "armv7":
-		return strings.Contains(n, "arm_cortex") || strings.Contains(n, "armv7") || strings.Contains(n, "armhf")
+		return (strings.Contains(n, "mips_24kc") || strings.Contains(n, "mips")) && !strings.Contains(n, "mipsel") && !strings.Contains(n, "mipsle")
+	case "armv7", "arm":
+		return strings.Contains(n, "arm_cortex") || strings.Contains(n, "armv7") || strings.Contains(n, "armhf") || strings.Contains(n, "arm")
+	case "386":
+		return strings.Contains(n, "i386") || strings.Contains(n, "x86")
 	}
 	return false
 }
@@ -342,13 +590,16 @@ func DownloadEnginePackage(
 
 	logFn(fmt.Sprintf("[#22c55e]✓ Ядро %s успешно скачано (зеркало: %s)[-]\n", engine.Filename, usedMirror))
 
-	// If tar.gz archive was downloaded, extract binary locally if needed or keep for upload
+	// If tar.gz archive was downloaded, extract binary locally and remove the archive
 	if strings.HasSuffix(destPath, ".tar.gz") {
 		logFn("[#cbd5e1]Распаковка архива ядра...[-]\n")
 		binPath, err := extractTarGzBinary(destPath, destDir, "sing-box")
 		if err == nil {
 			logFn(fmt.Sprintf("[#22c55e]✓ Бинарный файл ядра распакован: %s[-]\n", filepath.Base(binPath)))
+			_ = os.Remove(destPath)
+			return binPath, nil
 		}
+		logFn(fmt.Sprintf("[#eab308]⚠️ Не удалось распаковать архив локально: %v[-]\n", err))
 	}
 
 	return destPath, nil

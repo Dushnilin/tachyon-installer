@@ -172,7 +172,9 @@ func (m *adaptiveModal) Draw(screen tcell.Screen) {
 	if h > sh {
 		h = sh
 	}
-	m.content.SetRect((sw-w)/2, (sh-h)/2, w, h)
+	x, y := (sw-w)/2, (sh-h)/2
+	m.SetRect(x, y, w, h)
+	m.content.SetRect(x, y, w, h)
 	m.content.Draw(screen)
 }
 
@@ -185,6 +187,19 @@ func (m *adaptiveModal) HasFocus() bool { return m.content.HasFocus() }
 // InputHandler forwards keyboard input to the wrapped content.
 func (m *adaptiveModal) InputHandler() func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
 	return m.content.InputHandler()
+}
+
+// MouseHandler forwards mouse events to the wrapped content.
+func (m *adaptiveModal) MouseHandler() func(action tview.MouseAction, event *tcell.EventMouse, setFocus func(p tview.Primitive)) (consumed bool, recipient tview.Primitive) {
+	return func(action tview.MouseAction, event *tcell.EventMouse, setFocus func(p tview.Primitive)) (consumed bool, recipient tview.Primitive) {
+		if m.content == nil {
+			return false, nil
+		}
+		if handler := m.content.MouseHandler(); handler != nil {
+			return handler(action, event, setFocus)
+		}
+		return false, nil
+	}
 }
 
 // CreateWizardModal wraps a panel in a centered modal overlay with default dimensions.

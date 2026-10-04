@@ -24,6 +24,7 @@ func main() {
 	tui.InitTheme()
 
 	app := tview.NewApplication()
+	app.EnableMouse(true)
 	pages := tview.NewPages()
 
 	// Header
@@ -87,7 +88,7 @@ func main() {
 	// Display wizard
 	tui.ShowWelcomeWizard(ctx)
 
-	if err := app.SetRoot(pages, true).EnableMouse(false).Run(); err != nil {
+	if err := app.SetRoot(pages, true).EnableMouse(true).Run(); err != nil {
 		panic(err)
 	}
 }

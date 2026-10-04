@@ -73,6 +73,9 @@ type OptionsSelector struct {
 	// clipBottom is the first screen row that must not be drawn on.
 	clipBottom int
 
+	// clickTargets tracks clickable areas on screen for mouse support.
+	clickTargets []optClickTarget
+
 	// Callbacks
 	OnSubmit               func(opts InstallOptions)
 	OnBack                 func()
@@ -82,23 +85,30 @@ type OptionsSelector struct {
 	prefVersion string
 }
 
+type optClickTarget struct {
+	x1, y1, x2, y2 int
+	onClick        func()
+}
+
 // NewOptionsSelector initializes the OptionsSelector with default choices.
 func NewOptionsSelector(profile ProfileData) *OptionsSelector {
 	opt := &OptionsSelector{
 		Box:     tview.NewBox(),
 		Profile: profile,
 		engines: []EngineItem{
-			{Key: "sing-box-extended", Name: "sing-box-extended", Badge: "★ Рекомендуется", Desc: "xHTTP, Reality, ShadowTLS, gRPC, TUIC, Hy2"},
-			{Key: "steer-extended", Name: "steer-extended", Badge: "⚡ Скорость", Desc: "steer + xHTTP, оптимизация под высокую нагрузку"},
-			{Key: "steer", Name: "steer", Badge: "🍃 Легковес", Desc: "Ультра-легковесный Go-движок (минимум RAM)"},
-			{Key: "sing-box-lx", Name: "sing-box-lx", Badge: "📦 Leadaxe", Desc: "Компактная сборка sing-box от Leadaxe"},
-			{Key: "skip", Name: "Без ядра", Badge: "⚙️ Пропустить", Desc: "Настроить или загрузить ядро позже в LuCI"},
+			{Key: "sing-box-extended", Name: "sing-box-extended", Badge: "xHTTP", Desc: "xHTTP, Reality, ShadowTLS, gRPC, TUIC, Hy2"},
+			{Key: "sing-box-extended-compressed", Name: "sing-box-ext-compressed", Badge: "xHTTP (сжат)", Desc: "sing-box-extended в сжатом бинарнике (минимум Flash)"},
+			{Key: "sing-box-tiny", Name: "sing-box-tiny", Badge: "Tiny", Desc: "Минималистичная сборка OpenWrt (минимум RAM)"},
+			{Key: "sing-box-lx", Name: "sing-box-lx", Badge: "Leadaxe", Desc: "Компактная сборка sing-box от Leadaxe"},
+			{Key: "steer", Name: "steer", Badge: "C-движок", Desc: "Ультра-легковесный модульный C-движок (минимум RAM)"},
+			{Key: "steer-extended", Name: "steer-extended", Badge: "C-движок+", Desc: "Модульный steer на C + xHTTP, оптимизация под нагрузку"},
+			{Key: "skip", Name: "Без ядра", Badge: "Пропустить", Desc: "Настроить или загрузить ядро позже в LuCI"},
 		},
 		selectedEngine: 0,
 		engineCursor:   0,
 
 		versions: []VersionItem{
-			{Key: "latest", Name: "latest ★", Badge: ""},
+			{Key: "latest", Name: "latest", Badge: "★ Рекомендуется"},
 			{Key: "custom", Name: "Вручную...", Badge: ""},
 		},
 		selectedVersion:   0,
@@ -152,21 +162,26 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 	if width <= 0 || height <= 0 {
 		return
 	}
+	opt.clickTargets = opt.clickTargets[:0]
 
 	curY := y
 
 	// Hardware summary (compact, fits narrow terminals)
 	opt.clipBottom = y + height
 	modelStr := []rune(opt.Profile.Model)
-	if len(modelStr) > 28 {
-		modelStr = append(modelStr[:26], '.', '.')
+	if len(modelStr) > 22 {
+		modelStr = append(modelStr[:20], '.', '.')
 	}
 	fw := "fw4"
 	if opt.Profile.Firewall == "fw3" {
 		fw = "fw3 (устар.)"
 	}
-	line1 := fmt.Sprintf("  [#94a3b8]Модель:[-] [#f1f5f9]%s[-]  [#94a3b8]ОС:[-] [#f1f5f9]%s %s[-]  [#94a3b8]FW:[-] %s %s",
-		string(modelStr), opt.Profile.Version, opt.Profile.Arch, opt.Profile.FirewallDot(), fw)
+	archStr := opt.Profile.Arch
+	if opt.Profile.DistribArch != "" && opt.Profile.DistribArch != opt.Profile.Arch && width >= 84 {
+		archStr = fmt.Sprintf("%s (%s)", opt.Profile.Arch, opt.Profile.DistribArch)
+	}
+	line1 := fmt.Sprintf("  [#94a3b8]Модель:[-] [#f1f5f9]%s[-]  [#94a3b8]ОС:[-] [#f1f5f9]%s[-]  [#94a3b8]Arch:[-] [#38bdf8]%s[-]  [#94a3b8]FW:[-] %s %s",
+		string(modelStr), opt.Profile.Version, archStr, opt.Profile.FirewallDot(), fw)
 	opt.printClip(screen, line1, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	curY++
 
@@ -192,11 +207,11 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 	curY++
 
 	// -------------------------------------------------------------
-	// SECTION 1: PROXY ENGINE (5 options)
+	// SECTION 1: PROXY ENGINE
 	// -------------------------------------------------------------
 	sec1Header := "  [#94a3b8]⚡ 1. ЯДРО ПРОКСИ:[-]"
 	if opt.activeSection == SectionEngine {
-		sec1Header = "  [#38bdf8:b]▶ 1. ЯДРО ПРОКСИ[-]  [#64748b]↑↓ или 1-5[-]"
+		sec1Header = fmt.Sprintf("  [#38bdf8:b]▶ 1. ЯДРО ПРОКСИ[-]  [#64748b]↑↓ или 1-%d[-]", len(opt.engines))
 	}
 	opt.printClip(screen, sec1Header, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	curY++
@@ -219,27 +234,25 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 			highlightClose = "[-]"
 		}
 
-		badgeColor := "#38bdf8"
-		if strings.Contains(eng.Badge, "Рекомендуется") {
+		badgeColor := "#94a3b8"
+		if strings.Contains(eng.Badge, "xHTTP") {
 			badgeColor = "#38bdf8"
-		} else if strings.Contains(eng.Badge, "Скорость") {
-			badgeColor = "#eab308"
-		} else if strings.Contains(eng.Badge, "Легковес") {
+		} else if strings.Contains(eng.Badge, "C-движок") {
+			badgeColor = "#10b981"
+		} else if strings.Contains(eng.Badge, "Tiny") {
 			badgeColor = "#22c55e"
 		} else if strings.Contains(eng.Badge, "Leadaxe") {
 			badgeColor = "#a855f7"
-		} else {
-			badgeColor = "#94a3b8"
 		}
 
 		desc, badge := eng.Desc, eng.Badge
-		if width < 96 {
+		if width < 100 {
 			desc = ""
 		}
 		if width < 56 {
 			badge = ""
 		}
-		line := fmt.Sprintf("%s%s[%d] %s [#f1f5f9]%-18s[-] [%s]%-17s[-] [#94a3b8]%s[-]%s",
+		line := fmt.Sprintf("%s%s[%d] %s [#f1f5f9]%-25s[-] [%s]%-15s[-] [#94a3b8]%s[-]%s",
 			cursorPrefix,
 			highlightOpen,
 			i+1,
@@ -251,6 +264,15 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 			highlightClose,
 		)
 		opt.printClip(screen, line, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
+		engIdx := i
+		opt.clickTargets = append(opt.clickTargets, optClickTarget{
+			x1: x, y1: curY, x2: x + width, y2: curY,
+			onClick: func() {
+				opt.activeSection = SectionEngine
+				opt.engineCursor = engIdx
+				opt.selectedEngine = engIdx
+			},
+		})
 		curY++
 	}
 
@@ -259,42 +281,122 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 	curY++
 
 	// -------------------------------------------------------------
-	// SECTION 2: TACHYON VERSION (4 options inline)
+	// SECTION 2: TACHYON VERSION (Prominent latest + sub-grid)
 	// -------------------------------------------------------------
 	sec2Header := "  [#94a3b8]📦 2. ВЕРСИЯ TACHYON:[-]"
 	if opt.activeSection == SectionVersion {
-		sec2Header = "  [#38bdf8:b]▶ 2. ВЕРСИЯ TACHYON[-]  [#64748b]←→ или цифры, Enter на «Вручную»[-]"
+		sec2Header = "  [#38bdf8:b]▶ 2. ВЕРСИЯ TACHYON[-]  [#64748b]↑↓←→ выбор, Space/цифры 1-7, Enter на «Вручную»[-]"
 	}
 	opt.printClip(screen, sec2Header, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	curY++
 
-	const verPerRow = 4
-	colW := (width - 4) / verPerRow
-	for i, ver := range opt.versions {
-		isSelected := (opt.selectedVersion == i)
-		isFocused := (opt.activeSection == SectionVersion && opt.versionCursor == i)
+	if len(opt.versions) > 0 {
+		// Row 0: latest (prominently displayed)
+		ver0 := opt.versions[0]
+		isZeroSelected := (opt.selectedVersion == 0)
+		isZeroFocused := (opt.activeSection == SectionVersion && opt.versionCursor == 0)
 
-		radio := "[#64748b]( )[-]"
-		if isSelected {
-			radio = "[#38bdf8:b](•)[-]"
+		radio0 := "[#64748b]( )[-]"
+		if isZeroSelected {
+			radio0 = "[#38bdf8:b](•)[-]"
 		}
 
-		name := ver.Name
-		if i == len(opt.versions)-1 && opt.customVersionText != "" && opt.customVersionText != "latest" {
-			name = fmt.Sprintf("Вручную: %s", opt.customVersionText)
+		cursor0 := "  "
+		highlightOpen0 := ""
+		highlightClose0 := ""
+		if isZeroFocused {
+			cursor0 = "[#ffffff:#1e293b:b]▶ "
+			highlightOpen0 = "[#ffffff:#1e293b:b]"
+			highlightClose0 = "[-]"
 		}
 
-		var cell string
-		if isFocused {
-			cell = fmt.Sprintf("[#ffffff:#1e293b:b]▶ [%d] %s %s[-] ", i+1, radio, name)
-		} else if isSelected {
-			cell = fmt.Sprintf("  [%d] %s [#38bdf8:b]%s[-] ", i+1, radio, name)
-		} else {
-			cell = fmt.Sprintf("  [%d] %s [#94a3b8]%s[-] ", i+1, radio, name)
+		badge0 := ""
+		if ver0.Badge != "" {
+			badge0 = fmt.Sprintf(" [#38bdf8]%s[-]", ver0.Badge)
+		} else if strings.Contains(ver0.Name, "★") {
+			badge0 = " [#38bdf8]★ Рекомендуется[-]"
 		}
-		opt.printClip(screen, cell, x+2+(i%verPerRow)*colW, curY+i/verPerRow, colW, tview.AlignLeft, tcell.ColorDefault)
+
+		desc0 := ""
+		if width >= 80 {
+			desc0 = " [#64748b](актуальный стабильный релиз)[-]"
+		}
+
+		verName0 := strings.TrimSpace(strings.ReplaceAll(ver0.Name, "★", ""))
+
+		line0 := fmt.Sprintf("%s[1] %s %s%s%s%s%s",
+			cursor0,
+			radio0,
+			highlightOpen0,
+			verName0,
+			highlightClose0,
+			badge0,
+			desc0,
+		)
+		opt.printClip(screen, line0, x+2, curY, width-4, tview.AlignLeft, tcell.ColorDefault)
+		opt.clickTargets = append(opt.clickTargets, optClickTarget{
+			x1: x, y1: curY, x2: x + width, y2: curY,
+			onClick: func() {
+				opt.activeSection = SectionVersion
+				opt.versionCursor = 0
+				opt.selectedVersion = 0
+			},
+		})
+		curY++
+
+		// Sub-grid for remaining versions (older tags & manual entry)
+		if len(opt.versions) > 1 {
+			subCols := opt.versionGridCols(width)
+			colW := (width - 4) / subCols
+			for i := 1; i < len(opt.versions); i++ {
+				ver := opt.versions[i]
+				subIdx := i - 1
+				row := subIdx / subCols
+				col := subIdx % subCols
+
+				isSelected := (opt.selectedVersion == i)
+				isFocused := (opt.activeSection == SectionVersion && opt.versionCursor == i)
+
+				radio := "[#64748b]( )[-]"
+				if isSelected {
+					radio = "[#38bdf8:b](•)[-]"
+				}
+
+				name := ver.Name
+				if i == len(opt.versions)-1 && opt.customVersionText != "" && opt.customVersionText != "latest" {
+					name = fmt.Sprintf("Вручную: %s", opt.customVersionText)
+				}
+
+				cellW := colW
+				if col == subCols-1 {
+					cellW = width - 4 - col*colW
+				}
+
+				var cell string
+				if isFocused {
+					cell = fmt.Sprintf("[#ffffff:#1e293b:b]▶ [%d] %s %s[-] ", i+1, radio, name)
+				} else if isSelected {
+					cell = fmt.Sprintf("  [%d] %s [#38bdf8:b]%s[-] ", i+1, radio, name)
+				} else {
+					cell = fmt.Sprintf("  [%d] %s [#94a3b8]%s[-] ", i+1, radio, name)
+				}
+				cellX := x + 2 + col*colW
+				opt.printClip(screen, cell, cellX, curY+row, cellW, tview.AlignLeft, tcell.ColorDefault)
+				vIdx := i
+				opt.clickTargets = append(opt.clickTargets, optClickTarget{
+					x1: cellX, y1: curY + row, x2: cellX + cellW, y2: curY + row,
+					onClick: func() {
+						opt.activeSection = SectionVersion
+						opt.versionCursor = vIdx
+						opt.selectedVersion = vIdx
+						opt.checkManualVersion()
+					},
+				})
+			}
+			subRows := (len(opt.versions) - 1 + subCols - 1) / subCols
+			curY += subRows
+		}
 	}
-	curY += (len(opt.versions) + verPerRow - 1) / verPerRow
 
 	// Thin Divider
 	drawOptionDivider(screen, x, curY, width)
@@ -333,6 +435,15 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 			} else {
 				opt.printClip(screen, fmt.Sprintf("  [%d] %s [#94a3b8]%s[-] ", i+1, radio, m.Name), cellX, curY, colWidth, tview.AlignLeft, tcell.ColorDefault)
 			}
+			mIdx := i
+			opt.clickTargets = append(opt.clickTargets, optClickTarget{
+				x1: cellX, y1: curY, x2: cellX + colWidth, y2: curY,
+				onClick: func() {
+					opt.activeSection = SectionMirror
+					opt.mirrorCursor = mIdx
+					opt.selectedMirror = mIdx
+				},
+			})
 		}
 		curY++
 	}
@@ -358,8 +469,14 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 	} else {
 		opt.printClip(screen, fmt.Sprintf("%s   %s [#cbd5e1]Установить русский языковой пакет LuCI (luci-i18n-tachyon-ru)[-] ", sec4Header, checkIcon), x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	}
+	opt.clickTargets = append(opt.clickTargets, optClickTarget{
+		x1: x, y1: curY, x2: x + width, y2: curY,
+		onClick: func() {
+			opt.activeSection = SectionLang
+			opt.installRussian = !opt.installRussian
+		},
+	})
 	curY++
-	curY++ // breathing room
 
 	// -------------------------------------------------------------
 	// SECTION 5 & 6: ACTION BUTTONS
@@ -375,11 +492,27 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 
 	buttonsLine := fmt.Sprintf("        %s        %s", btnInstall, btnBack)
 	opt.printClip(screen, buttonsLine, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
-	curY++
+	midX := x + width/2
+	opt.clickTargets = append(opt.clickTargets, optClickTarget{
+		x1: x + 4, y1: curY, x2: midX - 2, y2: curY,
+		onClick: func() {
+			opt.activeSection = SectionBtnInstall
+			opt.submit()
+		},
+	})
+	opt.clickTargets = append(opt.clickTargets, optClickTarget{
+		x1: midX + 2, y1: curY, x2: x + width - 4, y2: curY,
+		onClick: func() {
+			opt.activeSection = SectionBtnBack
+			if opt.OnBack != nil {
+				opt.OnBack()
+			}
+		},
+	})
 	curY++
 
 	// Navigation Footer
-	footer := "  [#64748b]Tab разделы · ↑↓←→ выбор · Space переключить · Enter далее · D диагностика · Esc назад[-]"
+	footer := "  [#64748b]↑↓←→ навигация · Enter/Space выбор · Клик мышью · D диагностика · Esc назад[-]"
 	opt.printClip(screen, footer, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 }
 
@@ -388,6 +521,39 @@ func drawOptionDivider(screen tcell.Screen, x, y, width int) {
 	for col := x + 1; col < x+width-1; col++ {
 		screen.SetContent(col, y, '─', nil, style)
 	}
+}
+
+// MouseHandler handles mouse clicks and scrolling for OptionsSelector.
+func (opt *OptionsSelector) MouseHandler() func(action tview.MouseAction, event *tcell.EventMouse, setFocus func(p tview.Primitive)) (consumed bool, recipient tview.Primitive) {
+	return opt.WrapMouseHandler(func(action tview.MouseAction, event *tcell.EventMouse, setFocus func(p tview.Primitive)) (consumed bool, recipient tview.Primitive) {
+		if !opt.InRect(event.Position()) {
+			return false, nil
+		}
+		setFocus(opt)
+
+		mx, my := event.Position()
+
+		switch action {
+		case tview.MouseLeftClick:
+			for _, target := range opt.clickTargets {
+				if my >= target.y1 && my <= target.y2 && mx >= target.x1 && mx <= target.x2 {
+					target.onClick()
+					return true, opt
+				}
+			}
+			return true, opt
+
+		case tview.MouseScrollDown:
+			opt.activeSection = (opt.activeSection + 1) % totalSections
+			return true, opt
+
+		case tview.MouseScrollUp:
+			opt.activeSection = (opt.activeSection + totalSections - 1) % totalSections
+			return true, opt
+		}
+
+		return false, nil
+	})
 }
 
 // InputHandler handles keyboard navigation.
@@ -432,12 +598,14 @@ func (opt *OptionsSelector) InputHandler() func(event *tcell.EventKey, setFocus 
 				} else {
 					opt.activeSection = SectionVersion
 				}
+			case tcell.KeyRight:
+				opt.activeSection = SectionVersion
 			case tcell.KeyEnter:
 				opt.selectedEngine = opt.engineCursor
 				opt.activeSection = SectionVersion
 			case tcell.KeyRune:
 				r := event.Rune()
-				if r >= '1' && r <= '5' {
+				if r >= '1' && r <= rune('0'+len(opt.engines)) {
 					idx := int(r - '1')
 					opt.engineCursor = idx
 					opt.selectedEngine = idx
@@ -447,33 +615,81 @@ func (opt *OptionsSelector) InputHandler() func(event *tcell.EventKey, setFocus 
 			}
 
 		case SectionVersion:
+			_, _, innerW, _ := opt.GetInnerRect()
+			subCols := opt.versionGridCols(innerW)
+			n := len(opt.versions)
+
 			switch event.Key() {
 			case tcell.KeyLeft:
 				if opt.versionCursor > 0 {
 					opt.versionCursor--
 					opt.selectedVersion = opt.versionCursor
+				} else {
+					opt.activeSection = SectionEngine
 				}
 			case tcell.KeyRight:
-				if opt.versionCursor < len(opt.versions)-1 {
+				if opt.versionCursor < n-1 {
 					opt.versionCursor++
 					opt.selectedVersion = opt.versionCursor
+				} else {
+					opt.activeSection = SectionMirror
 				}
 			case tcell.KeyUp:
-				opt.activeSection = SectionEngine
+				if opt.versionCursor == 0 {
+					opt.activeSection = SectionEngine
+					opt.engineCursor = len(opt.engines) - 1
+					opt.selectedEngine = opt.engineCursor
+				} else if opt.versionCursor <= subCols {
+					opt.versionCursor = 0
+					opt.selectedVersion = 0
+				} else {
+					opt.versionCursor -= subCols
+					opt.selectedVersion = opt.versionCursor
+				}
 			case tcell.KeyDown:
-				opt.activeSection = SectionMirror
+				if opt.versionCursor == 0 {
+					if n > 1 {
+						opt.versionCursor = 1
+						opt.selectedVersion = 1
+					} else {
+						opt.activeSection = SectionMirror
+					}
+				} else {
+					next := opt.versionCursor + subCols
+					if next < n {
+						opt.versionCursor = next
+						opt.selectedVersion = next
+					} else {
+						col := (opt.versionCursor - 1) % subCols
+						if col > 2 {
+							col = 2
+						}
+						opt.mirrorCursor = col
+						opt.selectedMirror = col
+						opt.activeSection = SectionMirror
+					}
+				}
 			case tcell.KeyEnter:
-				if opt.versionCursor == len(opt.versions)-1 {
+				if opt.versionCursor == n-1 {
 					opt.triggerManualVersionPrompt()
 				} else {
+					opt.selectedVersion = opt.versionCursor
 					opt.activeSection = SectionMirror
 				}
 			case tcell.KeyRune:
 				r := event.Rune()
-				if idx := int(r - '1'); r >= '1' && r <= '9' && idx < len(opt.versions) {
-					opt.versionCursor = idx
-					opt.selectedVersion = idx
-					opt.checkManualVersion()
+				if r == ' ' {
+					opt.selectedVersion = opt.versionCursor
+					if opt.versionCursor == n-1 {
+						opt.triggerManualVersionPrompt()
+					}
+				} else if r >= '1' && r <= '9' {
+					idx := int(r - '1')
+					if idx < n {
+						opt.versionCursor = idx
+						opt.selectedVersion = idx
+						opt.checkManualVersion()
+					}
 				}
 			}
 
@@ -483,11 +699,15 @@ func (opt *OptionsSelector) InputHandler() func(event *tcell.EventKey, setFocus 
 				if opt.mirrorCursor > 0 {
 					opt.mirrorCursor--
 					opt.selectedMirror = opt.mirrorCursor
+				} else {
+					opt.activeSection = SectionVersion
 				}
 			case tcell.KeyRight:
 				if opt.mirrorCursor < len(opt.mirrors)-1 {
 					opt.mirrorCursor++
 					opt.selectedMirror = opt.mirrorCursor
+				} else {
+					opt.activeSection = SectionLang
 				}
 			case tcell.KeyUp:
 				if opt.mirrorCursor >= 3 {
@@ -495,6 +715,21 @@ func (opt *OptionsSelector) InputHandler() func(event *tcell.EventKey, setFocus 
 					opt.selectedMirror = opt.mirrorCursor
 				} else {
 					opt.activeSection = SectionVersion
+					_, _, innerW, _ := opt.GetInnerRect()
+					subCols := opt.versionGridCols(innerW)
+					n := len(opt.versions)
+					if n > 1 {
+						subRows := (n - 1 + subCols - 1) / subCols
+						target := 1 + (subRows-1)*subCols + (opt.mirrorCursor % subCols)
+						if target >= n {
+							target = n - 1
+						}
+						opt.versionCursor = target
+						opt.selectedVersion = target
+					} else {
+						opt.versionCursor = 0
+						opt.selectedVersion = 0
+					}
 				}
 			case tcell.KeyDown:
 				if opt.mirrorCursor < 3 {
@@ -511,6 +746,8 @@ func (opt *OptionsSelector) InputHandler() func(event *tcell.EventKey, setFocus 
 					idx := int(r - '1')
 					opt.mirrorCursor = idx
 					opt.selectedMirror = idx
+				} else if r == ' ' {
+					opt.activeSection = SectionLang
 				}
 			}
 
@@ -518,8 +755,10 @@ func (opt *OptionsSelector) InputHandler() func(event *tcell.EventKey, setFocus 
 			switch event.Key() {
 			case tcell.KeyUp:
 				opt.activeSection = SectionMirror
-			case tcell.KeyDown:
+			case tcell.KeyDown, tcell.KeyRight:
 				opt.activeSection = SectionBtnInstall
+			case tcell.KeyLeft:
+				opt.activeSection = SectionMirror
 			case tcell.KeyEnter:
 				opt.installRussian = !opt.installRussian
 			case tcell.KeyRune:
@@ -534,6 +773,10 @@ func (opt *OptionsSelector) InputHandler() func(event *tcell.EventKey, setFocus 
 				opt.activeSection = SectionLang
 			case tcell.KeyRight:
 				opt.activeSection = SectionBtnBack
+			case tcell.KeyLeft:
+				opt.activeSection = SectionBtnBack
+			case tcell.KeyDown:
+				opt.activeSection = SectionEngine
 			case tcell.KeyEnter:
 				opt.submit()
 			case tcell.KeyRune:
@@ -548,6 +791,10 @@ func (opt *OptionsSelector) InputHandler() func(event *tcell.EventKey, setFocus 
 				opt.activeSection = SectionLang
 			case tcell.KeyLeft:
 				opt.activeSection = SectionBtnInstall
+			case tcell.KeyRight:
+				opt.activeSection = SectionBtnInstall
+			case tcell.KeyDown:
+				opt.activeSection = SectionEngine
 			case tcell.KeyEnter:
 				if opt.OnBack != nil {
 					opt.OnBack()
@@ -578,12 +825,19 @@ func (opt *OptionsSelector) triggerManualVersionPrompt() {
 	}
 }
 
+func (opt *OptionsSelector) versionGridCols(width int) int {
+	if width > 0 && width < 60 {
+		return 2
+	}
+	return 3
+}
+
 // SetReleases replaces the version list with fetched release tags (newest first).
 // Must be called from the UI goroutine.
 func (opt *OptionsSelector) SetReleases(tags []string) {
-	list := []VersionItem{{Key: "latest", Name: "latest ★"}}
+	list := []VersionItem{{Key: "latest", Name: "latest", Badge: "★ Рекомендуется"}}
 	if len(tags) > 0 {
-		list[0].Name = "latest (" + tags[0] + ") ★"
+		list[0].Name = fmt.Sprintf("latest (%s)", tags[0])
 	}
 	for _, t := range tags {
 		list = append(list, VersionItem{Key: t, Name: t})

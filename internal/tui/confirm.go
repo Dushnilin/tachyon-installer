@@ -9,11 +9,13 @@ import (
 )
 
 var engineLabels = map[string]string{
-	"sing-box-extended": "sing-box-extended (рекомендуется)",
-	"steer-extended":    "steer-extended",
-	"steer":             "steer (лёгкий)",
-	"sing-box-lx":       "sing-box-lx",
-	"skip":              "без ядра (поставить позже)",
+	"sing-box-extended":            "sing-box-extended (xHTTP)",
+	"sing-box-extended-compressed": "sing-box-extended (сжатый бинарник)",
+	"sing-box-tiny":                "sing-box-tiny (минимум RAM)",
+	"sing-box-lx":                  "sing-box-lx (Leadaxe)",
+	"steer":                        "steer (C-движок, минимум RAM)",
+	"steer-extended":               "steer-extended (C-движок, xHTTP)",
+	"skip":                         "без ядра (поставить позже)",
 }
 
 func engineLabel(key string) string {

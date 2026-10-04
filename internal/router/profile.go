@@ -36,9 +36,9 @@ type RouterProfile struct {
 func RunPreConnectionCheck(client *gossh.Client) (*RouterProfile, error) {
 	cmd := `echo "=== TACHYON-PROFILE ==="
 cat /tmp/sysinfo/model 2>/dev/null || awk -F: '/model name/ {print $2; exit}' /proc/cpuinfo 2>/dev/null || echo "Generic OpenWrt Device"
-[ -f /etc/openwrt_release ] && . /etc/openwrt_release && echo "$DISTRIB_RELEASE ($DISTRIB_CODENAME)" || echo "OpenWrt"
+[ -f /etc/openwrt_release ] && . /etc/openwrt_release && { [ -n "$DISTRIB_CODENAME" ] && echo "$DISTRIB_RELEASE ($DISTRIB_CODENAME)" || echo "$DISTRIB_RELEASE"; } || echo "OpenWrt"
 uname -m
-[ -f /etc/openwrt_release ] && . /etc/openwrt_release && echo "$DISTRIB_ARCH"
+( [ -f /etc/apk/arch ] && cat /etc/apk/arch 2>/dev/null ) || ( command -v apk >/dev/null 2>&1 && apk --print-arch 2>/dev/null ) || ( [ -f /etc/os-release ] && . /etc/os-release && [ -n "$OPENWRT_ARCH" ] && echo "$OPENWRT_ARCH" ) || ( [ -f /etc/openwrt_release ] && . /etc/openwrt_release && [ -n "$DISTRIB_ARCH" ] && echo "$DISTRIB_ARCH" ) || ( command -v opkg >/dev/null 2>&1 && opkg print-architecture 2>/dev/null | awk '$2 != "all" && $2 != "noarch" {a=$2} END{print a}' ) || uname -m
 free -k | awk '/Mem:/ {print $2"|"$4}'
 df -k /overlay 2>/dev/null | awk 'END{print $2"|"$4}' || df -k / 2>/dev/null | awk 'END{print $2"|"$4}'
 (opkg list-installed 2>/dev/null | grep -E "nextdns|https-dns-proxy|passwall|bypass|shadowsocksr|openclash|forkop|podkop|netshift" || apk info 2>/dev/null | grep -E "nextdns|https-dns-proxy|passwall|bypass|shadowsocksr|openclash|forkop|podkop|netshift" || echo "none") | tr '\n' ' ' && echo ""
@@ -170,7 +170,7 @@ func DetectArch(client *gossh.Client) string {
 	return ClassifyArch(DetectRawArch(client))
 }
 
-// DetectRawArch queries the router for its raw CPU architecture string and DISTRIB_ARCH.
+// DetectRawArch queries the router for its package architecture (DISTRIB_ARCH/apk arch).
 func DetectRawArch(client *gossh.Client) string {
 	sess, err := client.NewSession()
 	if err != nil {
@@ -178,7 +178,8 @@ func DetectRawArch(client *gossh.Client) string {
 	}
 	defer sess.Close()
 
-	out, err := sess.Output("[ -f /etc/openwrt_release ] && . /etc/openwrt_release && echo $DISTRIB_ARCH || uname -m")
+	cmd := `( [ -f /etc/apk/arch ] && cat /etc/apk/arch 2>/dev/null ) || ( command -v apk >/dev/null 2>&1 && apk --print-arch 2>/dev/null ) || ( [ -f /etc/os-release ] && . /etc/os-release && [ -n "$OPENWRT_ARCH" ] && echo "$OPENWRT_ARCH" ) || ( [ -f /etc/openwrt_release ] && . /etc/openwrt_release && [ -n "$DISTRIB_ARCH" ] && echo "$DISTRIB_ARCH" ) || ( command -v opkg >/dev/null 2>&1 && opkg print-architecture 2>/dev/null | awk '$2 != "all" && $2 != "noarch" {a=$2} END{print a}' ) || uname -m`
+	out, err := sess.Output(cmd)
 	if err != nil {
 		return ""
 	}
@@ -187,7 +188,7 @@ func DetectRawArch(client *gossh.Client) string {
 
 // ClassifyArch maps raw uname/arch strings to normalized architecture names.
 func ClassifyArch(archStr string) string {
-	a := strings.ToLower(archStr)
+	a := strings.ToLower(strings.TrimSpace(archStr))
 	if strings.Contains(a, "aarch64") || strings.Contains(a, "arm64") {
 		return "arm64"
 	}
@@ -202,6 +203,9 @@ func ClassifyArch(archStr string) string {
 	}
 	if strings.Contains(a, "arm") {
 		return "arm"
+	}
+	if strings.Contains(a, "i386") || strings.Contains(a, "i686") || strings.Contains(a, "x86") {
+		return "386"
 	}
 	return ""
 }

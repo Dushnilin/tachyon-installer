@@ -156,6 +156,7 @@ func ShowWelcomeWizard(ctx *AppContext) {
 		ctx.Pages.SwitchToPage("password_wizard")
 		ctx.App.SetFocus(step3Form)
 	}
+
 	step2Form.AddButton("Продолжить →", goStep3)
 	step2Form.AddButton("🔎 Найти роутер", func() {
 		step2Err.SetText("  [#38bdf8]Поиск роутеров в локальной сети…[-]")
@@ -394,7 +395,7 @@ func ShowOptionsWizard(ctx *AppContext, profile ProfileData) {
 		ctx.App.QueueUpdateDraw(func() { optSelector.SetReleases(tags) })
 	}()
 
-	modal := CreateWizardModalCustom(panel, 92, 28)
+	modal := CreateWizardModalCustom(panel, 94, 30)
 	ctx.Pages.AddPage("options_wizard", modal, true, true)
 	ctx.Pages.SwitchToPage("options_wizard")
 	ctx.App.SetFocus(optSelector)

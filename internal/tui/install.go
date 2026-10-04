@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -94,10 +95,13 @@ func RunExpressInstall(ctx *AppContext, opts InstallOptions) {
 		// Detect system details
 		isAPK := routerpkg.IsAPKPackage(sshClient)
 		detectedArch := routerpkg.DetectArch(sshClient)
-		rawArch := routerpkg.DetectRawArch(sshClient)
+		distribArch := routerpkg.DetectRawArch(sshClient)
+		if distribArch == "" {
+			distribArch = detectedArch
+		}
 
-		ctx.ConsoleWritef("[#cbd5e1]⚡ Архитектура роутера: [#38bdf8]%s[-] (raw: %s), пакетный менеджер: [#38bdf8]%s[-][-]\n\n",
-			detectedArch, rawArch, map[bool]string{true: "apk (OpenWrt 25+)", false: "opkg (OpenWrt <= 24)"}[isAPK])
+		ctx.ConsoleWritef("[#cbd5e1]⚡ Архитектура роутера: [#38bdf8]%s[-] (пакетная: [#38bdf8]%s[-]), пакетный менеджер: [#38bdf8]%s[-][-]\n\n",
+			detectedArch, distribArch, map[bool]string{true: "apk (OpenWrt 25+)", false: "opkg (OpenWrt <= 24)"}[isAPK])
 
 		// ==========================================
 		// 3. СКАЧИВАНИЕ ПАКЕТОВ В ОС ЧЕРЕЗ ЗЕРКАЛА (3/7)
@@ -173,29 +177,40 @@ func RunExpressInstall(ctx *AppContext, opts InstallOptions) {
 
 		// 3b. Resolve & Download Routing Engine if requested
 		if opts.SelectedEngine != "skip" && opts.SelectedEngine != "" {
-			ctx.ConsoleWritef("\n[#cbd5e1]⚡ Разрешение ядра прокси [#38bdf8]%s[-] для архитектуры [#38bdf8]%s[-]...[-]\n", opts.SelectedEngine, detectedArch)
-			engineAsset, err := dlpkg.ResolveEngineAsset(
+			archLabel := detectedArch
+			if distribArch != "" && distribArch != detectedArch {
+				archLabel = fmt.Sprintf("%s (%s)", detectedArch, distribArch)
+			}
+			ctx.ConsoleWritef("\n[#cbd5e1]⚡ Разрешение ядра прокси [#38bdf8]%s[-] для архитектуры [#38bdf8]%s[-]...[-]\n", opts.SelectedEngine, archLabel)
+			engineAssets, err := dlpkg.ResolveEngineAssets(
 				context.Background(),
 				dlClient,
 				dlpkg.EngineType(opts.SelectedEngine),
-				rawArch,
+				distribArch,
 				detectedArch,
 				isAPK,
 			)
 			if err != nil {
 				ctx.ConsoleWritef("[#eab308]⚠️ Не удалось автоматически найти пакет ядра: %v[-]\n", err)
 				ctx.ConsoleWrite("[#eab308]   Установка продолжится, ядро можно будет установить позже через веб-интерфейс Tachyon.[-]\n")
-			} else if engineAsset != nil && engineAsset.URL != "" {
-				_, errDl := dlpkg.DownloadEnginePackage(
-					context.Background(),
-					dlClient,
-					engineAsset,
-					staging.Dir,
-					ctx.ConsoleWrite,
-					ctx.SetSubTask,
-				)
-				if errDl != nil {
-					ctx.ConsoleWritef("[#eab308]⚠️ Сбой загрузки ядра %s: %v (продолжаем)[-]\n", engineAsset.Filename, errDl)
+			} else if len(engineAssets) > 0 {
+				ctx.ConsoleWritef("[#22c55e]✓ Найдено пакетов ядра (%s): %d шт.[-]\n", opts.SelectedEngine, len(engineAssets))
+				for idx, ea := range engineAssets {
+					if ea == nil || ea.URL == "" {
+						continue
+					}
+					ctx.ConsoleWritef("[#38bdf8]  [%d/%d] %s[-]\n", idx+1, len(engineAssets), ea.Filename)
+					_, errDl := dlpkg.DownloadEnginePackage(
+						context.Background(),
+						dlClient,
+						ea,
+						staging.Dir,
+						ctx.ConsoleWrite,
+						ctx.SetSubTask,
+					)
+					if errDl != nil {
+						ctx.ConsoleWritef("[#eab308]⚠️ Сбой загрузки пакета %s: %v (продолжаем)[-]\n", ea.Filename, errDl)
+					}
 				}
 			}
 		}

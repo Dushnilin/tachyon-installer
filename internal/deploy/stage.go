@@ -66,17 +66,53 @@ else
     }
 fi
 
-# If standalone sing-box binary was uploaded
+# If standalone sing-box binary was uploaded (or compressed archive)
 if [ -f /tmp/tachyon-install/sing-box ]; then
     echo "==> Установка бинарного файла ядра sing-box..."
     mv -f /tmp/tachyon-install/sing-box /usr/bin/sing-box
     chmod 0755 /usr/bin/sing-box
+elif ls /tmp/tachyon-install/sing-box*.tar.gz >/dev/null 2>&1; then
+    echo "==> Распаковка архива ядра sing-box..."
+    for archive in /tmp/tachyon-install/sing-box*.tar.gz; do
+        tar -xzf "$archive" -C /tmp/tachyon-install/ 2>/dev/null || true
+        rm -f "$archive"
+    done
+    FOUND_BIN=$(find /tmp/tachyon-install/ -type f -name sing-box 2>/dev/null | head -1)
+    if [ -n "$FOUND_BIN" ]; then
+        mv -f "$FOUND_BIN" /usr/bin/sing-box
+        chmod 0755 /usr/bin/sing-box
+    fi
+elif [ "` + selectedEngine + `" = "sing-box-tiny" ]; then
+    echo "==> Установка sing-box-tiny через пакетный менеджер роутера..."
+    if [ -x /usr/bin/tachyon ]; then
+        /usr/bin/tachyon component_action sing_box install_tiny 2>&1 || true
+    elif [ "$PKG_MGR" = "apk" ]; then
+        apk add sing-box-tiny 2>&1 || true
+    else
+        opkg update >/dev/null 2>&1 || true
+        opkg install sing-box-tiny 2>&1 || true
+    fi
+fi
+
+# Ensure /usr/bin/steer symlink exists if steer is in /usr/sbin/steer (Steer 2.0+)
+if [ -x /usr/sbin/steer ] && [ ! -e /usr/bin/steer ]; then
+    ln -sf /usr/sbin/steer /usr/bin/steer 2>/dev/null || true
 fi
 
 ENGINE="` + selectedEngine + `"
 if [ -n "$ENGINE" ] && [ "$ENGINE" != "skip" ]; then
     echo "==> [3/5] Настройка активного ядра в UCI ($ENGINE)..."
-    uci -q set tachyon.settings.engine="$ENGINE"
+    case "$ENGINE" in
+        sing-box*|extended*|tiny|lx)
+            uci -q set tachyon.settings.engine="sing-box"
+            ;;
+        steer*)
+            uci -q set tachyon.settings.engine="$ENGINE"
+            ;;
+        *)
+            uci -q set tachyon.settings.engine="$ENGINE"
+            ;;
+    esac
     uci commit tachyon 2>/dev/null || true
 fi
 

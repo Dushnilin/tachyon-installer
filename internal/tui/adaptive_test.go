@@ -54,3 +54,35 @@ func TestOptionsAdaptToTerminalSize(t *testing.T) {
 		}
 	}
 }
+
+func TestModalMouseClickPropagation(t *testing.T) {
+	screen := tcell.NewSimulationScreen("UTF-8")
+	if err := screen.Init(); err != nil {
+		t.Fatal(err)
+	}
+	defer screen.Fini()
+	screen.SetSize(100, 30)
+
+	clicked := false
+	btn := tview.NewButton("ClickMe").SetSelectedFunc(func() {
+		clicked = true
+	})
+
+	modal := CreateWizardModalCustom(btn, 40, 10)
+	modal.Draw(screen)
+
+	mouseHandler := modal.MouseHandler()
+	if mouseHandler == nil {
+		t.Fatalf("expected modal to provide MouseHandler")
+	}
+
+	// Click in the center of the screen where button is drawn (50, 15)
+	ev := tcell.NewEventMouse(50, 15, tcell.Button1, 0)
+	consumed, _ := mouseHandler(tview.MouseLeftClick, ev, func(p tview.Primitive) {})
+	if !consumed {
+		t.Errorf("expected mouse click to be consumed by inner button")
+	}
+	if !clicked {
+		t.Errorf("expected button action to be triggered by mouse click")
+	}
+}

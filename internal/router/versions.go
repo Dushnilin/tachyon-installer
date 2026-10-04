@@ -78,7 +78,7 @@ func GetInstalledVersions(client *gossh.Client, isAPK bool, packages []string) m
 	// Also check steer
 	sessionSteer, err := client.NewSession()
 	if err == nil {
-		outBytesSteer, errSteer := sessionSteer.CombinedOutput("/usr/bin/steer version 2>/dev/null || /usr/bin/steer -v 2>/dev/null || echo ''")
+		outBytesSteer, errSteer := sessionSteer.CombinedOutput("steer version 2>/dev/null || /usr/sbin/steer version 2>/dev/null || /usr/bin/steer version 2>/dev/null || /usr/sbin/steer -v 2>/dev/null || /usr/bin/steer -v 2>/dev/null || echo ''")
 		if errSteer == nil {
 			stVer := strings.TrimSpace(string(outBytesSteer))
 			if stVer != "" {
