@@ -92,6 +92,23 @@ func RunExpressInstall(ctx *AppContext, opts InstallOptions) {
 		ctx.ConsoleWrite("[#22c55e]✓ Проверка памяти успешно пройдена![-]\n\n")
 		ctx.SetSubTask("Память проверена ✓", 1.0)
 
+		// Sync router time to prevent TLS certificate verification errors during apk/opkg or https requests
+		ctx.ConsoleWrite("[#cbd5e1]⚡ Синхронизация системного времени роутера с ПК...[-]\n")
+		if timeStr, errTime := routerpkg.SyncRouterTime(sshClient); errTime == nil {
+			ctx.ConsoleWritef("[#22c55e]✓ Системное время роутера синхронизировано: [#f1f5f9]%s[-] (защита TLS/HTTPS)[-]\n", timeStr)
+		} else {
+			ctx.ConsoleWritef("[#eab308]⚠️ Не удалось синхронизировать время: %v (продолжаем)[-]\n", errTime)
+		}
+
+		// Check router WAN & DNS connectivity
+		ctx.ConsoleWrite("[#cbd5e1]⚡ Проверка сетевой связности роутера (WAN/DNS)...[-]\n")
+		_, _, connDetails, errConn := routerpkg.CheckRouterConnectivity(sshClient)
+		if errConn == nil {
+			ctx.ConsoleWritef("[#22c55e]✓ Связность сети роутера: [#f1f5f9]%s[-][-]\n\n", connDetails)
+		} else {
+			ctx.ConsoleWritef("[#eab308]⚠️ Проверка связности: %v (продолжаем)[-]\n\n", errConn)
+		}
+
 		// Detect system details
 		isAPK := routerpkg.IsAPKPackage(sshClient)
 		detectedArch := routerpkg.DetectArch(sshClient)
@@ -252,7 +269,7 @@ func RunExpressInstall(ctx *AppContext, opts InstallOptions) {
 		ctx.SetSubTask("Загрузка пакетов на роутер по SSH...", 0.2)
 
 		// Generate install_on_router.sh
-		_, err = staging.WriteRunnerScript(opts.SelectedEngine, isAPK)
+		_, err = staging.WriteRunnerScript(opts.SelectedEngine, isAPK, opts.InstallZRAM)
 		if err != nil {
 			ctx.ConsoleWritef("[#ef5350]❌ Ошибка генерации установочного скрипта: %v[-]\n", err)
 			return

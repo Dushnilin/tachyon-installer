@@ -1,0 +1,406 @@
+// Package cli handles non-interactive, headless command-line execution.
+package cli
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"flag"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	gossh "golang.org/x/crypto/ssh"
+
+	backuppkg "tachyon-installer/internal/backup"
+	appconfig "tachyon-installer/internal/config"
+	deploypkg "tachyon-installer/internal/deploy"
+	"tachyon-installer/internal/diag"
+	dlpkg "tachyon-installer/internal/downloader"
+	routerpkg "tachyon-installer/internal/router"
+	sshpkg "tachyon-installer/internal/ssh"
+	"tachyon-installer/internal/updater"
+)
+
+// Options holds command line parameters for headless execution.
+type Options struct {
+	RouterIP       string
+	SSHPort        int
+	Username       string
+	Password       string
+	KeyPath        string
+	Engine         string
+	Mirror         string
+	Version        string
+	InstallI18n    bool
+	InstallZRAM    bool
+	Subscription   string
+	RunDiag        bool
+	ExportDiagPath string
+	RunUninstall   bool
+	RunRestore     string
+	ListBackups    bool
+	CheckUpdate    bool
+	Yes            bool
+	AppVersion     string
+}
+
+// ParseFlags parses command line arguments and populates Options.
+func ParseFlags(args []string, defaultCfg *appconfig.Config, appVersion string) (*Options, error) {
+	fs := flag.NewFlagSet("tachyon-installer", flag.ContinueOnError)
+
+	opts := &Options{
+		AppVersion: appVersion,
+	}
+
+	ipDef := defaultCfg.RouterIP
+	if ipDef == "" {
+		ipDef = "192.168.1.1"
+	}
+
+	fs.StringVar(&opts.RouterIP, "ip", ipDef, "IP-адрес роутера OpenWrt")
+	fs.IntVar(&opts.SSHPort, "port", defaultCfg.SSHPort, "SSH порт роутера")
+	fs.StringVar(&opts.Username, "user", defaultCfg.Username, "SSH имя пользователя")
+	fs.StringVar(&opts.Password, "pass", "", "SSH пароль")
+	fs.StringVar(&opts.KeyPath, "key", defaultCfg.KeyPath, "Путь к SSH приватному ключу")
+	fs.StringVar(&opts.Engine, "engine", defaultCfg.SelectedEngine, "Ядро прокси: sing-box-extended, sing-box-extended-compressed, sing-box-tiny, sing-box-lx, steer, steer-extended, skip")
+	fs.StringVar(&opts.Mirror, "mirror", defaultCfg.SelectedMirror, "Зеркало загрузки GitHub: auto, direct, https://gh-proxy.com/ и др.")
+	fs.StringVar(&opts.Version, "version", defaultCfg.TachyonVersion, "Версия Tachyon: latest или тег релиза (например 1.4.9)")
+	fs.BoolVar(&opts.InstallI18n, "i18n", defaultCfg.InstallI18n, "Установить русскую локализацию LuCI")
+	fs.BoolVar(&opts.InstallZRAM, "zram", defaultCfg.InstallZRAM, "Включить zRAM-swap (сжатый SWAP в ОЗУ)")
+	fs.StringVar(&opts.Subscription, "sub", "", "Ссылка на подписку (HTTPS, vless:// или base64)")
+	fs.BoolVar(&opts.RunDiag, "diag", false, "Запустить расширенную диагностику роутера и вывести отчет")
+	fs.StringVar(&opts.ExportDiagPath, "export-diag", "", "Экспортировать отчет диагностики в файл")
+	fs.BoolVar(&opts.RunUninstall, "uninstall", false, "Полное чистое удаление Tachyon с роутера")
+	fs.StringVar(&opts.RunRestore, "restore", "", "Восстановить настройки из файла бэкапа или 'latest'")
+	fs.BoolVar(&opts.ListBackups, "list-backups", false, "Показать список доступных локальных бэкапов")
+	fs.BoolVar(&opts.CheckUpdate, "check-update", false, "Проверить наличие обновлений программы на GitHub")
+	fs.BoolVar(&opts.Yes, "yes", false, "Автоматическое подтверждение (без интерактивного меню)")
+	fs.BoolVar(&opts.Yes, "y", false, "Короткий алиас для -yes")
+
+	if err := fs.Parse(args); err != nil {
+		return nil, err
+	}
+
+	return opts, nil
+}
+
+// ShouldRunHeadless checks if flags request non-interactive execution.
+func (o *Options) ShouldRunHeadless() bool {
+	return o.RunDiag || o.RunUninstall || o.RunRestore != "" || o.ListBackups || o.CheckUpdate || o.Yes
+}
+
+// Run executes non-interactive CLI operations.
+func Run(opts *Options) int {
+	fmt.Printf("==> Tachyon Express Installer %s (Headless Mode)\n\n", opts.AppVersion)
+
+	// 1. Check Update
+	if opts.CheckUpdate {
+		fmt.Println("⚡ Проверка наличия обновлений на GitHub...")
+		hasUpdate, latestVer, relURL, err := updater.CheckForUpdate(context.Background(), opts.AppVersion)
+		if err != nil {
+			fmt.Printf("⚠️ Ошибка проверки обновлений: %v\n", err)
+			return 1
+		}
+		if hasUpdate {
+			fmt.Printf("💡 Доступна новая версия: %s (текущая: %s)\nСсылка для загрузки: %s\n", latestVer, opts.AppVersion, relURL)
+		} else {
+			fmt.Printf("✓ У вас установлена актуальная версия Tachyon Installer (%s)\n", opts.AppVersion)
+		}
+		return 0
+	}
+
+	// 2. List Backups
+	if opts.ListBackups {
+		fmt.Println("⚡ Поиск сохраненных локальных резервных копий (backups/)...")
+		backups, err := backuppkg.ListBackups()
+		if err != nil {
+			fmt.Printf("❌ Ошибка чтения директории бэкапов: %v\n", err)
+			return 1
+		}
+		if len(backups) == 0 {
+			fmt.Println("Резервных копий пока нет.")
+			return 0
+		}
+		fmt.Printf("Найдено резервных копий: %d шт.\n", len(backups))
+		for i, b := range backups {
+			fi, _ := os.Stat(b)
+			sizeKB := float64(0)
+			if fi != nil {
+				sizeKB = float64(fi.Size()) / 1024
+			}
+			fmt.Printf("  [%d] %-48s (%.1f КБ)\n", i+1, filepath.Base(b), sizeKB)
+		}
+		return 0
+	}
+
+	// Connect to router over SSH
+	fmt.Printf("⚡ Подключение к роутеру %s:%d (%s)...\n", opts.RouterIP, opts.SSHPort, opts.Username)
+	client, err := sshpkg.Connect(opts.RouterIP, opts.SSHPort, opts.Username, opts.Password)
+	if err != nil {
+		fmt.Printf("❌ Ошибка SSH-подключения: %v\n", err)
+		return 1
+	}
+	defer client.Close()
+	fmt.Println("✓ SSH подключение установлено.")
+
+	isAPK := routerpkg.IsAPKPackage(client)
+
+	// 3. Uninstall
+	if opts.RunUninstall {
+		fmt.Println("⚡ Запуск чистого удаления Tachyon...")
+		out, err := deploypkg.UninstallTachyon(client, isAPK)
+		fmt.Println(out)
+		if err != nil {
+			fmt.Printf("❌ Сбой удаления: %v\n", err)
+			return 1
+		}
+		fmt.Println("✓ Tachyon успешно удален с роутера.")
+		return 0
+	}
+
+	// 4. Restore
+	if opts.RunRestore != "" {
+		backupPath := opts.RunRestore
+		if strings.ToLower(backupPath) == "latest" {
+			backups, err := backuppkg.ListBackups()
+			if err != nil || len(backups) == 0 {
+				fmt.Println("❌ Не найдены локальные файлы резервных копий в папке backups/")
+				return 1
+			}
+			backupPath = backups[0]
+		}
+		fmt.Printf("⚡ Восстановление конфигурации из архива: %s...\n", backupPath)
+		msg, err := backuppkg.RestoreBackup(client, backupPath)
+		if err != nil {
+			fmt.Printf("❌ Ошибка восстановления: %v\n", err)
+			return 1
+		}
+		fmt.Printf("✓ %s\n", msg)
+		return 0
+	}
+
+	// 5. Diagnostics Only
+	if opts.RunDiag {
+		fmt.Println("⚡ Запуск диагностики роутера...")
+		execCmd := func(cmd string) (string, error) {
+			sess, err := client.NewSession()
+			if err != nil {
+				return "", err
+			}
+			defer sess.Close()
+			out, err := sess.CombinedOutput(cmd)
+			return string(out), err
+		}
+		results := diag.RunRouter(execCmd, func(r diag.Result) {
+			fmt.Printf("  %-8s %s: %s\n", r.Status.Icon(), r.Title, r.Detail)
+		})
+		formatted := diag.Format(fmt.Sprintf("Отчет диагностики роутера %s", opts.RouterIP), results)
+		fmt.Println("\n" + formatted)
+
+		if opts.ExportDiagPath != "" {
+			p, err := diag.ExportToFile("Диагностика роутера "+opts.RouterIP, results, opts.ExportDiagPath)
+			if err != nil {
+				fmt.Printf("⚠️ Ошибка экспорта отчета: %v\n", err)
+			} else {
+				fmt.Printf("✓ Отчет успешно сохранен в файл: %s\n", p)
+			}
+		}
+		return 0
+	}
+
+	// 6. Automated Express Installation
+	if opts.Yes {
+		return runHeadlessInstall(client, isAPK, opts)
+	}
+
+	return 0
+}
+
+func runHeadlessInstall(client *gossh.Client, isAPK bool, opts *Options) int {
+	fmt.Println("\n==========================================")
+	fmt.Println("🚀 ЗАПУСК АВТОМАТИЧЕСКОЙ ЭКСПРЕСС-УСТАНОВКИ")
+	fmt.Println("==========================================")
+
+	// Step 1: Clock synchronization
+	fmt.Println("⚡ [1/7] Синхронизация системного времени роутера с ПК (защита TLS)...")
+	if dateStr, err := routerpkg.SyncRouterTime(client); err == nil {
+		fmt.Printf("✓ Время синхронизировано: %s\n", dateStr)
+	} else {
+		fmt.Printf("⚠️ Не удалось синхронизировать время: %v (продолжаем)\n", err)
+	}
+
+	// Step 2: System and Connectivity Checks
+	fmt.Println("⚡ [2/7] Оценка ресурсов и сетевой связности роутера...")
+	_, _, connDetails, _ := routerpkg.CheckRouterConnectivity(client)
+	fmt.Printf("  • Сеть роутера: %s\n", connDetails)
+
+	detectedArch := routerpkg.DetectArch(client)
+	distribArch := routerpkg.DetectRawArch(client)
+	if distribArch == "" {
+		distribArch = detectedArch
+	}
+	fmt.Printf("  • Архитектура:  %s (пакетная: %s)\n", detectedArch, distribArch)
+	fmt.Printf("  • Пакетный менеджер: %s\n", map[bool]string{true: "apk", false: "opkg"}[isAPK])
+
+	// Auto zRAM recommendation if not explicitly passed
+	installZRAM := opts.InstallZRAM
+
+	// Step 3: Mirrors & Downloads
+	fmt.Printf("⚡ [3/7] Подготовка зеркал загрузки (%s)...\n", opts.Mirror)
+	mirrorMgr := dlpkg.NewMirrorManager(opts.Mirror)
+	if opts.Mirror == "auto" {
+		fastest := mirrorMgr.TestFastestMirrorDetailed(context.Background(), func(res dlpkg.MirrorPingResult) {
+			if res.Err == nil {
+				fmt.Printf("    %-30s %d ms ✓\n", res.Mirror, res.Latency.Milliseconds())
+			}
+		})
+		fmt.Printf("✓ Выбрано быстрейшее зеркало: %s\n", fastest)
+	}
+	dlClient := dlpkg.NewClient(mirrorMgr)
+
+	staging, err := deploypkg.NewStagingArea()
+	if err != nil {
+		fmt.Printf("❌ Ошибка создания папки staging: %v\n", err)
+		return 1
+	}
+	defer staging.Cleanup()
+
+	fmt.Printf("⚡ Получение информации о релизе Tachyon (%s)...\n", opts.Version)
+	rel, err := dlpkg.FetchTachyonReleaseByTag(context.Background(), dlClient, opts.Version)
+	if err != nil {
+		fmt.Printf("❌ Ошибка запроса релиза Tachyon: %v\n", err)
+		return 1
+	}
+	fmt.Printf("✓ Релиз: %s\n", rel.TagName)
+
+	assets, err := dlpkg.ResolveTachyonAssets(rel, isAPK, opts.InstallI18n)
+	if err != nil {
+		fmt.Printf("❌ Ошибка разрешения файлов Tachyon: %v\n", err)
+		return 1
+	}
+
+	fmt.Println("⚡ Скачивание пакетов Tachyon на компьютер...")
+	logFn := func(msg string) { fmt.Print(msg) }
+	progFn := func(label string, frac float64) {}
+	_, err = dlpkg.DownloadTachyonPackages(context.Background(), dlClient, assets, opts.InstallI18n, staging.Dir, logFn, progFn)
+	if err != nil {
+		fmt.Printf("❌ Сбой скачивания Tachyon: %v\n", err)
+		return 1
+	}
+
+	if opts.Engine != "skip" && opts.Engine != "" {
+		fmt.Printf("⚡ Поиск и скачивание пакетов ядра (%s)...\n", opts.Engine)
+		engAssets, err := dlpkg.ResolveEngineAssets(context.Background(), dlClient, dlpkg.EngineType(opts.Engine), distribArch, detectedArch, isAPK)
+		if err == nil && len(engAssets) > 0 {
+			for _, ea := range engAssets {
+				if ea == nil || ea.URL == "" {
+					continue
+				}
+				fmt.Printf("  -> Загрузка %s...\n", ea.Filename)
+				_, _ = dlpkg.DownloadEnginePackage(context.Background(), dlClient, ea, staging.Dir, logFn, progFn)
+			}
+		}
+	}
+
+	// Step 4: Checksum integrity
+	fmt.Println("\n⚡ [4/7] Проверка целостности SHA256...")
+	if !verifyFiles(staging.Dir) {
+		fmt.Println("❌ Ошибка целостности скачанных пакетов")
+		return 1
+	}
+	fmt.Println("✓ Все файлы проверены и целостны.")
+
+	// Step 5: Backup
+	fmt.Println("⚡ [5/7] Создание локальной резервной копии настроек...")
+	msg, _ := backuppkg.CreateLocalBackup(client, opts.RouterIP)
+	fmt.Printf("✓ %s\n", msg)
+
+	// Step 6: Deploy & Execute
+	fmt.Println("⚡ [6/7] Загрузка и выполнение установки на роутере...")
+	_, err = staging.WriteRunnerScript(opts.Engine, isAPK, installZRAM)
+	if err != nil {
+		fmt.Printf("❌ Ошибка генерации runner скрипта: %v\n", err)
+		return 1
+	}
+
+	err = deploypkg.UploadStagingAndExecute(client, staging.Dir, os.Stdout, logFn)
+	if err != nil {
+		fmt.Printf("❌ Сбой установки на роутере: %v\n", err)
+		return 1
+	}
+	fmt.Println("\n✓ Пакеты успешно развернуты на роутере!")
+
+	// Step 7: Subscription & Service check
+	fmt.Println("⚡ [7/7] Проверка и настройка службы...")
+	execCmd := func(c *gossh.Client, cmd string) (string, error) {
+		sess, err := c.NewSession()
+		if err != nil {
+			return "", err
+		}
+		defer sess.Close()
+		out, err := sess.CombinedOutput(cmd)
+		return string(out), err
+	}
+
+	if opts.Subscription != "" {
+		fmt.Printf("⚡ Сохранение подписки: %s...\n", opts.Subscription)
+		if err := routerpkg.SaveSubscription(client, execCmd, opts.Subscription); err != nil {
+			fmt.Printf("⚠️ Ошибка сохранения подписки: %v\n", err)
+		} else {
+			fmt.Println("✓ Подписка сохранена.")
+		}
+	}
+
+	time.Sleep(3 * time.Second)
+	checkRes := routerpkg.VerifyAndFallback(client, execCmd, progFn)
+	if checkRes.OK {
+		fmt.Println("\n🎉 УСТАНОВКА УСПЕШНО ЗАВЕРШЕНА!")
+		fmt.Println("Панель управления доступна в веб-интерфейсе LuCI -> Службы -> Tachyon.")
+		return 0
+	}
+
+	fmt.Printf("\n⚠️ Установка завершена, но служба сообщила: %s\n", checkRes.Reason)
+	return 0
+}
+
+func verifyFiles(dir string) bool {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return false
+	}
+	for _, e := range entries {
+		if e.IsDir() || e.Name() == "sha256sums.txt" {
+			continue
+		}
+		p := filepath.Join(dir, e.Name())
+		if err := dlpkg.SanityCheckPackage(p); err != nil {
+			fmt.Printf("  ✗ %s: %v\n", e.Name(), err)
+			return false
+		}
+		sum, size, err := fileSHA256Sum(p)
+		if err != nil {
+			fmt.Printf("  ✗ %s: %v\n", e.Name(), err)
+			return false
+		}
+		fmt.Printf("  ✓ %-42s (%.1f МБ, sha256:%s…)\n", e.Name(), float64(size)/1024/1024, sum[:12])
+	}
+	return true
+}
+
+func fileSHA256Sum(path string) (string, int64, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", 0, err
+	}
+	defer f.Close()
+	h := sha256.New()
+	size, err := io.Copy(h, f)
+	if err != nil {
+		return "", 0, err
+	}
+	return hex.EncodeToString(h.Sum(nil)), size, nil
+}

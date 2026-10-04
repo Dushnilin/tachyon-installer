@@ -17,14 +17,17 @@
   <img src="assets/readme/divider_stream.svg" width="100%" alt="divider" />
 </p>
 
-## 🔍 Diagnostics & UX (v1.2)
+## 🔍 Key Highlights (v1.4)
 
-- **Diagnostics-only mode** — button on the first screen or `D` in the options dashboard: system, memory, flash, time, fw4, kernel modules, conflicts, DNS, internet, GitHub, Tachyon state and logs. Report can be saved.
-- **Automatic post-install diagnostics**; report: `%TEMP%/tachyon-diagnostics.txt`.
-- **Router auto-discovery** on the LAN (Dropbear/OpenWrt SSH).
-- **SSH key login**; the password is never stored on disk.
-- **Confirmation screen** before install and remembered choices.
-- **File checks**: size + sha256 of each downloaded file, rejects HTML/broken packages. Tachyon packages are verified against `sha256sums.txt`; engine packages get format sanity checks only.
+- **🖥️ Dual Mode (Interactive TUI + Headless CLI)**: Beautiful zinc terminal dashboard with mouse & arrow keys support, plus automated unattended CLI execution (`--yes`, `--ip`, `--pass`, `--engine`, `--zram`).
+- **🧠 Hardware-Aware Intelligence**: Real-time evaluation of router RAM/Flash with smart core recommendations; optional automatic activation of **zRAM-swap** for OOM prevention on constrained routers (<128 MB RAM).
+- **⏱️ Router Clock Sync & WAN Health**: Automatically synchronizes router clock with host PC UTC time (`date -u -s`) to prevent TLS/certificate validation failures; tests WAN routing and DNS.
+- **🌐 Universal Subscription Parser**: Supports HTTPS subscription URLs, raw configs (`vless://`, `hysteria2://`, `trojan://`, `ss://`, `vmess://`), and base64 bundles with live node counting and protocol breakdown.
+- **🛠️ Maintenance Suite**: Clean uninstaller (`--uninstall`), instant rollback from local backup archives (`--restore latest`), backup listing (`--list-backups`), and release update checker (`--check-update`).
+- **🔍 Deep Diagnostics**: Automatic post-install audit and standalone mode (dashboard button, `D` hotkey, or `--diag` flag) with export to file (`--export-diag`).
+- **LAN Router Discovery**: Automatically probes the local network for Dropbear OpenWrt routers.
+- **SSH Key Authentication**: Full support for passwordless or passphrase-protected SSH keys.
+- **Checksum Verification**: Validates SHA256 integrity and file formats before streaming to the router.
 
 ## ⚡ About The Project
 
@@ -113,6 +116,33 @@ Follow the on-screen TUI wizard:
 3. Review the live pre-flight hardware diagnostics summary.
 4. Select your preferred proxy engine, Tachyon version, and mirror on the dashboard.
 5. Press **«Start Installation»** (`Enter`) to deploy.
+
+### 3. Headless Automation (Unattended CLI)
+
+For script-based automation, CI/CD pipelines, or execution without launching the interactive TUI, use command-line flags:
+
+```bash
+# Automated express installation with steer engine and zRAM-swap
+./tachyon-installer -ip 192.168.1.1 -pass "secret" -engine steer -zram -yes
+
+# Express installation with immediate subscription link setup
+./tachyon-installer -ip 192.168.1.1 -pass "secret" -sub "vless://..." -yes
+
+# Standalone router diagnostics with report export
+./tachyon-installer -ip 192.168.1.1 -pass "secret" -diag -export-diag report.txt
+
+# List all local backup archives
+./tachyon-installer -list-backups
+
+# Restore configuration from the newest backup archive
+./tachyon-installer -ip 192.168.1.1 -pass "secret" -restore latest
+
+# Completely uninstall Tachyon from the router
+./tachyon-installer -ip 192.168.1.1 -pass "secret" -uninstall
+
+# Check for updates on GitHub
+./tachyon-installer -check-update
+```
 
 <p align="center">
   <img src="assets/readme/divider_stream.svg" width="100%" alt="divider" />

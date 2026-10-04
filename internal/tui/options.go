@@ -6,6 +6,8 @@ import (
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
+
+	routerpkg "tachyon-installer/internal/router"
 )
 
 // Section indices for navigation.
@@ -64,8 +66,10 @@ type OptionsSelector struct {
 	selectedMirror int
 	mirrorCursor   int
 
-	// 4. Localization
+	// 4. Localization & System Options
 	installRussian bool
+	installZRAM    bool
+	langCursor     int
 
 	// Active section focus (0..5)
 	activeSection int
@@ -92,23 +96,42 @@ type optClickTarget struct {
 
 // NewOptionsSelector initializes the OptionsSelector with default choices.
 func NewOptionsSelector(profile ProfileData) *OptionsSelector {
+	defaultZRAM := false
+	if (profile.RAMTotal > 0 && profile.RAMTotal < 128) || (profile.RAMFree > 0 && profile.RAMFree < 40) {
+		defaultZRAM = true
+	}
+
+	recEngine, _ := routerpkg.HardwareRecommendation(profile.RAMTotal, profile.RAMFree, profile.FlashFree)
+	initialEngIdx := 0
+
+	engines := []EngineItem{
+		{Key: "sing-box-extended", Name: "sing-box-extended", Badge: "xHTTP", Desc: "xHTTP, Reality, ShadowTLS, gRPC, TUIC, Hy2"},
+		{Key: "sing-box-extended-compressed", Name: "sing-box-ext-compressed", Badge: "xHTTP (сжат)", Desc: "sing-box-extended в сжатом бинарнике (минимум Flash)"},
+		{Key: "sing-box-tiny", Name: "sing-box-tiny", Badge: "Tiny", Desc: "Минималистичная сборка OpenWrt (минимум RAM)"},
+		{Key: "sing-box-lx", Name: "sing-box-lx", Badge: "Leadaxe", Desc: "Компактная сборка sing-box от Leadaxe"},
+		{Key: "steer", Name: "steer", Badge: "C-движок", Desc: "Ультра-легковесный модульный C-движок (минимум RAM)"},
+		{Key: "steer-extended", Name: "steer-extended", Badge: "C-движок+", Desc: "Модульный steer на C + xHTTP, оптимизация под нагрузку"},
+		{Key: "skip", Name: "Без ядра", Badge: "Пропустить", Desc: "Настроить или загрузить ядро позже в LuCI"},
+	}
+
+	if recEngine != "" {
+		for i, e := range engines {
+			if e.Key == recEngine {
+				initialEngIdx = i
+				break
+			}
+		}
+	}
+
 	opt := &OptionsSelector{
-		Box:     tview.NewBox(),
-		Profile: profile,
-		engines: []EngineItem{
-			{Key: "sing-box-extended", Name: "sing-box-extended", Badge: "xHTTP", Desc: "xHTTP, Reality, ShadowTLS, gRPC, TUIC, Hy2"},
-			{Key: "sing-box-extended-compressed", Name: "sing-box-ext-compressed", Badge: "xHTTP (сжат)", Desc: "sing-box-extended в сжатом бинарнике (минимум Flash)"},
-			{Key: "sing-box-tiny", Name: "sing-box-tiny", Badge: "Tiny", Desc: "Минималистичная сборка OpenWrt (минимум RAM)"},
-			{Key: "sing-box-lx", Name: "sing-box-lx", Badge: "Leadaxe", Desc: "Компактная сборка sing-box от Leadaxe"},
-			{Key: "steer", Name: "steer", Badge: "C-движок", Desc: "Ультра-легковесный модульный C-движок (минимум RAM)"},
-			{Key: "steer-extended", Name: "steer-extended", Badge: "C-движок+", Desc: "Модульный steer на C + xHTTP, оптимизация под нагрузку"},
-			{Key: "skip", Name: "Без ядра", Badge: "Пропустить", Desc: "Настроить или загрузить ядро позже в LuCI"},
-		},
-		selectedEngine: 0,
-		engineCursor:   0,
+		Box:            tview.NewBox(),
+		Profile:        profile,
+		engines:        engines,
+		selectedEngine: initialEngIdx,
+		engineCursor:   initialEngIdx,
 
 		versions: []VersionItem{
-			{Key: "latest", Name: "latest", Badge: "★ Рекомендуется"},
+			{Key: "latest", Name: "latest", Badge: "Стабильный"},
 			{Key: "custom", Name: "Вручную...", Badge: ""},
 		},
 		selectedVersion:   0,
@@ -127,6 +150,8 @@ func NewOptionsSelector(profile ProfileData) *OptionsSelector {
 		mirrorCursor:   0,
 
 		installRussian: true,
+		installZRAM:    defaultZRAM,
+		langCursor:     0,
 		activeSection:  SectionEngine,
 	}
 
@@ -152,6 +177,7 @@ func (opt *OptionsSelector) GetInstallOptions() InstallOptions {
 		SelectedEngine: engineKey,
 		SelectedMirror: mirrorKey,
 		InstallI18n:    opt.installRussian,
+		InstallZRAM:    opt.installZRAM,
 	}
 }
 
@@ -195,6 +221,13 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 		opt.Profile.ConflictDot(), conf)
 	opt.printClip(screen, line2, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	curY++
+
+	_, recHint := routerpkg.HardwareRecommendation(opt.Profile.RAMTotal, opt.Profile.RAMFree, opt.Profile.FlashFree)
+	if recHint != "" {
+		opt.printClip(screen, fmt.Sprintf("  [#eab308]💡 Совет:[-] [#cbd5e1]%s[-]", recHint),
+			x, curY, width, tview.AlignLeft, tcell.ColorDefault)
+		curY++
+	}
 
 	if opt.Profile.InstalledTachyonVer != "" {
 		opt.printClip(screen, fmt.Sprintf("  [#38bdf8]●[-] [#94a3b8]Уже установлено:[-] [#22c55e]Tachyon v%s[-]", opt.Profile.InstalledTachyonVer),
@@ -456,24 +489,61 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 	curY++
 
 	// -------------------------------------------------------------
-	// SECTION 4: LOCALIZATION
+	// SECTION 4: LOCALIZATION & SYSTEM
 	// -------------------------------------------------------------
-	checkIcon := "[#64748b][ ][-]"
-	if opt.installRussian {
-		checkIcon = "[#22c55e:b][✓][-]"
-	}
-	sec4Header := "  [#94a3b8]🌍 4. ЛОКАЛИЗАЦИЯ:[-]"
+	sec4Header := "  [#94a3b8]⚙️ 4. СИСТЕМА И ЛОКАЛИЗАЦИЯ:[-]"
 	if opt.activeSection == SectionLang {
-		sec4Header = "  [#38bdf8:b]▶ 4. ЛОКАЛИЗАЦИЯ[-]"
-		opt.printClip(screen, fmt.Sprintf("%s [#ffffff:#1e293b:b]▶ %s Установить русский языковой пакет LuCI (luci-i18n-tachyon-ru)[-] ", sec4Header, checkIcon), x, curY, width, tview.AlignLeft, tcell.ColorDefault)
-	} else {
-		opt.printClip(screen, fmt.Sprintf("%s   %s [#cbd5e1]Установить русский языковой пакет LuCI (luci-i18n-tachyon-ru)[-] ", sec4Header, checkIcon), x, curY, width, tview.AlignLeft, tcell.ColorDefault)
+		sec4Header = "  [#38bdf8:b]▶ 4. СИСТЕМА И ЛОКАЛИЗАЦИЯ[-]  [#64748b]↑↓ выбор, Space/Enter переключение[-]"
 	}
+	opt.printClip(screen, sec4Header, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
+	curY++
+
+	// 4.1 Russian language
+	ruCheck := "[#64748b][ ][-]"
+	if opt.installRussian {
+		ruCheck = "[#22c55e:b][✓][-]"
+	}
+	ruCursorPrefix := "    "
+	ruHighlightOpen := ""
+	ruHighlightClose := ""
+	if opt.activeSection == SectionLang && opt.langCursor == 0 {
+		ruCursorPrefix = "  [#38bdf8]▶[-] "
+		ruHighlightOpen = "[#ffffff:#1e293b:b]"
+		ruHighlightClose = "[-]"
+	}
+	opt.printClip(screen, fmt.Sprintf("%s%s%s [#cbd5e1]Установить русский языковой пакет LuCI (luci-i18n-tachyon-ru)[-]%s",
+		ruCursorPrefix, ruHighlightOpen, ruCheck, ruHighlightClose), x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	opt.clickTargets = append(opt.clickTargets, optClickTarget{
 		x1: x, y1: curY, x2: x + width, y2: curY,
 		onClick: func() {
 			opt.activeSection = SectionLang
+			opt.langCursor = 0
 			opt.installRussian = !opt.installRussian
+		},
+	})
+	curY++
+
+	// 4.2 zRAM swap
+	zramCheck := "[#64748b][ ][-]"
+	if opt.installZRAM {
+		zramCheck = "[#22c55e:b][✓][-]"
+	}
+	zramCursorPrefix := "    "
+	zramHighlightOpen := ""
+	zramHighlightClose := ""
+	if opt.activeSection == SectionLang && opt.langCursor == 1 {
+		zramCursorPrefix = "  [#38bdf8]▶[-] "
+		zramHighlightOpen = "[#ffffff:#1e293b:b]"
+		zramHighlightClose = "[-]"
+	}
+	opt.printClip(screen, fmt.Sprintf("%s%s%s [#cbd5e1]Включить zRAM-swap (сжатый SWAP в RAM для защиты от OOM)[-]%s",
+		zramCursorPrefix, zramHighlightOpen, zramCheck, zramHighlightClose), x, curY, width, tview.AlignLeft, tcell.ColorDefault)
+	opt.clickTargets = append(opt.clickTargets, optClickTarget{
+		x1: x, y1: curY, x2: x + width, y2: curY,
+		onClick: func() {
+			opt.activeSection = SectionLang
+			opt.langCursor = 1
+			opt.installZRAM = !opt.installZRAM
 		},
 	})
 	curY++
@@ -737,9 +807,11 @@ func (opt *OptionsSelector) InputHandler() func(event *tcell.EventKey, setFocus 
 					opt.selectedMirror = opt.mirrorCursor
 				} else {
 					opt.activeSection = SectionLang
+					opt.langCursor = 0
 				}
 			case tcell.KeyEnter:
 				opt.activeSection = SectionLang
+				opt.langCursor = 0
 			case tcell.KeyRune:
 				r := event.Rune()
 				if r >= '1' && r <= '6' {
@@ -748,22 +820,41 @@ func (opt *OptionsSelector) InputHandler() func(event *tcell.EventKey, setFocus 
 					opt.selectedMirror = idx
 				} else if r == ' ' {
 					opt.activeSection = SectionLang
+					opt.langCursor = 0
 				}
 			}
 
 		case SectionLang:
 			switch event.Key() {
 			case tcell.KeyUp:
-				opt.activeSection = SectionMirror
-			case tcell.KeyDown, tcell.KeyRight:
+				if opt.langCursor > 0 {
+					opt.langCursor--
+				} else {
+					opt.activeSection = SectionMirror
+				}
+			case tcell.KeyDown:
+				if opt.langCursor < 1 {
+					opt.langCursor++
+				} else {
+					opt.activeSection = SectionBtnInstall
+				}
+			case tcell.KeyRight:
 				opt.activeSection = SectionBtnInstall
 			case tcell.KeyLeft:
 				opt.activeSection = SectionMirror
 			case tcell.KeyEnter:
-				opt.installRussian = !opt.installRussian
+				if opt.langCursor == 0 {
+					opt.installRussian = !opt.installRussian
+				} else {
+					opt.installZRAM = !opt.installZRAM
+				}
 			case tcell.KeyRune:
 				if event.Rune() == ' ' {
-					opt.installRussian = !opt.installRussian
+					if opt.langCursor == 0 {
+						opt.installRussian = !opt.installRussian
+					} else {
+						opt.installZRAM = !opt.installZRAM
+					}
 				}
 			}
 
@@ -771,6 +862,7 @@ func (opt *OptionsSelector) InputHandler() func(event *tcell.EventKey, setFocus 
 			switch event.Key() {
 			case tcell.KeyUp:
 				opt.activeSection = SectionLang
+				opt.langCursor = 1
 			case tcell.KeyRight:
 				opt.activeSection = SectionBtnBack
 			case tcell.KeyLeft:

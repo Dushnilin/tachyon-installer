@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	gossh "golang.org/x/crypto/ssh"
 )
@@ -223,4 +224,78 @@ func IsAPKPackage(client *gossh.Client) bool {
 		return false
 	}
 	return strings.TrimSpace(string(out)) == "yes"
+}
+
+// SyncRouterTime synchronizes the OpenWrt router's clock with the host computer's UTC time.
+// This prevents TLS handshake and certificate verification failures when installing packages or using HTTPS.
+func SyncRouterTime(client *gossh.Client) (string, error) {
+	now := time.Now().UTC()
+	dateStr := now.Format("2006-01-02 15:04:05")
+	cmd := fmt.Sprintf("date -u -s '%s' >/dev/null 2>&1 && hwclock -w 2>/dev/null || true; date -u '+%%Y-%%m-%%d %%H:%%M:%%S UTC'", dateStr)
+
+	sess, err := client.NewSession()
+	if err != nil {
+		return "", err
+	}
+	defer sess.Close()
+
+	out, err := sess.Output(cmd)
+	if err != nil {
+		return "", fmt.Errorf("sync router time failed: %w", err)
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+// CheckRouterConnectivity tests whether the router has external IP routing and working DNS resolution.
+func CheckRouterConnectivity(client *gossh.Client) (dnsOK bool, inetOK bool, details string, err error) {
+	sess, err := client.NewSession()
+	if err != nil {
+		return false, false, "", err
+	}
+	defer sess.Close()
+
+	cmd := `
+inet=0; dns=0
+if ping -c 1 -W 2 1.1.1.1 >/dev/null 2>&1 || ping -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; then inet=1; fi
+if nslookup github.com 127.0.0.1 >/dev/null 2>&1 || nslookup github.com 1.1.1.1 >/dev/null 2>&1 || nslookup github.com >/dev/null 2>&1; then dns=1; fi
+echo "$inet|$dns"
+`
+	out, err := sess.Output(cmd)
+	if err != nil {
+		return false, false, "", err
+	}
+
+	parts := strings.Split(strings.TrimSpace(string(out)), "|")
+	if len(parts) >= 2 {
+		inetOK = (parts[0] == "1")
+		dnsOK = (parts[1] == "1")
+	}
+
+	var msgs []string
+	if inetOK {
+		msgs = append(msgs, "Интернет: доступен")
+	} else {
+		msgs = append(msgs, "Интернет: нет связи (проверьте WAN)")
+	}
+	if dnsOK {
+		msgs = append(msgs, "DNS: работает")
+	} else {
+		msgs = append(msgs, "DNS: сбой резолва")
+	}
+
+	return dnsOK, inetOK, strings.Join(msgs, ", "), nil
+}
+
+// HardwareRecommendation generates intelligent hardware hints based on RAM and Flash resources.
+func HardwareRecommendation(ramTotal, ramFree, flashFree float64) (recEngine string, hint string) {
+	if ramTotal > 0 && ramTotal < 128.0 {
+		return "steer", fmt.Sprintf("ОЗУ %.0f МБ (<128 МБ): рекомендуется steer или sing-box-tiny для защиты от OOM", ramTotal)
+	}
+	if ramFree > 0 && ramFree < 35.0 {
+		return "steer", fmt.Sprintf("Свободно ОЗУ %.0f МБ (<35 МБ): рекомендуется steer или sing-box-tiny", ramFree)
+	}
+	if flashFree > 0 && flashFree < 15.0 {
+		return "sing-box-extended-compressed", fmt.Sprintf("Свободно Flash %.0f МБ (<15 МБ): рекомендуется сжатый бинарник или steer", flashFree)
+	}
+	return "", ""
 }

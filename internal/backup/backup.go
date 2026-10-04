@@ -7,6 +7,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"time"
 
 	gossh "golang.org/x/crypto/ssh"
@@ -86,4 +88,71 @@ func createEmptyPlaceholderBackup(localPath, routerIP string) (string, error) {
 	_, _ = tw.Write([]byte(note))
 
 	return fmt.Sprintf("Первичная установка: создана точка восстановления %s", filepath.Base(localPath)), nil
+}
+
+// ListBackups returns all available local backup archives, sorted newest first.
+func ListBackups() ([]string, error) {
+	entries, err := os.ReadDir("backups")
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	var archives []string
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasPrefix(entry.Name(), "tachyon_backup_") && strings.HasSuffix(entry.Name(), ".tar.gz") {
+			archives = append(archives, filepath.Join("backups", entry.Name()))
+		}
+	}
+
+	// Sort newest first by filename (which embeds ISO timestamp YYYYMMDD-HHMMSS)
+	sort.Slice(archives, func(i, j int) bool {
+		return archives[i] > archives[j]
+	})
+
+	return archives, nil
+}
+
+// RestoreBackup uploads a chosen local backup archive to the router and restores it into /etc/config/ and /etc/tachyon.
+func RestoreBackup(client *gossh.Client, backupPath string) (string, error) {
+	file, err := os.Open(backupPath)
+	if err != nil {
+		return "", fmt.Errorf("open backup file: %w", err)
+	}
+	defer file.Close()
+
+	sess, err := client.NewSession()
+	if err != nil {
+		return "", fmt.Errorf("ssh session: %w", err)
+	}
+	defer sess.Close()
+
+	stdin, err := sess.StdinPipe()
+	if err != nil {
+		return "", fmt.Errorf("stdin pipe: %w", err)
+	}
+
+	remoteCmd := `cat > /tmp/tachyon_restore.tar.gz && \
+tar -xzf /tmp/tachyon_restore.tar.gz -C / 2>/dev/null || true; \
+rm -f /tmp/tachyon_restore.tar.gz; \
+if [ -x /etc/init.d/tachyon ]; then /etc/init.d/tachyon restart >/dev/null 2>&1 || true; fi; \
+echo 'RESTORE_OK'`
+
+	go func() {
+		defer stdin.Close()
+		_, _ = io.Copy(stdin, file)
+	}()
+
+	out, err := sess.CombinedOutput(remoteCmd)
+	if err != nil {
+		return "", fmt.Errorf("restore command failed: %w (output: %s)", err, string(out))
+	}
+
+	if !strings.Contains(string(out), "RESTORE_OK") {
+		return "", fmt.Errorf("restore did not complete cleanly: %s", string(out))
+	}
+
+	return fmt.Sprintf("Конфигурация Tachyon успешно восстановлена из %s", filepath.Base(backupPath)), nil
 }

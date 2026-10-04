@@ -1,6 +1,7 @@
 package diag
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -153,5 +154,30 @@ func TestHasPackage(t *testing.T) {
 	}
 	if hasPackage("tachyon-helper-2\n", "tachyon") {
 		t.Error("tachyon-helper must not count as tachyon")
+	}
+}
+
+func TestExportToFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	outPath := tmpDir + "/subdir/test-report.txt"
+	rs := []Result{
+		{ID: "c1", Title: "Check 1", Status: OK, Detail: "all good"},
+		{ID: "c2", Title: "Check 2", Status: Fail, Detail: "broken", Hint: "fix here"},
+	}
+	savedPath, err := ExportToFile("Test Diagnostics", rs, outPath)
+	if err != nil {
+		t.Fatalf("ExportToFile failed: %v", err)
+	}
+	if savedPath != outPath {
+		t.Errorf("ExportToFile returned path %q, want %q", savedPath, outPath)
+	}
+
+	content, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read exported file failed: %v", err)
+	}
+	str := string(content)
+	if !strings.Contains(str, "Test Diagnostics") || !strings.Contains(str, "[ OK ] Check 1") || !strings.Contains(str, "[FAIL] Check 2") {
+		t.Errorf("unexpected file content: %s", str)
 	}
 }

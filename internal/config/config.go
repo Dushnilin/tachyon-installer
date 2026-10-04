@@ -23,6 +23,7 @@ type Config struct {
 	SelectedEngine string `json:"selected_engine,omitempty"`
 	SelectedMirror string `json:"selected_mirror,omitempty"`
 	InstallI18n    bool   `json:"install_i18n"`
+	InstallZRAM    bool   `json:"install_zram"`
 }
 
 // DefaultConfig returns a Config with sensible defaults (auto-detected gateway IP).

@@ -2,14 +2,19 @@
 package main
 
 import (
+	"context"
+	"os"
+
 	"github.com/rivo/tview"
 	gossh "golang.org/x/crypto/ssh"
 
+	"tachyon-installer/internal/cli"
 	appconfig "tachyon-installer/internal/config"
 	routerpkg "tachyon-installer/internal/router"
 	sshpkg "tachyon-installer/internal/ssh"
 	"tachyon-installer/internal/tui"
 	"tachyon-installer/internal/tui/widgets"
+	"tachyon-installer/internal/updater"
 )
 
 // AppVersion and BuildDate are set at build time via -ldflags.
@@ -20,6 +25,43 @@ var (
 
 func main() {
 	cfg := appconfig.Load("manager_config.json")
+
+	// Parse command line flags
+	opts, err := cli.ParseFlags(os.Args[1:], cfg, AppVersion)
+	if err != nil {
+		os.Exit(2)
+	}
+
+	// If headless execution or maintenance flags are given, run non-interactively
+	if opts.ShouldRunHeadless() {
+		os.Exit(cli.Run(opts))
+	}
+
+	// Apply CLI flags override into config for TUI mode
+	if opts.RouterIP != "" {
+		cfg.RouterIP = opts.RouterIP
+	}
+	if opts.SSHPort > 0 {
+		cfg.SSHPort = opts.SSHPort
+	}
+	if opts.Username != "" {
+		cfg.Username = opts.Username
+	}
+	if opts.Password != "" {
+		cfg.Password = opts.Password
+	}
+	if opts.KeyPath != "" {
+		cfg.KeyPath = opts.KeyPath
+	}
+	if opts.Engine != "" {
+		cfg.SelectedEngine = opts.Engine
+	}
+	if opts.Mirror != "" {
+		cfg.SelectedMirror = opts.Mirror
+	}
+	if opts.Version != "" {
+		cfg.TachyonVersion = opts.Version
+	}
 
 	tui.InitTheme()
 
@@ -62,6 +104,14 @@ func main() {
 			return sshpkg.Connect(cfg.RouterIP, cfg.SSHPort, cfg.Username, cfg.Password)
 		},
 	}
+
+	// Background release update check
+	go func() {
+		hasUpd, latestVer, relURL, _ := updater.CheckForUpdate(context.Background(), AppVersion)
+		if hasUpd {
+			ctx.ConsoleWritef("\n[#eab308]💡 Доступна новая версия tachyon-installer: %s (текущая: %s)!\n   Скачать: %s[-]\n\n", latestVer, AppVersion, relURL)
+		}
+	}()
 
 	// Wire callbacks
 	ctx.OnProfileReady = func(profile *routerpkg.RouterProfile) {

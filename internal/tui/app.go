@@ -29,6 +29,7 @@ type InstallOptions struct {
 	SelectedEngine string
 	SelectedMirror string
 	InstallI18n    bool
+	InstallZRAM    bool
 }
 
 // AppContext holds all shared state for the TUI application.

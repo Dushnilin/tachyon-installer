@@ -277,3 +277,33 @@ func TestOptionsSelectorMouseClicksInModal(t *testing.T) {
 			opt.selectedEngine, opt.engines[opt.selectedEngine].Key)
 	}
 }
+
+func TestZRAMOptionAndHardwareAdvice(t *testing.T) {
+	// Constrained router (<128MB RAM)
+	optLow := NewOptionsSelector(ProfileData{
+		Model:     "GL-MT300N",
+		RAMTotal:  64,
+		RAMFree:   20,
+		FlashFree: 10,
+	})
+
+	optsLow := optLow.GetInstallOptions()
+	if !optsLow.InstallZRAM {
+		t.Errorf("expected InstallZRAM to be true by default for 64MB RAM router")
+	}
+	if optsLow.SelectedEngine != "steer" {
+		t.Errorf("expected steer engine to be preselected for 64MB router, got %s", optsLow.SelectedEngine)
+	}
+
+	// High-end router (>512MB RAM)
+	optHigh := NewOptionsSelector(ProfileData{
+		Model:     "x86_64 Gateway",
+		RAMTotal:  1024,
+		RAMFree:   800,
+		FlashFree: 500,
+	})
+	optsHigh := optHigh.GetInstallOptions()
+	if optsHigh.InstallZRAM {
+		t.Errorf("expected InstallZRAM to be false by default for 1024MB RAM router")
+	}
+}

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -447,6 +449,21 @@ func Format(title string, results []Result) string {
 	ok, warn, fail := Summary(results)
 	fmt.Fprintf(&b, "\nИтого: OK %d, предупреждений %d, ошибок %d\n", ok, warn, fail)
 	return b.String()
+}
+
+// ExportToFile formats the results and writes them to the specified path.
+func ExportToFile(title string, results []Result, targetPath string) (string, error) {
+	if targetPath == "" {
+		targetPath = fmt.Sprintf("tachyon-diag-report-%s.txt", time.Now().Format("20060102-150405"))
+	}
+	content := Format(title, results)
+	if dir := filepath.Dir(targetPath); dir != "." && dir != "" {
+		_ = os.MkdirAll(dir, 0755)
+	}
+	if err := os.WriteFile(targetPath, []byte(content), 0644); err != nil {
+		return "", err
+	}
+	return targetPath, nil
 }
 
 func hasPackage(pkgs, name string) bool {

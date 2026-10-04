@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	gossh "golang.org/x/crypto/ssh"
 )
 
 // StagingArea manages a temporary local directory for storing packages before upload.
@@ -29,7 +31,29 @@ func (s *StagingArea) Cleanup() {
 }
 
 // GenerateRunnerScript generates the shell script to be executed on the OpenWrt router.
-func GenerateRunnerScript(selectedEngine string, isAPK bool) string {
+func GenerateRunnerScript(selectedEngine string, isAPK bool, installZRAM ...bool) string {
+	withZRAM := false
+	if len(installZRAM) > 0 && installZRAM[0] {
+		withZRAM = true
+	}
+
+	zramSection := ""
+	if withZRAM {
+		zramSection = `
+echo "==> Настройка zRAM-swap (защита от OOM)..."
+if [ "$PKG_MGR" = "apk" ]; then
+    apk add zram-swap 2>&1 || true
+else
+    opkg update >/dev/null 2>&1 || true
+    opkg install zram-swap 2>&1 || true
+fi
+if [ -x /etc/init.d/zram ]; then
+    /etc/init.d/zram enable >/dev/null 2>&1 || true
+    /etc/init.d/zram restart >/dev/null 2>&1 || true
+fi
+`
+	}
+
 	script := `#!/bin/sh
 # Tachyon Host-Assisted Express Installer
 set -e
@@ -48,7 +72,7 @@ if command -v apk >/dev/null 2>&1; then
 else
     PKG_MGR="opkg"
 fi
-
+` + zramSection + `
 echo "==> [2/5] Установка пакетов Tachyon..."
 if [ "$PKG_MGR" = "apk" ]; then
     # Install local APK packages
@@ -132,11 +156,61 @@ echo "==> Экспресс-установка на роутере успешно
 }
 
 // WriteRunnerScript writes the runner script to the staging directory.
-func (s *StagingArea) WriteRunnerScript(selectedEngine string, isAPK bool) (string, error) {
-	content := GenerateRunnerScript(selectedEngine, isAPK)
+func (s *StagingArea) WriteRunnerScript(selectedEngine string, isAPK bool, installZRAM ...bool) (string, error) {
+	content := GenerateRunnerScript(selectedEngine, isAPK, installZRAM...)
 	path := filepath.Join(s.Dir, "install_on_router.sh")
 	if err := os.WriteFile(path, []byte(content), 0755); err != nil {
 		return "", err
 	}
 	return path, nil
+}
+
+// GenerateUninstallScript creates a clean uninstaller shell script.
+func GenerateUninstallScript(isAPK bool) string {
+	script := `#!/bin/sh
+# Tachyon Clean Complete Uninstaller
+set -e
+
+echo "==> [1/4] Остановка служб Tachyon..."
+if [ -x /etc/init.d/tachyon ]; then
+    /etc/init.d/tachyon stop >/dev/null 2>&1 || true
+    /etc/init.d/tachyon disable >/dev/null 2>&1 || true
+fi
+killall -9 tachyon sing-box steer 2>/dev/null || true
+
+echo "==> [2/4] Удаление пакетов Tachyon..."
+if command -v apk >/dev/null 2>&1; then
+    apk del luci-app-tachyon luci-i18n-tachyon-ru tachyon 2>&1 || true
+else
+    opkg remove --autoremove luci-app-tachyon luci-i18n-tachyon-ru tachyon 2>&1 || true
+fi
+
+echo "==> [3/4] Очистка конфигурации и временных файлов..."
+rm -rf /etc/config/tachyon /etc/tachyon /usr/bin/tachyon /usr/sbin/steer /tmp/tachyon-install /tmp/luci-modulecache/ /tmp/luci-indexcache* 2>/dev/null || true
+
+echo "==> [4/4] Сброс сетевых правил и перезапуск firewall..."
+if [ -x /etc/init.d/firewall ]; then
+    /etc/init.d/firewall restart >/dev/null 2>&1 || true
+fi
+
+echo "==> Tachyon успешно удален с роутера."
+`
+	return strings.ReplaceAll(script, "\r\n", "\n")
+}
+
+// UninstallTachyon executes clean removal of Tachyon on the remote router.
+func UninstallTachyon(client *gossh.Client, isAPK bool) (string, error) {
+	sess, err := client.NewSession()
+	if err != nil {
+		return "", fmt.Errorf("ssh session: %w", err)
+	}
+	defer sess.Close()
+
+	script := GenerateUninstallScript(isAPK)
+	cmd := fmt.Sprintf("sh -c '%s'", strings.ReplaceAll(script, "'", "'\\''"))
+	out, err := sess.CombinedOutput(cmd)
+	if err != nil {
+		return string(out), fmt.Errorf("uninstall failed: %w", err)
+	}
+	return string(out), nil
 }

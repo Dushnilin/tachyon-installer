@@ -5,9 +5,11 @@ import (
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
+
+	routerpkg "tachyon-installer/internal/router"
 )
 
-// ShowSubscriptionSetupForm displays a modal for entering a subscription URL.
+// ShowSubscriptionSetupForm displays a modal for entering a subscription URL or direct proxy link(s).
 func ShowSubscriptionSetupForm(ctx *AppContext) {
 	panel := NewSolidFlex()
 	panel.SetDirection(tview.FlexRow)
@@ -20,17 +22,36 @@ func ShowSubscriptionSetupForm(ctx *AppContext) {
 
 	text := "\n  [#38bdf8]🛰️  Tachyon успешно установлен![-]\n\n" +
 		"  [#cbd5e1]Для обхода блокировок вставьте вашу ссылку на подписку[-]\n" +
-		"  [#cbd5e1](VLESS / Shadowsocks / Trojan / VMess) от вашего VPN-провайдера:[-]"
+		"  [#cbd5e1](VLESS / Shadowsocks / Trojan / VMess / Hysteria2) от вашего VPN-провайдера:[-]"
 
 	textView := tview.NewTextView().
 		SetDynamicColors(true).
 		SetText(text)
 	textView.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
 
+	statusView := tview.NewTextView().
+		SetDynamicColors(true).
+		SetText("  [#64748b]Поддерживаются HTTPS ссылки, прямые конфиги (vless://...) и base64 бандлы[-] ")
+	statusView.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
+
 	subInput := tview.NewInputField().
 		SetLabel("Ссылка на подписку: ").
 		SetText("").
 		SetFieldWidth(60)
+
+	subInput.SetChangedFunc(func(text string) {
+		trimmed := strings.TrimSpace(text)
+		if trimmed == "" {
+			statusView.SetText("  [#64748b]Поддерживаются HTTPS ссылки, прямые конфиги (vless://...) и base64 бандлы[-] ")
+			return
+		}
+		analysis := routerpkg.AnalyzeSubscription(trimmed)
+		if analysis.Valid {
+			statusView.SetText("  [#22c55e]✓ " + analysis.Summary + "[-] ")
+		} else {
+			statusView.SetText("  [#ef5350]⚠️ " + analysis.ErrorMsg + "[-] ")
+		}
+	})
 
 	form := tview.NewForm()
 	form.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
@@ -71,7 +92,7 @@ func ShowSubscriptionSetupForm(ctx *AppContext) {
 	EnableFormArrowNavigation(form)
 
 	panel.AddItem(textViewLayout(textView), 5, 1, false)
-	panel.AddItem(nil, 1, 0, false)
+	panel.AddItem(statusView, 1, 0, false)
 	panel.AddItem(formLayout(form), 6, 1, true)
 
 	modalForm := NewSolidFlex()
