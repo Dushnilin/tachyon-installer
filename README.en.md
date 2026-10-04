@@ -74,14 +74,14 @@ The installation executes across 5 autonomous stages:
 
 Grab the executable for your OS from **[GitHub Releases](https://github.com/Dushnilin/tachyon-installer/releases)**:
 
-| Operating System | Architecture | Binary Archive |
+| Operating System | Architecture | Direct Executable Binary |
 | :--- | :--- | :--- |
-| **Windows** | x86_64 (64-bit) | `tachyon-installer_windows_amd64.zip` (`.exe`) |
-| **Windows** | ARM64 | `tachyon-installer_windows_arm64.zip` (`.exe`) |
-| **Linux** | x86_64 (amd64) | `tachyon-installer_linux_amd64.tar.gz` |
-| **Linux** | ARM64 (aarch64) | `tachyon-installer_linux_arm64.tar.gz` |
-| **macOS** | Apple Silicon (M1/M2/M3/M4) | `tachyon-installer_darwin_arm64.tar.gz` |
-| **macOS** | Intel (x86_64) | `tachyon-installer_darwin_amd64.tar.gz` |
+| **Windows** | x86_64 (64-bit) | `tachyon-installer-windows-amd64.exe` |
+| **Windows** | ARM64 | `tachyon-installer-windows-arm64.exe` |
+| **Linux** | x86_64 (amd64) | `tachyon-installer-linux-amd64` |
+| **Linux** | ARM64 (aarch64) | `tachyon-installer-linux-arm64` |
+| **macOS** | Apple Silicon (M1/M2/M3/M4) | `tachyon-installer-darwin-arm64` |
+| **macOS** | Intel (x86_64) | `tachyon-installer-darwin-amd64` |
 
 ### 2. Run the Installer
 

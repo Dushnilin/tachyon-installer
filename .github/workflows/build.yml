@@ -51,10 +51,6 @@ jobs:
         with:
           name: "Tachyon Installer v${{ steps.vars.outputs.version }}"
           files: |
-            dist/*.zip
-            dist/*.tar.gz
-            dist/*.exe
-            dist/tachyon-installer_linux_*
-            dist/tachyon-installer_darwin_*
+            dist/tachyon-installer-*
             dist/sha256sums.txt
           generate_release_notes: true
