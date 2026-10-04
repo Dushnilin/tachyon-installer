@@ -88,4 +88,10 @@ func TestToolsModalsCreation(t *testing.T) {
 	if !pages.HasPage("self_update_modal") {
 		t.Errorf("expected self_update_modal page to be created")
 	}
+
+	// Test creation of speed doctor modal
+	ShowSpeedDoctorModal(ctx, "")
+	if !pages.HasPage("speed_doctor_modal") {
+		t.Errorf("expected speed_doctor_modal page to be created")
+	}
 }

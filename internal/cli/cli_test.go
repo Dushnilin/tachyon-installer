@@ -145,5 +145,22 @@ func TestParseFlags_HeadlessTriggers(t *testing.T) {
 	if !optsFleetDeploy.FleetOnlyOutdated || optsFleetDeploy.FleetConcurrency != 5 {
 		t.Errorf("parsed fleet deploy options mismatch")
 	}
+
+	// 18. -speedtest and -speed-doctor
+	optsSpeed, err := ParseFlags([]string{"-speedtest"}, cfg, "v1.7.0")
+	if err != nil || !optsSpeed.ShouldRunHeadless() || !optsSpeed.SpeedDoctor {
+		t.Errorf("expected -speedtest to trigger headless mode")
+	}
+	if optsSpeed.SpeedDuration != 5 {
+		t.Errorf("expected default speed duration 5, got %d", optsSpeed.SpeedDuration)
+	}
+
+	optsSpeedDoc, err := ParseFlags([]string{"-speed-doctor", "-speed-duration", "10"}, cfg, "v1.7.0")
+	if err != nil || !optsSpeedDoc.ShouldRunHeadless() || !optsSpeedDoc.SpeedDoctor {
+		t.Errorf("expected -speed-doctor to trigger headless mode")
+	}
+	if optsSpeedDoc.SpeedDuration != 10 {
+		t.Errorf("expected custom speed duration 10, got %d", optsSpeedDoc.SpeedDuration)
+	}
 }
 

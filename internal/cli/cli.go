@@ -61,6 +61,8 @@ type Options struct {
 	FleetOnlyOutdated bool
 	FleetOnlyClean    bool
 	FleetConcurrency  int
+	SpeedDoctor       bool
+	SpeedDuration     int
 	Yes               bool
 	AppVersion        string
 }
@@ -115,6 +117,9 @@ func ParseFlags(args []string, defaultCfg *appconfig.Config, appVersion string) 
 	fs.BoolVar(&opts.FleetOnlyOutdated, "fleet-only-outdated", false, "Применять fleet-deploy только к роутерам с устаревшим Tachyon")
 	fs.BoolVar(&opts.FleetOnlyClean, "fleet-only-clean", false, "Применять fleet-deploy только к чистым роутерам без Tachyon")
 	fs.IntVar(&opts.FleetConcurrency, "fleet-concurrency", 3, "Количество одновременных потоков установки при fleet-deploy")
+	fs.BoolVar(&opts.SpeedDoctor, "speedtest", false, "Запустить тест скорости, Bufferbloat и троттлинга CPU роутера")
+	fs.BoolVar(&opts.SpeedDoctor, "speed-doctor", false, "Алиас для -speedtest")
+	fs.IntVar(&opts.SpeedDuration, "speed-duration", 5, "Длительность замера скорости в секундах (по умолчанию 5)")
 
 	if err := fs.Parse(args); err != nil {
 		return nil, err
@@ -125,7 +130,7 @@ func ParseFlags(args []string, defaultCfg *appconfig.Config, appVersion string) 
 
 // ShouldRunHeadless checks if flags request non-interactive execution.
 func (o *Options) ShouldRunHeadless() bool {
-	return o.RunDiag || o.RunUninstall || o.RunRestore != "" || o.ListBackups || o.CheckUpdate || o.SelfUpdate || o.TuneNetwork || o.GuidedSetup || o.SwitchEngine != "" || o.RunRescue || o.FixConflicts || o.FullSnapshot || o.OfflineBundle != "" || o.RunMonitor || o.TestSub != "" || o.FleetScan || o.FleetDeploy || o.Yes
+	return o.RunDiag || o.RunUninstall || o.RunRestore != "" || o.ListBackups || o.CheckUpdate || o.SelfUpdate || o.TuneNetwork || o.GuidedSetup || o.SwitchEngine != "" || o.RunRescue || o.FixConflicts || o.FullSnapshot || o.OfflineBundle != "" || o.RunMonitor || o.TestSub != "" || o.FleetScan || o.FleetDeploy || o.SpeedDoctor || o.Yes
 }
 
 // Run executes non-interactive CLI operations.
@@ -362,6 +367,39 @@ func Run(opts *Options) int {
 	fmt.Println("✓ SSH подключение установлено.")
 
 	isAPK := routerpkg.IsAPKPackage(client)
+
+	// Bufferbloat & CPU Encryption Doctor
+	if opts.SpeedDoctor {
+		dur := opts.SpeedDuration
+		if dur <= 0 {
+			dur = 5
+		}
+		fmt.Printf("⚡ ЗАПУСК BUFFERBLOAT & SPEED DOCTOR (Длительность: %d сек)...\n", dur)
+		fmt.Println("  Измерение прямой задержки в покое, скорости WAN и задержки под насыщением...")
+		fmt.Println("  (Замер потоковый, без записи во Flash-память)")
+		fmt.Println()
+
+		execCmd := func(_ *gossh.Client, cmd string) (string, error) {
+			sess, err := client.NewSession()
+			if err != nil {
+				return "", err
+			}
+			defer sess.Close()
+			out, err := sess.CombinedOutput(cmd)
+			return string(out), err
+		}
+
+		report, err := routerpkg.RunSpeedDoctor(client, execCmd, routerpkg.SpeedDoctorOptions{
+			DurationSec: dur,
+		})
+		if err != nil {
+			fmt.Printf("❌ Ошибка выполнения теста: %v\n", err)
+			return 1
+		}
+
+		printSpeedDoctorCLIReport(report)
+		return 0
+	}
 
 	// 5. Emergency Rescue
 	if opts.RunRescue {
@@ -894,4 +932,42 @@ func fileSHA256Sum(path string) (string, int64, error) {
 		return "", 0, err
 	}
 	return hex.EncodeToString(h.Sum(nil)), size, nil
+}
+
+func printSpeedDoctorCLIReport(report *routerpkg.SpeedDoctorReport) {
+	if report.Direct != nil {
+		d := report.Direct
+		fmt.Printf("================================================================================\n")
+		fmt.Printf("  BUFFERBLOAT GRADE:  [ %s ]  —  %s\n", d.Grade, d.Verdict)
+		fmt.Printf("================================================================================\n")
+		fmt.Printf("  • Скорость скачивания (WAN):  %.1f Мбит/с\n", d.SpeedMbps)
+		fmt.Printf("  • Задержка в покое (Idle):    %.1f мс (мин: %.1f, макс: %.1f, джиттер: %.1f мс)\n",
+			d.IdlePingAvg, d.IdlePingMin, d.IdlePingMax, d.IdleJitter)
+		fmt.Printf("  • Задержка под нагрузкой:     %.1f мс\n", d.LoadedPingAvg)
+		fmt.Printf("  • Bufferbloat Оверхед:        +%.1f мс (Оценка: %s)\n", d.BufferbloatDelta, d.Grade)
+
+		throttledMsg := ""
+		if d.CPU.Throttled {
+			throttledMsg = " [ВНИМАНИЕ: CPU Throttling / Перегрузка SoftIRQ!]"
+		}
+		fmt.Printf("  • Загрузка CPU роутера:       %.0f%% (sys: %.0f%%, softirq: %.0f%%)%s\n",
+			d.CPU.TotalPct, d.CPU.SystemPct, d.CPU.SoftIRQPct, throttledMsg)
+		fmt.Printf("================================================================================\n")
+	}
+
+	if report.Tunnel != nil {
+		t := report.Tunnel
+		fmt.Printf("\n--- ТУННЕЛЬ TACHYON (PROXY) ---\n")
+		fmt.Printf("  • Скорость:            %.1f Мбит/с\n", t.SpeedMbps)
+		fmt.Printf("  • Пинг в туннеле:      %.1f мс (Bufferbloat: +%.1f мс)\n", t.IdlePingAvg, t.BufferbloatDelta)
+		fmt.Printf("  • Загрузка CPU:        %.0f%%\n", t.CPU.TotalPct)
+	}
+
+	if len(report.Recommendations) > 0 {
+		fmt.Printf("\n💡 Рекомендации сетевого доктора:\n")
+		for _, rec := range report.Recommendations {
+			fmt.Printf("  • %s\n", rec)
+		}
+		fmt.Println()
+	}
 }

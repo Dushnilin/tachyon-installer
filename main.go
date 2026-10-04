@@ -271,6 +271,13 @@ func handleProfileReady(ctx *tui.AppContext) {
 		return
 	}
 
+	if ctx.SpeedDoctorOnly {
+		ctx.App.QueueUpdateDraw(func() {
+			tui.ShowSpeedDoctorModal(ctx, "welcome_wizard")
+		})
+		return
+	}
+
 	profile, err := routerpkg.RunPreConnectionCheck(client)
 	if err != nil {
 		client.Close()

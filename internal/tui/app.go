@@ -75,6 +75,8 @@ type AppContext struct {
 	RescueOnly bool
 	// GuidedOnly makes the wizard open the hand-in-hand autopilot setup modal directly.
 	GuidedOnly bool
+	// SpeedDoctorOnly makes the wizard open the Bufferbloat & Speed Doctor directly after connecting.
+	SpeedDoctorOnly bool
 	// AppVersion is the version of tachyon-installer.
 	AppVersion string
 }

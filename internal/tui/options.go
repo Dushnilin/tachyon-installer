@@ -95,6 +95,7 @@ type OptionsSelector struct {
 	OnSelfUpdate           func()
 	OnGuidedSetup          func()
 	OnFleetManager         func()
+	OnSpeedDoctor          func()
 
 	prefVersion string
 }
@@ -626,9 +627,9 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 
 		var footer string
 		if width < 80 {
-			footer = "  " + FormatHotkey("Enter", "Выбор") + " · " + FormatVioletHotkey("F", "Флот") + " · " + FormatHotkey("A", "Авто") + " · " + FormatExitHotkey("Esc", "Назад")
+			footer = "  " + FormatHotkey("Enter", "Выбор") + " · " + FormatVioletHotkey("F", "Флот") + " · " + FormatHotkey("P", "Скорость") + " · " + FormatExitHotkey("Esc", "Назад")
 		} else {
-			footer = "  " + FormatHotkey("Enter", "Выбор") + " · " + FormatHotkey("A", "Авто") + " · " + FormatVioletHotkey("F", "Флот") + " · " + FormatHotkey("D", "Диаг") + " · " + FormatHotkey("M", "Монитор") + " · " + FormatHotkey("T", "Тюнинг") + " · " + FormatHotkey("R", "Rescue") + " · " + FormatHotkey("S", "Ядро") + " · " + FormatExitHotkey("Esc", "Назад")
+			footer = "  " + FormatHotkey("Enter", "Выбор") + " · " + FormatHotkey("A", "Авто") + " · " + FormatVioletHotkey("F", "Флот") + " · " + FormatHotkey("P", "Скорость") + " · " + FormatHotkey("D", "Диаг") + " · " + FormatHotkey("M", "Монитор") + " · " + FormatHotkey("T", "Тюнинг") + " · " + FormatHotkey("R", "Rescue") + " · " + FormatHotkey("S", "Ядро") + " · " + FormatExitHotkey("Esc", "Назад")
 		}
 		opt.printClip(screen, footer, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	} else {
@@ -664,9 +665,9 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 
 		var footer string
 		if width < 80 {
-			footer = "  " + FormatHotkey("Enter", "Выбор") + " · " + FormatVioletHotkey("F", "Флот") + " · " + FormatHotkey("A", "Авто") + " · " + FormatExitHotkey("Esc", "Назад")
+			footer = "  " + FormatHotkey("Enter", "Выбор") + " · " + FormatVioletHotkey("F", "Флот") + " · " + FormatHotkey("P", "Скорость") + " · " + FormatExitHotkey("Esc", "Назад")
 		} else {
-			footer = "  " + FormatHotkey("Enter", "Выбор") + " · " + FormatHotkey("A", "Авто") + " · " + FormatVioletHotkey("F", "Флот") + " · " + FormatHotkey("D", "Диаг") + " · " + FormatHotkey("M", "Монитор") + " · " + FormatHotkey("T", "Тюнинг") + " · " + FormatHotkey("R", "Rescue") + " · " + FormatHotkey("C", "Конфликты") + " · " + FormatExitHotkey("Esc", "Назад")
+			footer = "  " + FormatHotkey("Enter", "Выбор") + " · " + FormatHotkey("A", "Авто") + " · " + FormatVioletHotkey("F", "Флот") + " · " + FormatHotkey("P", "Скорость") + " · " + FormatHotkey("D", "Диаг") + " · " + FormatHotkey("M", "Монитор") + " · " + FormatHotkey("T", "Тюнинг") + " · " + FormatHotkey("R", "Rescue") + " · " + FormatHotkey("C", "Конфликты") + " · " + FormatExitHotkey("Esc", "Назад")
 		}
 		opt.printClip(screen, footer, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	}
@@ -786,6 +787,11 @@ func (opt *OptionsSelector) InputHandler() func(event *tcell.EventKey, setFocus 
 			case 'f', 'F', 'а', 'А':
 				if opt.OnFleetManager != nil {
 					opt.OnFleetManager()
+				}
+				return
+			case 'p', 'P', 'з', 'З':
+				if opt.OnSpeedDoctor != nil {
+					opt.OnSpeedDoctor()
 				}
 				return
 			case 's', 'S', 'ы', 'Ы':

@@ -80,6 +80,7 @@ func ShowWelcomeWizard(ctx *AppContext) {
 		ctx.DiagOnly = false
 		ctx.RescueOnly = false
 		ctx.GuidedOnly = true
+		ctx.SpeedDoctorOnly = false
 		ctx.Pages.SwitchToPage("ssh_wizard")
 		ctx.App.SetFocus(step2Form)
 	})
@@ -87,6 +88,15 @@ func ShowWelcomeWizard(ctx *AppContext) {
 		ctx.DiagOnly = false
 		ctx.RescueOnly = false
 		ctx.GuidedOnly = false
+		ctx.SpeedDoctorOnly = false
+		ctx.Pages.SwitchToPage("ssh_wizard")
+		ctx.App.SetFocus(step2Form)
+	})
+	step1Form.AddButton("🚀 Скорость & CPU", func() {
+		ctx.DiagOnly = false
+		ctx.RescueOnly = false
+		ctx.GuidedOnly = false
+		ctx.SpeedDoctorOnly = true
 		ctx.Pages.SwitchToPage("ssh_wizard")
 		ctx.App.SetFocus(step2Form)
 	})
@@ -94,6 +104,7 @@ func ShowWelcomeWizard(ctx *AppContext) {
 		ctx.DiagOnly = true
 		ctx.RescueOnly = false
 		ctx.GuidedOnly = false
+		ctx.SpeedDoctorOnly = false
 		ctx.Pages.SwitchToPage("ssh_wizard")
 		ctx.App.SetFocus(step2Form)
 	})
@@ -101,6 +112,7 @@ func ShowWelcomeWizard(ctx *AppContext) {
 		ctx.DiagOnly = false
 		ctx.RescueOnly = true
 		ctx.GuidedOnly = false
+		ctx.SpeedDoctorOnly = false
 		ctx.Pages.SwitchToPage("ssh_wizard")
 		ctx.App.SetFocus(step2Form)
 	})
@@ -408,6 +420,10 @@ func ShowOptionsWizard(ctx *AppContext, profile ProfileData) {
 
 	optSelector.OnFleetManager = func() {
 		ShowFleetModal(ctx, "options_wizard")
+	}
+
+	optSelector.OnSpeedDoctor = func() {
+		ShowSpeedDoctorModal(ctx, "options_wizard")
 	}
 
 	optSelector.OnHotSwap = func(engineKey, mirrorKey string) {
