@@ -171,17 +171,22 @@ func TestGuidedSetupForm_AllControlsVisibleWithoutClipping(t *testing.T) {
 	form.SetItemPadding(1)
 
 	modeOptions := []string{
-		"1. Автономный обход (Steer/Zapret — без серверов)",
-		"2. VLESS / Sing-box подписка (Туннель)",
+		"1. VLESS / Sing-box подписка (Туннель)",
+		"2. Автономный обход (Steer/Zapret — без серверов)",
 		"3. Гибридный режим (Zapret + VLESS Туннель)",
 	}
 	modeItem := newCycleSelectorItem("Режим работы:        ", modeOptions, 0, nil)
 	form.AddFormItem(modeItem)
 
+	subInput := tview.NewInputField().
+		SetLabel("Ссылка / ключ подписки:").
+		SetFieldWidth(48)
+	form.AddFormItem(subInput)
+
 	cb := tview.NewCheckbox().
 		SetLabel("Оптимизация сети:    ").
 		SetChecked(true).
-		SetCheckedString("[X] Включить TCP BBR, тюнинг буферов и Flow Offloading").
+		SetCheckedString("[X] Включить TCP BBR, тюнинг буферов и защиту Netfilter").
 		SetUncheckedString("[ ] Отключено (стандартные параметры ядра)")
 	form.AddFormItem(cb)
 
@@ -189,7 +194,7 @@ func TestGuidedSetupForm_AllControlsVisibleWithoutClipping(t *testing.T) {
 	form.AddButton("Отмена (Esc)", nil)
 
 	panel.AddItem(infoView, 0, 1, false)
-	panel.AddItem(formLayout(form), 7, 0, true)
+	panel.AddItem(formLayout(form), 9, 0, true)
 
 	modal := CreateWizardModalCustom(panel, 92, 27)
 	modal.SetRect(0, 0, 92, 27)
@@ -212,6 +217,9 @@ func TestGuidedSetupForm_AllControlsVisibleWithoutClipping(t *testing.T) {
 	// Verify all elements are simultaneously visible without scrolling:
 	if !strings.Contains(rendered, "Режим работы:") {
 		t.Errorf("missing 'Режим работы:' in modal render:\n%s", rendered)
+	}
+	if !strings.Contains(rendered, "Ссылка / ключ подписки:") {
+		t.Errorf("missing 'Ссылка / ключ подписки:' in modal render:\n%s", rendered)
 	}
 	if !strings.Contains(rendered, "Оптимизация сети:") {
 		t.Errorf("missing 'Оптимизация сети:' in modal render:\n%s", rendered)

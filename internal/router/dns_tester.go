@@ -199,38 +199,47 @@ func parseBenchOutput(out string) map[string]benchItem {
 	return res
 }
 
-// GenerateApplyDNSCommand returns the shell script to configure dnsmasq on OpenWrt
+// GenerateApplyDNSCommand returns the shell script to configure dnsmasq and Tachyon on OpenWrt
 // to use the chosen DNS resolver with anti-leak protection.
 func GenerateApplyDNSCommand(resolver DNSResolver) string {
 	script := fmt.Sprintf(`
-# 1. Clear existing dnsmasq upstream servers
-while uci -q delete dhcp.@dnsmasq[0].server 2>/dev/null; do :; done
+# 1. Configure Tachyon internal DNS settings if Tachyon is installed
+if command -v uci >/dev/null 2>&1 && uci -q get tachyon.settings >/dev/null; then
+    while uci -q delete tachyon.settings.dns_server 2>/dev/null; do :; done
+    uci -q add_list tachyon.settings.dns_server='%s' 2>/dev/null || true
+    if [ -n "%s" ]; then
+        uci -q add_list tachyon.settings.dns_server='%s' 2>/dev/null || true
+    fi
+    while uci -q delete tachyon.settings.bootstrap_dns_server 2>/dev/null; do :; done
+    uci -q add_list tachyon.settings.bootstrap_dns_server='%s' 2>/dev/null || true
+    if [ -n "%s" ]; then
+        uci -q add_list tachyon.settings.bootstrap_dns_server='%s' 2>/dev/null || true
+    fi
+    uci commit tachyon 2>/dev/null || true
+fi
 
-# 2. Add high-performance primary and secondary DNS upstreams
-uci add_list dhcp.@dnsmasq[0].server='%s'
-uci add_list dhcp.@dnsmasq[0].server='%s'
-
-# 3. Enable anti-leak: prevent provider WAN DNS from polluting responses
-uci set dhcp.@dnsmasq[0].noresolv='1'
-uci set dhcp.@dnsmasq[0].localuse='1'
-uci set dhcp.@dnsmasq[0].cachesize='4096'
-
-# 4. Commit and restart dnsmasq
-uci commit dhcp
-/etc/init.d/dnsmasq restart >/dev/null 2>&1 || true
-`, resolver.PrimaryIP, resolver.SecondaryIP)
+# 2. Configure dnsmasq upstream servers and anti-leak
+if command -v uci >/dev/null 2>&1; then
+    while uci -q delete dhcp.@dnsmasq[0].server 2>/dev/null; do :; done
+    uci -q add_list dhcp.@dnsmasq[0].server='%s' 2>/dev/null || true
+    if [ -n "%s" ]; then
+        uci -q add_list dhcp.@dnsmasq[0].server='%s' 2>/dev/null || true
+    fi
+    uci -q set dhcp.@dnsmasq[0].noresolv='1' 2>/dev/null || true
+    uci -q set dhcp.@dnsmasq[0].localuse='1' 2>/dev/null || true
+    uci -q set dhcp.@dnsmasq[0].cachesize='4096' 2>/dev/null || true
+    uci commit dhcp 2>/dev/null || true
+    /etc/init.d/dnsmasq restart >/dev/null 2>&1 || true
+fi
+`, resolver.PrimaryIP, resolver.SecondaryIP, resolver.SecondaryIP,
+		resolver.PrimaryIP, resolver.SecondaryIP, resolver.SecondaryIP,
+		resolver.PrimaryIP, resolver.SecondaryIP, resolver.SecondaryIP)
 
 	return strings.ReplaceAll(script, "\r\n", "\n")
 }
 
 // ApplyDNSConfig executes DNS configuration directly on the router.
 func ApplyDNSConfig(client *gossh.Client, execFn sshutil.ExecFunc, resolver DNSResolver) error {
-	// 1. If Tachyon is installed on the router, attempt native dns_autotune
-	autotuneCmd := `[ -x /usr/bin/tachyon ] && /usr/bin/tachyon dns_autotune --apply 2>/dev/null && echo "AUTOTUNE_OK" || echo ""`
-	if out, _ := execFn(client, autotuneCmd); strings.Contains(out, "AUTOTUNE_OK") {
-		return nil
-	}
-
 	cmd := GenerateApplyDNSCommand(resolver)
 	_, err := execFn(client, cmd)
 	if err != nil {

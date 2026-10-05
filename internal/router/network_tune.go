@@ -89,14 +89,18 @@ fi
 # 5. Apply sysctl
 sysctl -p /etc/sysctl.d/99-tachyon-tune.conf >/dev/null 2>&1 || true
 
-# 6. Configure firewall flow offloading if UCI available
+# 6. Disable firewall flow offloading (prevents bypassing Netfilter/TProxy for Sing-box)
 FLOW_OK="0"
 if command -v uci >/dev/null 2>&1; then
-    uci set firewall.@defaults[0].flow_offloading='1' 2>/dev/null || true
+    uci -q set firewall.@defaults[0].flow_offloading='0' 2>/dev/null || true
     uci commit firewall 2>/dev/null || true
     /etc/init.d/firewall reload >/dev/null 2>&1 || true
     FLOW_OK="1"
 fi
+
+# 7. Disable bridge netfilter interception on LAN bridges
+sysctl -w net.bridge.bridge-nf-call-iptables=0 >/dev/null 2>&1 || true
+sysctl -w net.bridge.bridge-nf-call-ip6tables=0 >/dev/null 2>&1 || true
 
 echo "TUNE_DONE:$BBR_AVAIL:$RAM_TOTAL_MB:$CONN_MAX:$FLOW_OK"
 `
@@ -153,11 +157,12 @@ echo "TUNE_DONE:$BBR_AVAIL:$RAM_TOTAL_MB:$CONN_MAX:$FLOW_OK"
 	)
 
 	if flowOK {
-		report.Offloading = "Flow Offloading (аппаратное/программное ускорение трафика) включен"
-		report.AppliedRules = append(report.AppliedRules, "Активирован Firewall Software Flow Offloading")
+		report.Offloading = "Flow Offloading безопасно отключен (защита TProxy/sing-box от обхода правил Netfilter)"
+		report.AppliedRules = append(report.AppliedRules, "Отключен Flow Offloading (защита TProxy и прозрачного проксирования)")
 	} else {
 		report.Offloading = "Flow Offloading пропущен (UCI недоступен)"
 	}
+	report.AppliedRules = append(report.AppliedRules, "Отключена фильтрация bridge-nf для LAN мостов (bridge-nf-call-iptables = 0)")
 
 	report.Details = "Сетевой стек и параметры ядра успешно оптимизированы."
 	return report

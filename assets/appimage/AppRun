@@ -1,0 +1,65 @@
+#!/bin/sh
+set -e
+
+# Resolve directory of AppRun inside the mounted AppImage
+HERE="$(dirname "$(readlink -f "${0}")")"
+BIN="${HERE}/usr/bin/tachyon-installer"
+
+if [ ! -f "$BIN" ]; then
+    echo "Error: binary not found at $BIN" >&2
+    exit 1
+fi
+
+export PATH="${HERE}/usr/bin:${PATH}"
+
+# If running interactively inside an existing terminal (TTY), run directly
+if [ -t 0 ] && [ -t 1 ]; then
+    exec "$BIN" "$@"
+fi
+
+# If launched from GUI / Desktop file manager without a TTY, spawn a desktop terminal emulator
+if command -v x-terminal-emulator >/dev/null 2>&1; then
+    exec x-terminal-emulator -e "$BIN" "$@"
+fi
+if command -v gnome-terminal >/dev/null 2>&1; then
+    exec gnome-terminal -- "$BIN" "$@"
+fi
+if command -v konsole >/dev/null 2>&1; then
+    exec konsole -e "$BIN" "$@"
+fi
+if command -v xfce4-terminal >/dev/null 2>&1; then
+    exec xfce4-terminal -e "$BIN" "$@"
+fi
+if command -v alacritty >/dev/null 2>&1; then
+    exec alacritty -e "$BIN" "$@"
+fi
+if command -v kitty >/dev/null 2>&1; then
+    exec kitty "$BIN" "$@"
+fi
+if command -v wezterm >/dev/null 2>&1; then
+    exec wezterm start -- "$BIN" "$@"
+fi
+if command -v mate-terminal >/dev/null 2>&1; then
+    exec mate-terminal -e "$BIN" "$@"
+fi
+if command -v tilix >/dev/null 2>&1; then
+    exec tilix -e "$BIN" "$@"
+fi
+if command -v terminator >/dev/null 2>&1; then
+    exec terminator -e "$BIN" "$@"
+fi
+if command -v lxterminal >/dev/null 2>&1; then
+    exec lxterminal -e "$BIN" "$@"
+fi
+if command -v foot >/dev/null 2>&1; then
+    exec foot "$BIN" "$@"
+fi
+if command -v urxvt >/dev/null 2>&1; then
+    exec urxvt -e "$BIN" "$@"
+fi
+if command -v xterm >/dev/null 2>&1; then
+    exec xterm -e "$BIN" "$@"
+fi
+
+# Fallback if no graphical terminal emulator detected
+exec "$BIN" "$@"

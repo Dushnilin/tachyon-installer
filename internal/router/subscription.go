@@ -214,26 +214,33 @@ func SaveSubscription(client *gossh.Client, execFn sshutil.ExecFunc, subInput st
 
 	var cmd strings.Builder
 	cmd.WriteString(`
+# 1. Initialize main section and community lists (RKN + YouTube + Discord + Meta + Twitter)
 uci -q get tachyon.main >/dev/null || uci set tachyon.main=section
 uci set tachyon.main.label='Main'
 uci set tachyon.main.enabled='1'
 uci set tachyon.main.action='connection'
+uci -q del_list tachyon.main.community_lists 2>/dev/null || true
 uci -q add_list tachyon.main.community_lists='russia_inside' 2>/dev/null || true
+uci -q add_list tachyon.main.community_lists='youtube' 2>/dev/null || true
+uci -q add_list tachyon.main.community_lists='discord' 2>/dev/null || true
+uci -q add_list tachyon.main.community_lists='meta' 2>/dev/null || true
+uci -q add_list tachyon.main.community_lists='twitter' 2>/dev/null || true
 `)
 
 	if analysis.Type == "https" {
 		safeURL := strings.ReplaceAll(strings.TrimSpace(subInput), "'", "'\\''")
 		cmd.WriteString(fmt.Sprintf(`
-# configure subscription_url
+# 2. Configure subscription_url
 uci -q delete tachyon.@subscription_url[0] 2>/dev/null || true
 uci add tachyon subscription_url >/dev/null
 uci set tachyon.@subscription_url[-1].section='main'
 uci set tachyon.@subscription_url[-1].url='%s'
 uci set tachyon.@subscription_url[-1].subscription_update_enabled='1'
+uci set tachyon.@subscription_url[-1].subscription_update_interval='1h'
 `, safeURL))
 	} else if len(analysis.Nodes) > 0 {
 		// Direct proxy links or decoded base64 links
-		cmd.WriteString("\n# configure selector_proxy_links\nuci -q del_list tachyon.main.selector_proxy_links 2>/dev/null || true\n")
+		cmd.WriteString("\n# 2. Configure selector_proxy_links\nuci -q del_list tachyon.main.selector_proxy_links 2>/dev/null || true\n")
 		for _, node := range analysis.Nodes {
 			safeNode := strings.ReplaceAll(node, "'", "'\\''")
 			cmd.WriteString(fmt.Sprintf("uci add_list tachyon.main.selector_proxy_links='%s'\n", safeNode))
@@ -241,9 +248,24 @@ uci set tachyon.@subscription_url[-1].subscription_update_enabled='1'
 	}
 
 	cmd.WriteString(`
-uci set tachyon.settings.enabled='1'
-uci commit tachyon
-/etc/init.d/tachyon restart >/dev/null 2>&1 || true
+# 3. Ensure sing-box engine is active and enabled
+uci -q set tachyon.settings.engine='sing-box' 2>/dev/null || true
+uci -q set tachyon.settings.enabled='1' 2>/dev/null || true
+uci commit tachyon 2>/dev/null || true
+
+# 4. Synchronously fetch subscription proxies into cache so sing-box can start
+if [ -x /usr/bin/tachyon ]; then
+    /usr/bin/tachyon subscription_update main >/dev/null 2>&1 || /usr/bin/tachyon subscription_update >/dev/null 2>&1 || true
+fi
+
+# 5. Populate community ruleset binary files (.srs)
+if [ -x /usr/bin/tachyon ]; then
+    /usr/bin/tachyon list_update_async >/dev/null 2>&1 || /usr/bin/tachyon list_update >/dev/null 2>&1 || true
+fi
+
+# 6. Enable and restart Tachyon service
+/etc/init.d/tachyon enable >/dev/null 2>&1 || true
+/etc/init.d/tachyon restart 2>&1 || /usr/bin/tachyon restart 2>&1 || true
 `)
 
 	_, err := execFn(client, cmd.String())

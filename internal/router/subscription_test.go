@@ -4,6 +4,8 @@ import (
 	"encoding/base64"
 	"strings"
 	"testing"
+
+	gossh "golang.org/x/crypto/ssh"
 )
 
 func TestAnalyzeSubscription(t *testing.T) {
@@ -78,5 +80,57 @@ func TestAnalyzeSubscription(t *testing.T) {
 				t.Errorf("AnalyzeSubscription(%q) unexpected Summary: %q", tt.input, res.Summary)
 			}
 		})
+	}
+}
+
+func TestSaveSubscription_HTTPS(t *testing.T) {
+	var executedCmd string
+	mockExec := func(_ *gossh.Client, cmd string) (string, error) {
+		executedCmd = cmd
+		return "", nil
+	}
+
+	err := SaveSubscription(nil, mockExec, "https://sub.example.com/api?token=abc")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(executedCmd, "community_lists='youtube'") {
+		t.Errorf("expected community_lists='youtube' in executed command")
+	}
+	if !strings.Contains(executedCmd, "community_lists='discord'") {
+		t.Errorf("expected community_lists='discord' in executed command")
+	}
+	if !strings.Contains(executedCmd, "subscription_update main") {
+		t.Errorf("expected subscription_update main in executed command")
+	}
+	if !strings.Contains(executedCmd, "list_update_async") {
+		t.Errorf("expected list_update_async in executed command")
+	}
+	if !strings.Contains(executedCmd, "engine='sing-box'") {
+		t.Errorf("expected engine='sing-box' in executed command")
+	}
+}
+
+func TestSaveSubscription_DirectLinks(t *testing.T) {
+	var executedCmd string
+	mockExec := func(_ *gossh.Client, cmd string) (string, error) {
+		executedCmd = cmd
+		return "", nil
+	}
+
+	err := SaveSubscription(nil, mockExec, "vless://user@1.2.3.4:443?type=tcp#Node1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(executedCmd, "selector_proxy_links='vless://user@1.2.3.4:443?type=tcp#Node1'") {
+		t.Errorf("expected selector_proxy_links with vless link")
+	}
+	if !strings.Contains(executedCmd, "community_lists='youtube'") {
+		t.Errorf("expected community_lists='youtube' in executed command")
+	}
+	if !strings.Contains(executedCmd, "list_update_async") {
+		t.Errorf("expected list_update_async in executed command")
 	}
 }

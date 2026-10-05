@@ -74,3 +74,44 @@ func TestRunGuidedSetup_Success(t *testing.T) {
 		t.Errorf("summary missing DNS name: %s", res.SummaryMessage)
 	}
 }
+
+func TestRunGuidedSetup_TunnelWithSubscription(t *testing.T) {
+	var savedSub bool
+	mockExec := func(_ *gossh.Client, cmd string) (string, error) {
+		if strings.Contains(cmd, "subscription_update") || strings.Contains(cmd, "community_lists") {
+			savedSub = true
+		}
+		if strings.Contains(cmd, "PROBE:") {
+			return "PROBE:YouTube 200 0.05\nPROBE:Discord 200 0.06\n", nil
+		}
+		return "OK", nil
+	}
+
+	plan := GuidedSetupPlan{
+		Mode: ModeTunnel,
+		ChosenDNS: DNSResolver{
+			ID:        "cloudflare",
+			Name:      "Cloudflare DNS",
+			PrimaryIP: "1.1.1.1",
+			LatencyMs: 14,
+		},
+		SubscriptionURL: "vless://user@1.1.1.1:443?type=tcp#Node",
+		SelectedEngine:  "sing-box",
+		EnableTune:      true,
+	}
+
+	res, err := RunGuidedSetup(nil, mockExec, plan, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !savedSub {
+		t.Errorf("expected subscription to be saved and updated")
+	}
+	if !res.OverallSuccess {
+		t.Errorf("expected overall success to be true")
+	}
+	if !strings.Contains(res.SummaryMessage, "VLESS Туннель активен") {
+		t.Errorf("expected summary to mention VLESS tunnel: %s", res.SummaryMessage)
+	}
+}

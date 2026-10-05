@@ -27,8 +27,8 @@ func TestTuneNetwork_SuccessBBR(t *testing.T) {
 	if !strings.Contains(rep.Conntrack, "65536") {
 		t.Errorf("expected conntrack 65536, got: %s", rep.Conntrack)
 	}
-	if !strings.Contains(rep.Offloading, "включен") {
-		t.Errorf("expected offloading enabled, got: %s", rep.Offloading)
+	if !strings.Contains(rep.Offloading, "отключен") {
+		t.Errorf("expected offloading disabled, got: %s", rep.Offloading)
 	}
 }
 

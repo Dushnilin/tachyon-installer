@@ -73,8 +73,8 @@ func VerifyAndFallback(client *gossh.Client, execFn sshutil.ExecFunc, progressFn
 		progress(fmt.Sprintf("Тест соединения (попытка %d/3)...", attempt+1), 0.90+float64(attempt)*0.03)
 	})
 	if !connOk {
-		progress("⚠ Нет доступа к тестовому серверу через прокси ✓", 0.98)
-		return VerifyResult{OK: true, Reason: "internet_warning"}
+		progress("⚠ Нет доступа к тестовому серверу через прокси", 0.98)
+		return VerifyResult{OK: false, Reason: "internet_connectivity_failed"}
 	}
 
 	progress("Все проверки успешно пройдены ✓", 1.0)

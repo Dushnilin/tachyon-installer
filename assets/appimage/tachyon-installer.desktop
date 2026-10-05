@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Tachyon Installer
+GenericName=OpenWrt Tachyon Deployment Wizard
+Comment=One-Click Express Installer & Diagnostic Wizard for Tachyon on OpenWrt
+Exec=tachyon-installer %U
+Icon=tachyon-installer
+Terminal=true
+Categories=Network;System;Utility;ConsoleOnly;
+Keywords=openwrt;tachyon;vpn;proxy;zapret;installer;router;network;diagnostic;
+StartupNotify=false
+X-AppImage-Version=1.8.0

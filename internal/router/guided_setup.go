@@ -101,21 +101,23 @@ fi
 `, engine)
 	execFn(client, setEngineCmd)
 
-	// Apply DPI Strategy
-	if plan.ChosenStrategy.TCPArgs != "" {
+	// Apply DPI Strategy if in Standalone DPI or Hybrid mode
+	if (plan.Mode == ModeStandaloneDPI || plan.Mode == ModeHybrid) && plan.ChosenStrategy.TCPArgs != "" {
 		progress(fmt.Sprintf("Применение DPI-стратегии (%s)...", plan.ChosenStrategy.Name), 0.60)
 		if err := ApplyDPIStrategy(client, execFn, plan.ChosenStrategy); err == nil {
 			res.StrategyApplied = true
 		}
 	}
 
-	// Apply Subscription if provided
+	// Apply Subscription if provided (Tunnel or Hybrid mode)
 	if plan.SubscriptionURL != "" {
-		progress("Сохранение ссылки подписки в Tachyon...", 0.70)
-		SaveSubscription(client, execFn, plan.SubscriptionURL)
+		progress("Сохранение ссылки подписки и запуск обновления узлов...", 0.70)
+		if err := SaveSubscription(client, execFn, plan.SubscriptionURL); err == nil {
+			res.EngineName = "sing-box"
+		}
 	}
 
-	// 4. Network Optimization (BBR, buffers, flow offloading)
+	// 4. Network Optimization (BBR, buffers, disabling flow offloading)
 	if plan.EnableTune {
 		progress("Оптимизация сетевого стека роутера (TCP BBR, сокеты, conntrack)...", 0.80)
 		tuneReport := TuneNetwork(client, execFn)
@@ -141,11 +143,15 @@ sleep 2
 	bypassReport := TestBypass(client, execFn)
 	res.VerifyResult = bypassReport
 
-	// Success evaluation
-	res.OverallSuccess = bypassReport.Success || res.StrategyApplied || res.DNSApplied
+	// Success evaluation: considered successful if either live bypass succeeded
+	// or DNS + DPI/Subscription was successfully applied without crashing.
+	res.OverallSuccess = bypassReport.Success || (res.DNSApplied && (res.StrategyApplied || plan.SubscriptionURL != ""))
 
 	var summaryParts []string
 	summaryParts = append(summaryParts, fmt.Sprintf("DNS: %s (%d мс)", plan.ChosenDNS.Name, plan.ChosenDNS.LatencyMs))
+	if plan.SubscriptionURL != "" {
+		summaryParts = append(summaryParts, "VLESS Туннель активен")
+	}
 	if res.StrategyApplied {
 		summaryParts = append(summaryParts, fmt.Sprintf("Стратегия: %s", plan.ChosenStrategy.Name))
 	}

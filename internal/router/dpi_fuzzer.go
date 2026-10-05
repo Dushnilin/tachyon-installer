@@ -289,15 +289,31 @@ func parseFuzzLine(out, prefix string) (bool, int64) {
 // GenerateApplyDPIStrategyScript creates UCI / configuration update commands for the strategy.
 func GenerateApplyDPIStrategyScript(strategy DPIStrategy) string {
 	script := fmt.Sprintf(`
-# 1. Update Tachyon / Steer UCI configuration with the winning DPI strategy
-if command -v uci >/dev/null 2>&1; then
+# 1. Update Tachyon UCI configuration with DPI section for YouTube and Discord
+if command -v uci >/dev/null 2>&1 && uci -q get tachyon.settings >/dev/null; then
+    uci -q get tachyon.dpi_bypass >/dev/null || uci set tachyon.dpi_bypass=section
+    uci -q set tachyon.dpi_bypass.label='DPI Bypass' 2>/dev/null || true
+    uci -q set tachyon.dpi_bypass.enabled='1' 2>/dev/null || true
+    if [ -x /opt/zapret2/nfqws2 ] || [ -x /usr/bin/nfqws2 ] || (command -v opkg >/dev/null 2>&1 && opkg list-installed 2>/dev/null | grep -q zapret2); then
+        uci -q set tachyon.dpi_bypass.action='zapret2' 2>/dev/null || true
+    else
+        uci -q set tachyon.dpi_bypass.action='zapret' 2>/dev/null || true
+    fi
+    uci -q del_list tachyon.dpi_bypass.community_lists 2>/dev/null || true
+    uci -q add_list tachyon.dpi_bypass.community_lists='youtube' 2>/dev/null || true
+    uci -q add_list tachyon.dpi_bypass.community_lists='discord' 2>/dev/null || true
     uci -q set tachyon.settings.steer_tcp_args='%s' 2>/dev/null || true
     uci -q set tachyon.settings.steer_udp_args='%s' 2>/dev/null || true
     uci -q set tachyon.settings.dpi_profile='%s' 2>/dev/null || true
     uci commit tachyon 2>/dev/null || true
 fi
 
-# 2. Persist zapret / steer profile if standalone config file exists
+# 2. Persist zapret profile if standalone config exists
+if [ -f /etc/config/zapret ]; then
+    uci -q set zapret.config.NFQWS_OPT_DESYNC='%s' 2>/dev/null || true
+    uci commit zapret 2>/dev/null || true
+    /etc/init.d/zapret restart >/dev/null 2>&1 || true
+fi
 mkdir -p /etc/tachyon 2>/dev/null || true
 cat << 'EOF' > /etc/tachyon/dpi_strategy.conf
 # Tachyon DPI Auto-Fuzzer Profile: %s
@@ -307,24 +323,15 @@ EOF
 
 # 3. Reload Tachyon / proxy engine to activate new bypass rules
 if [ -x /etc/init.d/tachyon ]; then
-    /etc/init.d/tachyon reload >/dev/null 2>&1 || /etc/init.d/tachyon restart >/dev/null 2>&1 || true
+    /etc/init.d/tachyon restart >/dev/null 2>&1 || true
 fi
-`, strategy.TCPArgs, strategy.UDPArgs, strategy.ID, strategy.Name, strategy.TCPArgs, strategy.UDPArgs)
+`, strategy.TCPArgs, strategy.UDPArgs, strategy.ID, strategy.TCPArgs, strategy.Name, strategy.TCPArgs, strategy.UDPArgs)
 
 	return strings.ReplaceAll(script, "\r\n", "\n")
 }
 
 // ApplyDPIStrategy applies the chosen DPI strategy on the router.
 func ApplyDPIStrategy(client *gossh.Client, execFn sshutil.ExecFunc, strategy DPIStrategy) error {
-	// 1. If Tachyon is installed and strategy ID is set, attempt native router apply
-	if strategy.ID != "" {
-		nativeApplyCmd := fmt.Sprintf(`[ -x /usr/bin/tachyon ] && /usr/bin/tachyon fuzzer_apply '%s' 2>/dev/null && echo "APPLIED_NATIVE" || echo ""`, strategy.ID)
-		if out, err := execFn(client, nativeApplyCmd); err == nil && strings.Contains(out, "APPLIED_NATIVE") {
-			return nil
-		}
-	}
-
-	// 2. Direct configuration fallback
 	cmd := GenerateApplyDPIStrategyScript(strategy)
 	_, err := execFn(client, cmd)
 	if err != nil {

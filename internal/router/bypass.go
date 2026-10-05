@@ -100,7 +100,7 @@ probe_site() {
     name="$1"
     url="$2"
     if command -v curl >/dev/null 2>&1; then
-        res=$(curl -m 5 -s -o /dev/null -w "%{http_code} %{time_total}" "$url" 2>/dev/null || echo "000 0")
+        res=$(curl -m 5 -s -L -o /dev/null -w "%{http_code} %{time_total}" "$url" 2>/dev/null || echo "000 0")
     else
         if wget -q --spider --timeout=5 "$url" 2>/dev/null; then
             res="200 0.15"
@@ -156,7 +156,8 @@ fi
 				if durSec, err := strconv.ParseFloat(parts[2], 64); err == nil {
 					latMs = int64(durSec * 1000.0)
 				}
-				success := (statusCode >= 200 && statusCode < 500)
+				// 200/204 or non-302 2xx/3xx (302 is typically ISP blockpage redirect)
+				success := (statusCode == 200 || statusCode == 204 || (statusCode >= 200 && statusCode < 400 && statusCode != 302))
 				probe := TargetProbe{
 					Name:       name,
 					HTTPStatus: statusCode,

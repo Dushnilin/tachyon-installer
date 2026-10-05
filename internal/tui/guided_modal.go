@@ -232,7 +232,7 @@ func ShowGuidedSetupModal(ctx *AppContext, returnPage string) {
 	EnableFormArrowNavigation(form)
 
 	panel.AddItem(infoView, 0, 1, false)
-	panel.AddItem(formLayout(form), 7, 0, true)
+	panel.AddItem(formLayout(form), 9, 0, true)
 
 	modal := CreateWizardModalCustom(panel, 92, 27)
 	ctx.Pages.AddPage("guided_modal", modal, true, true)
@@ -279,6 +279,9 @@ func ShowGuidedSetupModal(ctx *AppContext, returnPage string) {
 		// 3. DPI Fuzzing for YouTube and Discord
 		fuzzReport := routerpkg.RunDPIFuzzer(client, execFn, nil)
 
+		// 4. Existing subscription detection
+		subStatus := routerpkg.CheckSubscriptions(client, execFn)
+
 		// Render diagnostic findings & ready-to-apply action
 		ctx.App.QueueUpdateDraw(func() {
 			var sb strings.Builder
@@ -313,7 +316,7 @@ func ShowGuidedSetupModal(ctx *AppContext, returnPage string) {
 			sb.WriteString(fmt.Sprintf("  • DPI-стратегия: [#22c55e:b]%s[-] (Эффективность: [#38bdf8]%d%%[-])\n",
 				bestStratName, bestStratRate))
 
-			sb.WriteString(fmt.Sprintf("  • Стек роутера:  [#f1f5f9]Доступна авто-настройка TCP BBR + Flow Offloading[-]\n\n"))
+			sb.WriteString(fmt.Sprintf("  • Стек роутера:  [#f1f5f9]Доступна авто-настройка TCP BBR + защита Netfilter[-]\n\n"))
 			sb.WriteString("  [#22c55e]Готово к автоматической настройке под ключ в 1 клик![-]\n")
 
 			infoView.SetText(sb.String())
@@ -325,8 +328,8 @@ func ShowGuidedSetupModal(ctx *AppContext, returnPage string) {
 			form.SetItemPadding(1)
 
 			modeOptions := []string{
-				"1. Автономный обход (Steer/Zapret — без серверов)",
-				"2. VLESS / Sing-box подписка (Туннель)",
+				"1. VLESS / Sing-box подписка (Туннель)",
+				"2. Автономный обход (Steer/Zapret — без серверов)",
 				"3. Гибридный режим (Zapret + VLESS Туннель)",
 			}
 			selectedModeIdx := 0
@@ -335,11 +338,18 @@ func ShowGuidedSetupModal(ctx *AppContext, returnPage string) {
 			})
 			form.AddFormItem(modeItem)
 
+			initialSub := subStatus.CurrentURL
+			subInput := tview.NewInputField().
+				SetLabel("Ссылка / ключ подписки:").
+				SetText(initialSub).
+				SetFieldWidth(48)
+			form.AddFormItem(subInput)
+
 			tuneStack := true
 			cb := tview.NewCheckbox().
 				SetLabel("Оптимизация сети:    ").
 				SetChecked(true).
-				SetCheckedString("[X] Включить TCP BBR, тюнинг буферов и Flow Offloading").
+				SetCheckedString("[X] Включить TCP BBR, тюнинг буферов и защиту Netfilter").
 				SetUncheckedString("[ ] Отключено (стандартные параметры ядра)").
 				SetChangedFunc(func(checked bool) {
 					tuneStack = checked
@@ -348,6 +358,13 @@ func ShowGuidedSetupModal(ctx *AppContext, returnPage string) {
 
 			// Apply Button
 			form.AddButton("🚀 Настроить всё автоматически (Enter)", func() {
+				subVal := strings.TrimSpace(subInput.GetText())
+				if (selectedModeIdx == 0 || selectedModeIdx == 2) && subVal == "" {
+					infoView.SetText(sb.String() + "\n  [#ef5350:b]⚠️ Внимание:[-] укажите ссылку на подписку VLESS для режима туннеля!\n")
+					ctx.App.SetFocus(subInput)
+					return
+				}
+
 				// Switch to execution view
 				infoView.SetText("\n  [#38bdf8:b]⚡ Применение параметров автопилота... Пожалуйста, подождите[-]\n\n")
 				form.Clear(true)
@@ -370,22 +387,23 @@ func ShowGuidedSetupModal(ctx *AppContext, returnPage string) {
 						chosenStrat = routerpkg.DefaultDPIStrategies()[0]
 					}
 
-					mode := routerpkg.ModeStandaloneDPI
-					engine := "steer"
+					mode := routerpkg.ModeTunnel
+					engine := "sing-box"
 					if selectedModeIdx == 1 {
-						mode = routerpkg.ModeTunnel
-						engine = "sing-box"
+						mode = routerpkg.ModeStandaloneDPI
+						engine = "steer"
 					} else if selectedModeIdx == 2 {
 						mode = routerpkg.ModeHybrid
 						engine = "sing-box"
 					}
 
 					plan := routerpkg.GuidedSetupPlan{
-						Mode:           mode,
-						ChosenDNS:      chosenDNS,
-						ChosenStrategy: chosenStrat,
-						SelectedEngine: engine,
-						EnableTune:     tuneStack,
+						Mode:            mode,
+						ChosenDNS:       chosenDNS,
+						ChosenStrategy:  chosenStrat,
+						SubscriptionURL: subVal,
+						SelectedEngine:  engine,
+						EnableTune:      tuneStack,
 					}
 
 					var logLines []string
