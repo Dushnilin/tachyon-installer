@@ -47,6 +47,7 @@ const (
 	ActionSnapshot   = "snapshot"
 	ActionHotSwap    = "hot_swap"
 	ActionSelfUpdate = "self_update"
+	ActionAWG        = "awg"
 )
 
 // AppContext holds all shared state for the TUI application.
@@ -97,6 +98,8 @@ type AppContext struct {
 	GuidedOnly bool
 	// SpeedDoctorOnly makes the wizard open the Bufferbloat & Speed Doctor directly after connecting.
 	SpeedDoctorOnly bool
+	// AWGOnly makes the wizard open the AmneziaWG manager modal directly after connecting.
+	AWGOnly bool
 	// AppVersion is the version of tachyon-installer.
 	AppVersion string
 }

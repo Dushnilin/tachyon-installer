@@ -331,6 +331,7 @@ func ShowGuidedSetupModal(ctx *AppContext, returnPage string) {
 				"1. VLESS / Sing-box подписка (Туннель)",
 				"2. Автономный обход (Steer/Zapret — без серверов)",
 				"3. Гибридный режим (Zapret + VLESS Туннель)",
+				"4. AmneziaWG (Генератор WARP / свой .conf)",
 			}
 			selectedModeIdx := 0
 			modeItem := newCycleSelectorItem("Режим работы:        ", modeOptions, 0, func(index int) {
@@ -358,6 +359,12 @@ func ShowGuidedSetupModal(ctx *AppContext, returnPage string) {
 
 			// Apply Button
 			form.AddButton("🚀 Настроить всё автоматически (Enter)", func() {
+				if selectedModeIdx == 3 {
+					ctx.Pages.RemovePage("guided_modal")
+					ShowAWGModal(ctx, returnPage)
+					return
+				}
+
 				subVal := strings.TrimSpace(subInput.GetText())
 				if (selectedModeIdx == 0 || selectedModeIdx == 2) && subVal == "" {
 					infoView.SetText(sb.String() + "\n  [#ef5350:b]⚠️ Внимание:[-] укажите ссылку на подписку VLESS для режима туннеля!\n")

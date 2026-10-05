@@ -63,6 +63,10 @@ type Options struct {
 	FleetConcurrency  int
 	SpeedDoctor       bool
 	SpeedDuration     int
+	AWGSetup          bool
+	AWGType           string
+	AWGSection        string
+	AWGTest           bool
 	Yes               bool
 	AppVersion        string
 }
@@ -120,6 +124,10 @@ func ParseFlags(args []string, defaultCfg *appconfig.Config, appVersion string) 
 	fs.BoolVar(&opts.SpeedDoctor, "speedtest", false, "Запустить тест скорости, Bufferbloat и троттлинга CPU роутера")
 	fs.BoolVar(&opts.SpeedDoctor, "speed-doctor", false, "Алиас для -speedtest")
 	fs.IntVar(&opts.SpeedDuration, "speed-duration", 5, "Длительность замера скорости в секундах (по умолчанию 5)")
+	fs.BoolVar(&opts.AWGSetup, "awg", false, "Создать секцию AmneziaWG (генератор WARP или кастомная конфигурация)")
+	fs.StringVar(&opts.AWGType, "awg-conf", "warp", "Тип/источник AWG: 'warp', 'custom', путь к .conf файлу или ссылка vpn://")
+	fs.StringVar(&opts.AWGSection, "awg-section", "warp", "Имя секции UCI tachyon.<name> для AmneziaWG (по умолчанию 'warp')")
+	fs.BoolVar(&opts.AWGTest, "awg-test", false, "Протестировать работу AmneziaWG (YouTube, Discord, Rutracker, Cloudflare WARP trace)")
 
 	if err := fs.Parse(args); err != nil {
 		return nil, err
@@ -130,7 +138,7 @@ func ParseFlags(args []string, defaultCfg *appconfig.Config, appVersion string) 
 
 // ShouldRunHeadless checks if flags request non-interactive execution.
 func (o *Options) ShouldRunHeadless() bool {
-	return o.RunDiag || o.RunUninstall || o.RunRestore != "" || o.ListBackups || o.CheckUpdate || o.SelfUpdate || o.TuneNetwork || o.GuidedSetup || o.SwitchEngine != "" || o.RunRescue || o.FixConflicts || o.FullSnapshot || o.OfflineBundle != "" || o.RunMonitor || o.TestSub != "" || o.FleetScan || o.FleetDeploy || o.SpeedDoctor || o.Yes
+	return o.RunDiag || o.RunUninstall || o.RunRestore != "" || o.ListBackups || o.CheckUpdate || o.SelfUpdate || o.TuneNetwork || o.GuidedSetup || o.SwitchEngine != "" || o.RunRescue || o.FixConflicts || o.FullSnapshot || o.OfflineBundle != "" || o.RunMonitor || o.TestSub != "" || o.FleetScan || o.FleetDeploy || o.SpeedDoctor || o.AWGSetup || o.AWGTest || o.Yes
 }
 
 // Run executes non-interactive CLI operations.
@@ -529,6 +537,116 @@ func Run(opts *Options) int {
 		}
 		fmt.Printf("\n✓ Конфигурация сохранена в %s\n", rep.PersistPath)
 		fmt.Printf("✓ %s\n", rep.Details)
+		return 0
+	}
+
+	// 9.5. AmneziaWG Configuration & Live Verification
+	if opts.AWGSetup || opts.AWGTest {
+		execCmd := func(_ *gossh.Client, cmd string) (string, error) {
+			sess, err := client.NewSession()
+			if err != nil {
+				return "", err
+			}
+			defer sess.Close()
+			out, err := sess.CombinedOutput(cmd)
+			return string(out), err
+		}
+
+		secName := strings.TrimSpace(opts.AWGSection)
+		if secName == "" {
+			secName = "warp"
+		}
+
+		if opts.AWGSetup {
+			fmt.Printf("⚡ [AWG] Настройка секции AmneziaWG '%s' на роутере...\n", secName)
+			var awgConf *routerpkg.AWGConfig
+			var err error
+
+			src := strings.TrimSpace(opts.AWGType)
+			if src == "" || strings.EqualFold(src, "warp") {
+				fmt.Println("⚡ Генерация конфигурации Cloudflare WARP via AWG...")
+				awgConf, err = routerpkg.GenerateWarpAWG(client, execCmd)
+			} else if strings.EqualFold(src, "custom") {
+				fmt.Println("⚡ Генерация кастомных ключей Curve25519 и параметров обфускации AWG...")
+				awgConf, err = routerpkg.GenerateCustomAWGConfig("", 0, "")
+			} else if strings.HasPrefix(src, "vpn://") {
+				fmt.Println("⚡ Разбор Amnezia vpn:// контейнера...")
+				awgConf, err = routerpkg.ParseAWGConfig(src)
+			} else if _, statErr := os.Stat(src); statErr == nil {
+				fmt.Printf("⚡ Чтение файла конфигурации %s...\n", src)
+				data, readErr := os.ReadFile(src)
+				if readErr != nil {
+					err = readErr
+				} else {
+					awgConf, err = routerpkg.ParseAWGConfig(string(data))
+				}
+			} else {
+				awgConf, err = routerpkg.ParseAWGConfig(src)
+			}
+
+			if err != nil {
+				fmt.Printf("❌ Ошибка подготовки конфигурации AWG: %v\n", err)
+				return 1
+			}
+
+			fmt.Printf("✓ Параметры AWG:\n  Сервер: %s:%d\n  IP: %s\n  Jc: %d, Jmin: %d, Jmax: %d, S1: %d, S2: %d, H1: %s\n",
+				awgConf.ServerAddress, awgConf.ServerPort, awgConf.Address,
+				awgConf.Jc, awgConf.Jmin, awgConf.Jmax, awgConf.S1, awgConf.S2, awgConf.H1)
+
+			fmt.Println("⚡ Применение секции в /etc/config/tachyon и перезапуск службы...")
+			err = routerpkg.ApplyAWGSection(client, execCmd, awgConf, secName, true)
+			if err != nil {
+				fmt.Printf("❌ Сбой применения секции AWG: %v\n", err)
+				return 1
+			}
+			fmt.Printf("✓ Секция tachyon.%s успешно сохранена и активирована!\n", secName)
+		}
+
+		if opts.AWGTest || opts.AWGSetup {
+			fmt.Printf("\n⚡ [AWG] Сквозная проверка работы секции '%s' через роутер...\n", secName)
+			testRes, err := routerpkg.TestAWGSection(client, execCmd, secName)
+			if err != nil {
+				fmt.Printf("⚠️ Ошибка тестирования секции AWG: %v\n", err)
+			}
+
+			fmt.Println("\n--- РЕЗУЛЬТАТЫ ПРОВЕРКИ ---")
+			sbStatus := "❌ ОСТАНОВЛЕНА"
+			if testRes.ServiceRunning {
+				sbStatus = "✓ РАБОТАЕТ"
+			}
+			fakeIPStatus := "⚠️ НЕ ОТВЕЧАЕТ"
+			if testRes.FakeIPActive {
+				fakeIPStatus = "✓ РАБОТАЕТ (" + testRes.ResolvedIP + ")"
+			}
+			fmt.Printf("Служба sing-box:   %s\n", sbStatus)
+			fmt.Printf("Fake-IP DNS:       %s\n", fakeIPStatus)
+			if testRes.EgressIP != "" {
+				loc := testRes.EgressLocation
+				if loc != "" {
+					loc = " (" + loc + ")"
+				}
+				fmt.Printf("Внешний IP:        %s%s\n", testRes.EgressIP, loc)
+			}
+			if testRes.IsWARP {
+				fmt.Println("Cloudflare WARP:   ✓ ВКЛЮЧЕН (warp=on)")
+			}
+
+			fmt.Println("\nТестирование доступности ресурсов через роутер:")
+			for _, p := range testRes.Probes {
+				statusIcon := "✓"
+				if !p.Success {
+					statusIcon = "❌"
+				}
+				fmt.Printf("  • %-16s %s HTTP %d (%d мс)\n", p.Name+":", statusIcon, p.HTTPStatus, p.LatencyMs)
+			}
+			fmt.Println("---------------------------")
+			if testRes.Success {
+				fmt.Println("🎉 Проверка успешно пройдена! Трафик идет через AmneziaWG.")
+			} else {
+				fmt.Printf("⚠️ %s\n", testRes.Details)
+			}
+		}
+
 		return 0
 	}
 

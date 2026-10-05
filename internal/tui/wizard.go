@@ -111,6 +111,8 @@ func ShowWelcomeWizard(ctx *AppContext) {
 				ShowConflictFixModal(ctx, "welcome_wizard")
 			case ActionSnapshot:
 				ShowSnapshotModal(ctx, "welcome_wizard")
+			case ActionAWG:
+				ShowAWGModal(ctx, "welcome_wizard")
 			}
 			return
 		}
@@ -124,6 +126,9 @@ func ShowWelcomeWizard(ctx *AppContext) {
 	})
 	menuList.AddItem("✨ [2] Авто-мастер (Настройка под ключ)", "Полный автопилот: аудит роутера, установка и конфигурация в 1 клик", '2', func() {
 		startAction(ActionGuided)
+	})
+	menuList.AddItem("🛡️ [W] AmneziaWG (Генератор WARP & Конфигов)", "Встроенный генератор AmneziaWG/WARP, импорт .conf/vpn:// и проверка обхода", 'w', func() {
+		startAction(ActionAWG)
 	})
 	menuList.AddItem("🌐 [3] Флот роутеров (Multi-Router Fleet)", "Массовый поиск роутеров в сети, аудит версий и параллельная установка", '3', func() {
 		startAction(ActionFleet)
@@ -469,6 +474,10 @@ func ShowOptionsWizard(ctx *AppContext, profile ProfileData) {
 
 	optSelector.OnSpeedDoctor = func() {
 		ShowSpeedDoctorModal(ctx, "options_wizard")
+	}
+
+	optSelector.OnAWGManager = func() {
+		ShowAWGModal(ctx, "options_wizard")
 	}
 
 	optSelector.OnHotSwap = func(engineKey, mirrorKey string) {

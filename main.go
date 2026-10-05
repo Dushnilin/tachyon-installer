@@ -306,6 +306,13 @@ func handleProfileReady(ctx *tui.AppContext) {
 		return
 	}
 
+	if ctx.AWGOnly || ctx.PendingAction == tui.ActionAWG {
+		ctx.App.QueueUpdateDraw(func() {
+			tui.ShowAWGModal(ctx, "welcome_wizard")
+		})
+		return
+	}
+
 	profile, err := routerpkg.RunPreConnectionCheck(client)
 	if err != nil {
 		client.Close()
