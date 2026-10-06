@@ -4,7 +4,9 @@ package main
 import (
 	"context"
 	"os"
+	"time"
 
+	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 	gossh "golang.org/x/crypto/ssh"
 
@@ -68,6 +70,26 @@ func main() {
 
 	app := tview.NewApplication()
 	app.EnableMouse(true)
+
+	// Filter out duplicate keystrokes arriving within 35ms (Windows console chatter / duplicate key releases)
+	var (
+		lastRune rune
+		lastKey  tcell.Key
+		lastMod  tcell.ModMask
+		lastTime time.Time
+	)
+	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		now := time.Now()
+		if event.Key() == lastKey && event.Rune() == lastRune && event.Modifiers() == lastMod && !lastTime.IsZero() && now.Sub(lastTime) < 35*time.Millisecond {
+			return nil
+		}
+		lastKey = event.Key()
+		lastRune = event.Rune()
+		lastMod = event.Modifiers()
+		lastTime = now
+		return event
+	})
+
 	pages := tview.NewPages()
 
 	// Header

@@ -218,6 +218,8 @@ func ShowWelcomeWizard(ctx *AppContext) {
 		AddFormItem(portInput).
 		AddFormItem(userInput)
 
+	var step3ShowTime time.Time
+
 	goStep3 := func() {
 		field, msg := validateSSHInput(ipInput.GetText(), portInput.GetText(), userInput.GetText())
 		if msg != "" {
@@ -235,6 +237,7 @@ func ShowWelcomeWizard(ctx *AppContext) {
 			}
 			return
 		}
+		step3ShowTime = time.Now()
 		step2Err.SetText("")
 		ctx.Pages.SwitchToPage("password_wizard")
 		ctx.App.SetFocus(step3Form)
@@ -315,6 +318,11 @@ func ShowWelcomeWizard(ctx *AppContext) {
 	step3Form.AddFormItem(keyInput)
 
 	submitCredentials := func() {
+		// Prevent accidental double-Enter carry-over from step 2
+		if !step3ShowTime.IsZero() && time.Since(step3ShowTime) < 200*time.Millisecond {
+			return
+		}
+
 		port, err := strconv.Atoi(strings.TrimSpace(portInput.GetText()))
 		if err != nil || port <= 0 {
 			port = 22
