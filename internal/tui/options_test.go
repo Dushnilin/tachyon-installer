@@ -189,6 +189,7 @@ func TestEngineOptionsConfigurationAndSteerC(t *testing.T) {
 
 	foundTiny := false
 	foundExtCompressed := false
+	foundTachyonCore := false
 
 	for _, eng := range opt.engines {
 		// 1. User requirement: "никакой не рекомендуется" (no engine should have "Рекомендуется")
@@ -206,6 +207,12 @@ func TestEngineOptionsConfigurationAndSteerC(t *testing.T) {
 			}
 		}
 
+		if eng.Key == "tachyon-core" {
+			foundTachyonCore = true
+			if !strings.Contains(eng.Badge, "Rust") {
+				t.Errorf("expected tachyon-core badge to contain Rust, got %s", eng.Badge)
+			}
+		}
 		if eng.Key == "sing-box-tiny" {
 			foundTiny = true
 		}
@@ -214,6 +221,9 @@ func TestEngineOptionsConfigurationAndSteerC(t *testing.T) {
 		}
 	}
 
+	if !foundTachyonCore {
+		t.Errorf("expected tachyon-core in engine options")
+	}
 	if !foundTiny {
 		t.Errorf("expected sing-box-tiny in engine options")
 	}
@@ -221,18 +231,24 @@ func TestEngineOptionsConfigurationAndSteerC(t *testing.T) {
 		t.Errorf("expected sing-box-extended-compressed in engine options")
 	}
 
-	// 3. Test numeric shortcuts 1..7 for engines
+	// 3. Test numeric shortcuts 1..8 for engines
 	handler := opt.InputHandler()
 	opt.activeSection = SectionEngine
-	handler(tcell.NewEventKey(tcell.KeyRune, '3', tcell.ModNone), nil) // sing-box-tiny
-	if opt.selectedEngine != 2 || opt.engines[opt.selectedEngine].Key != "sing-box-tiny" {
-		t.Errorf("expected '3' to select sing-box-tiny (index 2), got index=%d key=%s",
+	handler(tcell.NewEventKey(tcell.KeyRune, '1', tcell.ModNone), nil) // tachyon-core
+	if opt.selectedEngine != 0 || opt.engines[opt.selectedEngine].Key != "tachyon-core" {
+		t.Errorf("expected '1' to select tachyon-core (index 0), got index=%d key=%s",
 			opt.selectedEngine, opt.engines[opt.selectedEngine].Key)
 	}
 
-	handler(tcell.NewEventKey(tcell.KeyRune, '5', tcell.ModNone), nil) // steer
-	if opt.selectedEngine != 4 || opt.engines[opt.selectedEngine].Key != "steer" {
-		t.Errorf("expected '5' to select steer (index 4), got index=%d key=%s",
+	handler(tcell.NewEventKey(tcell.KeyRune, '4', tcell.ModNone), nil) // sing-box-tiny
+	if opt.selectedEngine != 3 || opt.engines[opt.selectedEngine].Key != "sing-box-tiny" {
+		t.Errorf("expected '4' to select sing-box-tiny (index 3), got index=%d key=%s",
+			opt.selectedEngine, opt.engines[opt.selectedEngine].Key)
+	}
+
+	handler(tcell.NewEventKey(tcell.KeyRune, '6', tcell.ModNone), nil) // steer
+	if opt.selectedEngine != 5 || opt.engines[opt.selectedEngine].Key != "steer" {
+		t.Errorf("expected '6' to select steer (index 5), got index=%d key=%s",
 			opt.selectedEngine, opt.engines[opt.selectedEngine].Key)
 	}
 }
@@ -265,15 +281,15 @@ func TestOptionsSelectorMouseClicksInModal(t *testing.T) {
 		t.Fatalf("expected click targets to be registered in Draw")
 	}
 
-	// Target 2 should be the 3rd engine ("sing-box-tiny")
-	targetTiny := opt.clickTargets[2]
-	ev := tcell.NewEventMouse((targetTiny.x1+targetTiny.x2)/2, targetTiny.y1, tcell.Button1, 0)
+	// Target 0 should be the 1st engine ("tachyon-core")
+	targetTC := opt.clickTargets[0]
+	ev := tcell.NewEventMouse((targetTC.x1+targetTC.x2)/2, targetTC.y1, tcell.Button1, 0)
 	consumed, _ := mouseHandler(tview.MouseLeftClick, ev, func(p tview.Primitive) {})
 	if !consumed {
-		t.Errorf("expected mouse click on sing-box-tiny to be consumed")
+		t.Errorf("expected mouse click on tachyon-core to be consumed")
 	}
-	if opt.selectedEngine != 2 || opt.engines[opt.selectedEngine].Key != "sing-box-tiny" {
-		t.Errorf("expected sing-box-tiny (index 2) to be selected after mouse click, got %d key=%s",
+	if opt.selectedEngine != 0 || opt.engines[opt.selectedEngine].Key != "tachyon-core" {
+		t.Errorf("expected tachyon-core (index 0) to be selected after mouse click, got %d key=%s",
 			opt.selectedEngine, opt.engines[opt.selectedEngine].Key)
 	}
 }

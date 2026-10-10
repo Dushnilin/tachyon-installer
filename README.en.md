@@ -29,7 +29,7 @@
 - **⚡ Subscription Benchmark & Latency Ping**: Concurrently measures TCP handshake latency to all nodes in a subscription (HTTPS URL, raw `vless://`, file, or base64), sorted from lowest to highest ping (`-test-sub "vless://..."`).
 - **📦 Offline Bundle Downloader**: Pre-downloads Tachyon releases (OPKG + APK, i18n, and cores for x86_64, arm64, mipsle, mips) into a local bundle directory for air-gapped / offline deployments (`-offline-bundle "offline_pkg/"`).
 - **🌐 Multi-Target Bypass Probes**: Verifies router Fake-IP DNS interception and tests response latency across YouTube, Discord, Telegram, and GitHub directly through the router pipeline, reporting egress GeoIP country and IP.
-- **⚡ Engine Hot-Swap**: Swap routing engines (`sing-box-extended`, `sing-box-tiny`, `steer`, `steer-extended`) in ~3 seconds without reinstalling LuCI or clearing subscriptions — via `--switch-engine` or hotkey `S` in TUI.
+- **⚡ Engine Hot-Swap**: Swap routing engines (`tachyon-core`, `sing-box-extended`, `sing-box-tiny`, `steer`, `steer-extended`) in ~3 seconds without reinstalling LuCI or clearing subscriptions — via `--switch-engine` or hotkey `S` in TUI.
 - **🌐 1-Click LuCI Launch**: Completion modal and global hotkey `O` instantly launch the Tachyon LuCI web panel in your default system browser.
 - **🖥️ Dual Mode (Interactive TUI + Headless CLI)**: Beautiful zinc terminal dashboard with mouse & arrow keys support, plus automated unattended CLI execution (`--yes`, `--ip`, `--pass`, `--engine`, `--zram`).
 - **🧠 Hardware-Aware Intelligence**: Real-time evaluation of router RAM/Flash with smart core recommendations; optional automatic activation of **zRAM-swap** for OOM prevention on constrained routers (<128 MB RAM).
@@ -184,11 +184,11 @@ For script-based automation, CI/CD pipelines, or execution without launching the
 # Pre-download complete offline package bundle for air-gapped routers
 ./tachyon-installer -offline-bundle "offline_pack/"
 
-# Hot-swap routing engine to sing-box-tiny in ~3 seconds (without LuCI reinstallation)
-./tachyon-installer -ip 192.168.1.1 -pass "secret" -switch-engine sing-box-tiny
+# Hot-swap routing engine to tachyon-core in ~3 seconds (Rust, 4.2 MB RAM, 0ms GC)
+./tachyon-installer -ip 192.168.1.1 -pass "secret" -switch-engine tachyon-core
 
-# Automated express installation with steer engine and zRAM-swap
-./tachyon-installer -ip 192.168.1.1 -pass "secret" -engine steer -zram -yes
+# Automated express installation with tachyon-core engine and zRAM-swap
+./tachyon-installer -ip 192.168.1.1 -pass "secret" -engine tachyon-core -zram -yes
 
 # Express installation with immediate subscription link setup
 ./tachyon-installer -ip 192.168.1.1 -pass "secret" -sub "vless://..." -yes

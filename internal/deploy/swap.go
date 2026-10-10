@@ -66,7 +66,7 @@ func HotSwapEngine(
 	// 2. Generate hot-swap runner script
 	uciEngine := targetEngine
 	switch targetEngine {
-	case "sing-box-extended", "sing-box-extended-compressed", "sing-box-tiny", "sing-box-lx":
+	case "tachyon-core", "sing-box-extended", "sing-box-extended-compressed", "sing-box-tiny", "sing-box-lx":
 		uciEngine = "sing-box"
 	case "steer", "steer-extended":
 		uciEngine = targetEngine
@@ -87,15 +87,30 @@ echo "==> [1/3] Остановка службы Tachyon..."
 if [ -x /etc/init.d/tachyon ]; then
     /etc/init.d/tachyon stop >/dev/null 2>&1 || true
 fi
-killall -9 sing-box steer 2>/dev/null || true
+killall -9 tachyon-core sing-box steer 2>/dev/null || true
 
 echo "==> [2/3] Обновление файлов ядра (%s)..."
 %s
 
-# If sing-box binary or tar.gz was uploaded
-if [ -f /tmp/tachyon-install/sing-box ]; then
+# If tachyon-core or sing-box binary or tar.gz was uploaded
+if [ -f /tmp/tachyon-install/tachyon-core ]; then
+    mv -f /tmp/tachyon-install/tachyon-core /usr/bin/tachyon-core
+    chmod 0755 /usr/bin/tachyon-core
+    ln -sf /usr/bin/tachyon-core /usr/bin/sing-box
+elif [ -f /tmp/tachyon-install/sing-box ]; then
     mv -f /tmp/tachyon-install/sing-box /usr/bin/sing-box
     chmod 0755 /usr/bin/sing-box
+elif ls /tmp/tachyon-install/tachyon-core*.tar.gz >/dev/null 2>&1; then
+    for a in /tmp/tachyon-install/tachyon-core*.tar.gz; do
+        tar -xzf "$a" -C /tmp/tachyon-install/ 2>/dev/null || true
+        rm -f "$a"
+    done
+    FOUND=$(find /tmp/tachyon-install/ -type f \( -name "tachyon-core*" -o -name "sing-box" \) 2>/dev/null | head -1)
+    if [ -n "$FOUND" ]; then
+        mv -f "$FOUND" /usr/bin/tachyon-core
+        chmod 0755 /usr/bin/tachyon-core
+        ln -sf /usr/bin/tachyon-core /usr/bin/sing-box
+    fi
 elif ls /tmp/tachyon-install/sing-box*.tar.gz >/dev/null 2>&1; then
     for a in /tmp/tachyon-install/sing-box*.tar.gz; do
         tar -xzf "$a" -C /tmp/tachyon-install/ 2>/dev/null || true

@@ -70,9 +70,23 @@ func GetInstalledVersions(client *gossh.Client, isAPK bool, packages []string) m
 			if sbVer != "" {
 				versions["sing-box-extended"] = sbVer
 				versions["sing-box"] = sbVer
+				versions["tachyon-core"] = sbVer
 			}
 		}
 		sessionSB.Close()
+	}
+
+	// Also check tachyon-core binary
+	sessionTC, errTC := client.NewSession()
+	if errTC == nil {
+		outBytesTC, errTCB := sessionTC.CombinedOutput("/usr/bin/tachyon-core version 2>/dev/null | head -1 | awk '{print $3}' || /usr/bin/tachyon-core --version 2>/dev/null | head -1 | awk '{print $2}'")
+		if errTCB == nil {
+			tcVer := strings.TrimSpace(string(outBytesTC))
+			if tcVer != "" {
+				versions["tachyon-core"] = tcVer
+			}
+		}
+		sessionTC.Close()
 	}
 
 	// Also check steer

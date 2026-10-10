@@ -90,11 +90,28 @@ else
     }
 fi
 
-# If standalone sing-box binary was uploaded (or compressed archive)
-if [ -f /tmp/tachyon-install/sing-box ]; then
+# If standalone tachyon-core or sing-box binary was uploaded (or compressed archive)
+if [ -f /tmp/tachyon-install/tachyon-core ]; then
+    echo "==> Установка бинарного файла ядра tachyon-core..."
+    mv -f /tmp/tachyon-install/tachyon-core /usr/bin/tachyon-core
+    chmod 0755 /usr/bin/tachyon-core
+    ln -sf /usr/bin/tachyon-core /usr/bin/sing-box
+elif [ -f /tmp/tachyon-install/sing-box ]; then
     echo "==> Установка бинарного файла ядра sing-box..."
     mv -f /tmp/tachyon-install/sing-box /usr/bin/sing-box
     chmod 0755 /usr/bin/sing-box
+elif ls /tmp/tachyon-install/tachyon-core*.tar.gz >/dev/null 2>&1; then
+    echo "==> Распаковка архива ядра tachyon-core..."
+    for archive in /tmp/tachyon-install/tachyon-core*.tar.gz; do
+        tar -xzf "$archive" -C /tmp/tachyon-install/ 2>/dev/null || tar -xf "$archive" -C /tmp/tachyon-install/ 2>/dev/null || true
+        rm -f "$archive"
+    done
+    FOUND_BIN=$(find /tmp/tachyon-install/ -type f \( -name "tachyon-core*" -o -name "sing-box" \) 2>/dev/null | head -1)
+    if [ -n "$FOUND_BIN" ]; then
+        mv -f "$FOUND_BIN" /usr/bin/tachyon-core
+        chmod 0755 /usr/bin/tachyon-core
+        ln -sf /usr/bin/tachyon-core /usr/bin/sing-box
+    fi
 elif ls /tmp/tachyon-install/sing-box*.tar.gz >/dev/null 2>&1; then
     echo "==> Распаковка архива ядра sing-box..."
     for archive in /tmp/tachyon-install/sing-box*.tar.gz; do
@@ -127,7 +144,7 @@ ENGINE="` + selectedEngine + `"
 if [ -n "$ENGINE" ] && [ "$ENGINE" != "skip" ]; then
     echo "==> [3/5] Настройка активного ядра в UCI ($ENGINE)..."
     case "$ENGINE" in
-        sing-box*|extended*|tiny|lx)
+        tachyon-core|sing-box*|extended*|tiny|lx)
             uci -q set tachyon.settings.engine="sing-box"
             ;;
         steer*)
@@ -176,7 +193,7 @@ if [ -x /etc/init.d/tachyon ]; then
     /etc/init.d/tachyon stop >/dev/null 2>&1 || true
     /etc/init.d/tachyon disable >/dev/null 2>&1 || true
 fi
-killall -9 tachyon sing-box steer 2>/dev/null || true
+killall -9 tachyon tachyon-core sing-box steer 2>/dev/null || true
 
 echo "==> [2/4] Удаление пакетов Tachyon..."
 if command -v apk >/dev/null 2>&1; then

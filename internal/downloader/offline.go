@@ -117,7 +117,7 @@ func CreateOfflineBundle(
 	// 2. Download sing-box and steer for requested architectures
 	logFn("⚡ [2/2] Загрузка ядер для распространенных архитектур...\n")
 	for _, arch := range archList {
-		for _, eng := range []EngineType{EngineSingBoxExtended, EngineSteer} {
+		for _, eng := range []EngineType{EngineTachyonCore, EngineSingBoxExtended, EngineSteer} {
 			engAssets, errEng := ResolveEngineAssets(ctx, dlClient, eng, arch, arch, false)
 			if errEng != nil || len(engAssets) == 0 {
 				continue

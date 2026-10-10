@@ -45,22 +45,11 @@ jobs:
         run: |
           go run scripts/build.go -v "${{ steps.vars.outputs.version }}"
 
-      - name: Prepare Release Notes
-        id: notes
-        run: |
-          VER="${{ steps.vars.outputs.version }}"
-          if [ -f "RELEASE_NOTES_v${VER}.md" ]; then
-            echo "path=RELEASE_NOTES_v${VER}.md" >> $GITHUB_OUTPUT
-          elif [ -f "RELEASE_NOTES.md" ]; then
-            echo "path=RELEASE_NOTES.md" >> $GITHUB_OUTPUT
-          fi
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
         with:
           name: "Tachyon Installer v${{ steps.vars.outputs.version }}"
-          body_path: ${{ steps.notes.outputs.path }}
           files: |
             dist/tachyon-installer-*
             dist/sha256sums.txt

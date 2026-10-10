@@ -9,6 +9,7 @@ import (
 )
 
 var engineLabels = map[string]string{
+	"tachyon-core":                 "tachyon-core (Rust, 4.2 МБ RAM, 0ms GC)",
 	"sing-box-extended":            "sing-box-extended (xHTTP)",
 	"sing-box-extended-compressed": "sing-box-extended (сжатый бинарник)",
 	"sing-box-tiny":                "sing-box-tiny (минимум RAM)",

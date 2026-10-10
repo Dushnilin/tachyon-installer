@@ -59,7 +59,7 @@ cat /proc/uptime 2>/dev/null
 echo "--- DEV ---"
 cat /proc/net/dev 2>/dev/null
 echo "--- PROC ---"
-ps 2>/dev/null | grep -E 'sing-box|steer' | grep -v grep | head -n 1
+ps 2>/dev/null | grep -E 'tachyon-core|sing-box|steer' | grep -v grep | head -n 1
 echo "--- CONN ---"
 cat /proc/sys/net/netfilter/nf_conntrack_count 2>/dev/null || echo 0
 `
@@ -156,7 +156,10 @@ func ParseLiveStats(out string) *LiveStats {
 					stats.EnginePID = fields[0]
 					stats.EngineVSZ = fields[2]
 					for _, f := range fields {
-						if strings.Contains(f, "sing-box") {
+						if strings.Contains(f, "tachyon-core") {
+							stats.EngineName = "tachyon-core"
+							break
+						} else if strings.Contains(f, "sing-box") {
 							stats.EngineName = "sing-box"
 							break
 						} else if strings.Contains(f, "steer") {

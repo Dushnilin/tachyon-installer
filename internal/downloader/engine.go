@@ -16,6 +16,7 @@ import (
 type EngineType string
 
 const (
+	EngineTachyonCore               EngineType = "tachyon-core"
 	EngineSingBoxExtended           EngineType = "sing-box-extended"
 	EngineSingBoxExtendedCompressed EngineType = "sing-box-extended-compressed"
 	EngineSingBoxTiny               EngineType = "sing-box-tiny"
@@ -55,6 +56,8 @@ func ResolveEngineAssets(
 	}
 
 	switch engine {
+	case EngineTachyonCore:
+		return resolveTachyonCore(ctx, client, distribArch, rawArch, ext)
 	case EngineSingBoxExtended:
 		return resolveSingBoxExtended(ctx, client, distribArch, rawArch, ext, false)
 	case EngineSingBoxExtendedCompressed:
@@ -133,6 +136,20 @@ func getArchCandidates(distribArch, normArch string) []string {
 				candidates = append(candidates, c)
 			}
 		}
+	case "riscv64":
+		genericList := []string{"riscv64", "riscv64gc"}
+		for _, c := range genericList {
+			if !slices.Contains(candidates, c) {
+				candidates = append(candidates, c)
+			}
+		}
+	case "armv6":
+		genericList := []string{"arm_arm1176jzf-s_vfp", "arm_mpcore", "armv6"}
+		for _, c := range genericList {
+			if !slices.Contains(candidates, c) {
+				candidates = append(candidates, c)
+			}
+		}
 	case "386":
 		genericList := []string{"i386_pentium4", "x86"}
 		for _, c := range genericList {
@@ -168,6 +185,125 @@ func isLinuxBinaryArchiveMatch(name, normArch string) bool {
 		return strings.Contains(n, "linux-386") || strings.Contains(n, "linux-x86")
 	}
 	return false
+}
+
+func isTachyonCoreArchiveMatch(name, normArch, distribArch string) bool {
+	n := strings.ToLower(name)
+	if !strings.HasSuffix(n, ".tar.gz") && !strings.HasSuffix(n, ".tgz") {
+		return false
+	}
+	if strings.Contains(n, "darwin") || strings.Contains(n, "windows") {
+		return false
+	}
+
+	switch normArch {
+	case "arm64":
+		return strings.Contains(n, "aarch64") || strings.Contains(n, "arm64")
+	case "amd64":
+		return strings.Contains(n, "linux-amd64") || strings.Contains(n, "x86_64") || strings.Contains(n, "-amd64")
+	case "mipsle":
+		return strings.Contains(n, "mipsel") || strings.Contains(n, "mipsle")
+	case "mips":
+		return (strings.Contains(n, "-mips-") || strings.Contains(n, "-mips.") || strings.Contains(n, "_mips") || strings.Contains(n, "linux-mips")) &&
+			!strings.Contains(n, "mipsel") && !strings.Contains(n, "mipsle")
+	case "armv7", "arm":
+		return strings.Contains(n, "armv7") || strings.Contains(n, "armhf")
+	case "armv6":
+		return strings.Contains(n, "armv6")
+	case "riscv64":
+		return strings.Contains(n, "riscv64")
+	case "386":
+		return (strings.Contains(n, "386") || strings.Contains(n, "x86")) && !strings.Contains(n, "x86_64")
+	}
+
+	d := strings.ToLower(distribArch)
+	if d != "" && strings.Contains(n, d) {
+		return true
+	}
+
+	return false
+}
+
+func resolveTachyonCore(ctx context.Context, client *Client, distribArch, rawArch, ext string) ([]*EngineDownload, error) {
+	repo := "Dushnilin/tachyon-core"
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", repo)
+
+	var rel struct {
+		TagName string `json:"tag_name"`
+		Assets  []struct {
+			Name               string `json:"name"`
+			BrowserDownloadURL string `json:"browser_download_url"`
+		} `json:"assets"`
+	}
+
+	_, err := client.FetchJSON(ctx, apiURL, &rel)
+	if err != nil || len(rel.Assets) == 0 {
+		scraped, sErr := client.ScrapeExpandedAssets(ctx, repo, "latest")
+		if sErr == nil && len(scraped) > 0 {
+			rel.TagName = "latest"
+			for name, u := range scraped {
+				rel.Assets = append(rel.Assets, struct {
+					Name               string `json:"name"`
+					BrowserDownloadURL string `json:"browser_download_url"`
+				}{Name: name, BrowserDownloadURL: u})
+			}
+		} else {
+			return nil, fmt.Errorf("failed to fetch %s release: %v", repo, err)
+		}
+	}
+
+	var assets []ReleaseAsset
+	for _, a := range rel.Assets {
+		assets = append(assets, ReleaseAsset{
+			Name:               a.Name,
+			BrowserDownloadURL: a.BrowserDownloadURL,
+		})
+	}
+
+	return FilterTachyonCoreAssets(assets, distribArch, rawArch, ext, rel.TagName)
+}
+
+// FilterTachyonCoreAssets matches the best tachyon-core package or binary archive for the router architecture.
+func FilterTachyonCoreAssets(assets []ReleaseAsset, distribArch, rawArch, ext, tagName string) ([]*EngineDownload, error) {
+	normArch := NormalizeArch(rawArch)
+	if normArch == "" {
+		normArch = NormalizeArch(distribArch)
+	}
+
+	// 1. Check if OpenWrt package exists (e.g. tachyon-core_*_<arch>.<ext>)
+	candidates := getArchCandidates(distribArch, normArch)
+	for _, cand := range candidates {
+		suffix := "_" + cand + "." + ext
+		for _, a := range assets {
+			if strings.HasPrefix(a.Name, "tachyon-core") && strings.HasSuffix(a.Name, suffix) {
+				return []*EngineDownload{{
+					EngineType: EngineTachyonCore,
+					Version:    tagName,
+					URL:        a.BrowserDownloadURL,
+					Filename:   a.Name,
+					IsPackage:  true,
+				}}, nil
+			}
+		}
+	}
+
+	// 2. Binary archive match (.tar.gz):
+	for _, a := range assets {
+		if !strings.HasPrefix(a.Name, "tachyon-core") {
+			continue
+		}
+		if isTachyonCoreArchiveMatch(a.Name, normArch, distribArch) {
+			return []*EngineDownload{{
+				EngineType: EngineTachyonCore,
+				Version:    tagName,
+				URL:        a.BrowserDownloadURL,
+				Filename:   a.Name,
+				IsPackage:  false,
+			}}, nil
+		}
+	}
+
+	return nil, fmt.Errorf("tachyon-core binary archive not found for arch %s / %s in release %s", distribArch, normArch, tagName)
 }
 
 func resolveSingBoxExtended(ctx context.Context, client *Client, distribArch, rawArch, ext string, compressedOnly bool) ([]*EngineDownload, error) {
@@ -524,8 +660,14 @@ func NormalizeArch(arch string) string {
 	if strings.Contains(a, "mips") {
 		return "mips"
 	}
+	if strings.Contains(a, "armv6") || strings.Contains(a, "arm11") {
+		return "armv6"
+	}
 	if strings.Contains(a, "arm_cortex") || strings.Contains(a, "armv7") || strings.Contains(a, "arm") {
 		return "armv7"
+	}
+	if strings.Contains(a, "riscv64") {
+		return "riscv64"
 	}
 	if strings.Contains(a, "i386") || strings.Contains(a, "i686") || strings.Contains(a, "x86") {
 		return "386"
@@ -593,10 +735,21 @@ func DownloadEnginePackage(
 	// If tar.gz archive was downloaded, extract binary locally and remove the archive
 	if strings.HasSuffix(destPath, ".tar.gz") {
 		logFn("[#cbd5e1]Распаковка архива ядра...[-]\n")
-		binPath, err := extractTarGzBinary(destPath, destDir, "sing-box")
+		binTarget := "sing-box"
+		if engine.EngineType == EngineTachyonCore {
+			binTarget = "tachyon-core"
+		}
+		binPath, err := extractTarGzBinary(destPath, destDir, binTarget)
 		if err == nil {
 			logFn(fmt.Sprintf("[#22c55e]✓ Бинарный файл ядра распакован: %s[-]\n", filepath.Base(binPath)))
 			_ = os.Remove(destPath)
+			if engine.EngineType == EngineTachyonCore {
+				// Also create a copy as sing-box for universal compatibility with any tachyon LuCI calls
+				sbPath := filepath.Join(destDir, "sing-box")
+				if data, rErr := os.ReadFile(binPath); rErr == nil {
+					_ = os.WriteFile(sbPath, data, 0755)
+				}
+			}
 			return binPath, nil
 		}
 		logFn(fmt.Sprintf("[#eab308]⚠️ Не удалось распаковать архив локально: %v[-]\n", err))
@@ -631,7 +784,19 @@ func extractTarGzBinary(tarGzPath, destDir, binName string) (string, error) {
 			return "", err
 		}
 
-		if header.Typeflag == tar.TypeReg && (header.Name == binName || strings.HasSuffix(header.Name, "/"+binName)) {
+		baseName := filepath.Base(header.Name)
+		isMatch := false
+		if header.Typeflag == tar.TypeReg || header.Typeflag == tar.TypeRegA || header.Typeflag == 0 {
+			if header.Name == binName || strings.HasSuffix(header.Name, "/"+binName) || baseName == binName {
+				isMatch = true
+			} else if binName == "tachyon-core" && (strings.HasPrefix(baseName, "tachyon-core") || baseName == "sing-box") {
+				isMatch = true
+			} else if binName == "sing-box" && (strings.HasPrefix(baseName, "sing-box") || strings.HasPrefix(baseName, "tachyon-core")) {
+				isMatch = true
+			}
+		}
+
+		if isMatch {
 			out, err := os.OpenFile(targetPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
 			if err != nil {
 				return "", err

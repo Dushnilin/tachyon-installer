@@ -129,6 +129,7 @@ func NewOptionsSelector(profile ProfileData) *OptionsSelector {
 	initialEngIdx := 0
 
 	engines := []EngineItem{
+		{Key: "tachyon-core", Name: "tachyon-core", Badge: "Rust ⚡", Desc: "Ультрабыстрое ядро на Rust (4.2 МБ RAM, 0ms GC, xHTTP/VLESS)"},
 		{Key: "sing-box-extended", Name: "sing-box-extended", Badge: "xHTTP", Desc: "xHTTP, Reality, ShadowTLS, gRPC, TUIC, Hy2"},
 		{Key: "sing-box-extended-compressed", Name: "sing-box-ext-compressed", Badge: "xHTTP (сжат)", Desc: "sing-box-extended в сжатом бинарнике (минимум Flash)"},
 		{Key: "sing-box-tiny", Name: "sing-box-tiny", Badge: "Tiny", Desc: "Минималистичная сборка OpenWrt (минимум RAM)"},
@@ -295,7 +296,9 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 		}
 
 		badgeColor := TagMuted
-		if strings.Contains(eng.Badge, "xHTTP") {
+		if strings.Contains(eng.Badge, "Rust") {
+			badgeColor = TagAmberBold
+		} else if strings.Contains(eng.Badge, "xHTTP") {
 			badgeColor = TagSkyBold
 		} else if strings.Contains(eng.Badge, "C-движок") {
 			badgeColor = TagGreenBold
