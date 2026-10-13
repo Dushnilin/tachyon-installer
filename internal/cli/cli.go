@@ -45,6 +45,7 @@ type Options struct {
 	RunRestore     string
 	ListBackups    bool
 	CheckUpdate    bool
+	CheckRouter    bool
 	SwitchEngine   string
 	RunRescue      bool
 	FixConflicts   bool
@@ -102,7 +103,8 @@ func ParseFlags(args []string, defaultCfg *appconfig.Config, appVersion string) 
 	fs.StringVar(&opts.RunRestore, "restore", "", "Восстановить настройки из файла бэкапа или 'latest'")
 	fs.BoolVar(&opts.ListBackups, "list-backups", false, "Показать список доступных локальных бэкапов")
 	fs.BoolVar(&opts.CheckUpdate, "check-update", false, "Проверить наличие обновлений программы на GitHub")
-	fs.BoolVar(&opts.SelfUpdate, "self-update", false, "Автоматическое обновление программы установщика до последней версии с GitHub")
+	fs.BoolVar(&opts.CheckRouter, "check-router", false, "Проверить установленные версии Tachyon на роутере и доступность обновления")
+	fs.BoolVar(&opts.SelfUpdate, "self-update", false, "Алиас для -check-update: показать уведомление о новой версии (автозамена бинарника удалена)")
 	fs.BoolVar(&opts.TuneNetwork, "tune-network", false, "Оптимизировать сетевой стек роутера (TCP BBR, fq_codel, rmem/wmem, conntrack, offloading)")
 	fs.BoolVar(&opts.GuidedSetup, "wizard", false, "Мастер быстрой первоначальной настройки (автопилот под ключ)")
 	fs.BoolVar(&opts.GuidedSetup, "guided", false, "Алиас для -wizard")
@@ -138,15 +140,15 @@ func ParseFlags(args []string, defaultCfg *appconfig.Config, appVersion string) 
 
 // ShouldRunHeadless checks if flags request non-interactive execution.
 func (o *Options) ShouldRunHeadless() bool {
-	return o.RunDiag || o.RunUninstall || o.RunRestore != "" || o.ListBackups || o.CheckUpdate || o.SelfUpdate || o.TuneNetwork || o.GuidedSetup || o.SwitchEngine != "" || o.RunRescue || o.FixConflicts || o.FullSnapshot || o.OfflineBundle != "" || o.RunMonitor || o.TestSub != "" || o.FleetScan || o.FleetDeploy || o.SpeedDoctor || o.AWGSetup || o.AWGTest || o.Yes
+	return o.RunDiag || o.RunUninstall || o.RunRestore != "" || o.ListBackups || o.CheckUpdate || o.CheckRouter || o.SelfUpdate || o.TuneNetwork || o.GuidedSetup || o.SwitchEngine != "" || o.RunRescue || o.FixConflicts || o.FullSnapshot || o.OfflineBundle != "" || o.RunMonitor || o.TestSub != "" || o.FleetScan || o.FleetDeploy || o.SpeedDoctor || o.AWGSetup || o.AWGTest || o.Yes
 }
 
 // Run executes non-interactive CLI operations.
 func Run(opts *Options) int {
 	fmt.Printf("==> Tachyon Express Installer %s (Headless Mode)\n\n", opts.AppVersion)
 
-	// 1. Check Update
-	if opts.CheckUpdate {
+	// 1. Check Update (-self-update is a legacy alias: it only notifies, never replaces the binary)
+	if opts.CheckUpdate || opts.SelfUpdate {
 		fmt.Println("⚡ Проверка наличия обновлений на GitHub...")
 		hasUpdate, latestVer, relURL, err := updater.CheckForUpdate(context.Background(), opts.AppVersion)
 		if err != nil {
@@ -155,22 +157,9 @@ func Run(opts *Options) int {
 		}
 		if hasUpdate {
 			fmt.Printf("💡 Доступна новая версия: %s (текущая: %s)\nСсылка для загрузки: %s\n", latestVer, opts.AppVersion, relURL)
+			fmt.Println("Обновление: повторно запустите скрипт установки (install.sh / install.ps1).")
 		} else {
 			fmt.Printf("✓ У вас установлена актуальная версия Tachyon Installer (%s)\n", opts.AppVersion)
-		}
-		return 0
-	}
-
-	// In-Place Self-Update
-	if opts.SelfUpdate {
-		logFn := func(msg string) { fmt.Print(msg) }
-		updated, newVer, err := updater.SelfUpdate(context.Background(), opts.AppVersion, logFn)
-		if err != nil {
-			fmt.Printf("❌ Ошибка самообновления: %v\n", err)
-			return 1
-		}
-		if updated {
-			fmt.Printf("✓ Программа успешно обновлена до %s. Пожалуйста, перезапустите установщик.\n", newVer)
 		}
 		return 0
 	}
@@ -373,6 +362,11 @@ func Run(opts *Options) int {
 	}
 	defer client.Close()
 	fmt.Println("✓ SSH подключение установлено.")
+
+	// Router update check: what's installed vs latest release
+	if opts.CheckRouter {
+		return runRouterCheck(opts, client)
+	}
 
 	isAPK := routerpkg.IsAPKPackage(client)
 

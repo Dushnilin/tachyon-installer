@@ -154,7 +154,7 @@ func ShowWelcomeWizard(ctx *AppContext) {
 	menuList.AddItem("💾 [B] Полный бэкап и снимки (Snapshot)", "Резервная копия настроек сети, dhcp, firewall и конфигурации Tachyon", 'b', func() {
 		startAction(ActionSnapshot)
 	})
-	menuList.AddItem("🆙 [U] Обновление установщика", "Проверка новых версий на GitHub и самообновление программы", 'u', func() {
+	menuList.AddItem("🆙 [U] Обновление установщика", "Проверка новых версий на GitHub и ссылка на загрузку", 'u', func() {
 		startAction(ActionSelfUpdate)
 	})
 	menuList.AddItem("🚪 [Q] Выход из программы", "Завершить работу Tachyon Express Installer", 'q', func() {

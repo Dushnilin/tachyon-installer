@@ -10,6 +10,7 @@ import (
 	gossh "golang.org/x/crypto/ssh"
 
 	backuppkg "tachyon-installer/internal/backup"
+	"tachyon-installer/internal/browser"
 	routerpkg "tachyon-installer/internal/router"
 	sshpkg "tachyon-installer/internal/ssh"
 	"tachyon-installer/internal/updater"
@@ -484,21 +485,15 @@ func ShowNetworkTuneModal(ctx *AppContext, returnPage string) {
 	ctx.App.SetFocus(form)
 }
 
-// ShowSelfUpdateModal checks and downloads the newest installer release in-place.
+// ShowSelfUpdateModal checks GitHub for a newer installer release and shows
+// a notification with a link. Binaries are never replaced in-place.
 func ShowSelfUpdateModal(ctx *AppContext, returnPage, currentVersion string) {
-	panel := buildStepPanel(" 🔄 ОБНОВЛЕНИЕ TACHYON INSTALLER ")
+	panel := buildStepPanel(" 🆙 ОБНОВЛЕНИЕ TACHYON INSTALLER ")
 
 	infoView := tview.NewTextView().
 		SetDynamicColors(true)
 	infoView.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
-
-	initialText := fmt.Sprintf("\n"+
-		"  [#38bdf8:b]Автоматическое самообновление программы Tachyon Installer:[-]\n\n"+
-		"  [#cbd5e1]Текущая версия:[-] [#f1f5f9]%s[-]\n"+
-		"  [#cbd5e1]Утилита скачает официальный релиз с GitHub, проверит хэш SHA256[-]\n"+
-		"  [#cbd5e1]и безопасно заменит исполняемый файл на диске без потери данных.[-]\n", currentVersion)
-
-	infoView.SetText(initialText)
+	infoView.SetText(fmt.Sprintf("\n  [#38bdf8]⚡ Проверка наличия новых версий на GitHub...[-]\n\n  [#cbd5e1]Текущая версия:[-] [#f1f5f9]%s[-]\n", currentVersion))
 
 	form := tview.NewForm()
 	StyleForm(form)
@@ -514,46 +509,38 @@ func ShowSelfUpdateModal(ctx *AppContext, returnPage, currentVersion string) {
 		}
 	}
 
-	runUpdate := func() {
-		infoView.SetText("\n  [#38bdf8]⚡ Поиск и загрузка обновления... Подождите[-]\n")
-		form.Clear(true)
-		form.AddButton("⏳ Выполняется...", nil)
+	var releaseURL string
 
-		go func() {
-			var logLines []string
-			logFn := func(msg string) {
-				ctx.App.QueueUpdateDraw(func() {
-					logLines = append(logLines, "  "+msg)
-					infoView.SetText("\n" + strings.Join(logLines, ""))
-				})
-			}
-
-			updated, newVer, err := updater.SelfUpdate(context.Background(), currentVersion, logFn)
-
-			ctx.App.QueueUpdateDraw(func() {
-				var sb strings.Builder
-				sb.WriteString("\n")
-				if err != nil {
-					sb.WriteString(fmt.Sprintf("  [#ef5350:b]❌ Ошибка обновления:[-] %v\n", err))
-				} else if updated {
-					sb.WriteString(fmt.Sprintf("  [#22c55e:b]🎉 Успешно обновлено до версии %s![-]\n\n", newVer))
-					sb.WriteString("  [#f1f5f9]Пожалуйста, закройте и перезапустите установщик.[-]\n")
-				} else {
-					sb.WriteString(fmt.Sprintf("  [#22c55e:b]✓ У вас уже установлена актуальная версия (%s)[-]\n", currentVersion))
-				}
-				infoView.SetText(sb.String())
-
-				form.Clear(true)
-				form.AddButton("✅ Закрыть", closeModal)
-				ctx.App.SetFocus(form)
-			})
-		}()
-	}
-
-	form.AddButton("🔄 Обновить сейчас", runUpdate)
-	form.AddButton("Отмена", closeModal)
+	form.AddButton("Открыть страницу релиза", func() {
+		if releaseURL != "" {
+			_ = browser.OpenURL(releaseURL)
+		}
+	})
+	form.AddButton("Закрыть", closeModal)
 	form.SetCancelFunc(closeModal)
 	EnableFormArrowNavigation(form)
+
+	go func() {
+		hasUpdate, latestVer, relURL, err := updater.CheckForUpdate(context.Background(), currentVersion)
+
+		ctx.App.QueueUpdateDraw(func() {
+			releaseURL = relURL
+			var sb strings.Builder
+			sb.WriteString("\n")
+			switch {
+			case err != nil:
+				sb.WriteString(fmt.Sprintf("  [#ef5350]❌ Не удалось проверить обновления: %v[-]\n", err))
+			case hasUpdate:
+				sb.WriteString(fmt.Sprintf("  [#eab308:b]💡 Доступна новая версия: %s (текущая: %s)[-]\n", latestVer, currentVersion))
+				sb.WriteString(fmt.Sprintf("  [#cbd5e1]Страница релиза:[-] [#38bdf8]%s[-]\n", relURL))
+				sb.WriteString("\n  [#cbd5e1]Обновление: повторно запустите скрипт установки (install.sh / install.ps1)[-]\n")
+			default:
+				sb.WriteString(fmt.Sprintf("  [#22c55e:b]✓ У вас уже установлена актуальная версия (%s)[-]\n", currentVersion))
+			}
+			infoView.SetText(sb.String())
+			ctx.App.SetFocus(form)
+		})
+	}()
 
 	panel.AddItem(infoView, 11, 1, false)
 	panel.AddItem(nil, 1, 0, false)

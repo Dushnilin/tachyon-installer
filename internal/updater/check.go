@@ -58,6 +58,9 @@ func CheckForUpdate(ctx context.Context, currentVersion string) (hasUpdate bool,
 	return false, rel.TagName, rel.HTMLURL, nil
 }
 
+// IsNewerVersion reports whether the remote semver tag is newer than the local one.
+func IsNewerVersion(remote, local string) bool { return isNewerVersion(remote, local) }
+
 // isNewerVersion compares two semver tags like "v1.3.1" and "v1.3.0".
 func isNewerVersion(remote, local string) bool {
 	remote = strings.TrimPrefix(strings.TrimSpace(remote), "v")
