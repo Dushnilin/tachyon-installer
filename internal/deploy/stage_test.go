@@ -61,6 +61,33 @@ func TestGenerateRunnerScript_APK(t *testing.T) {
 	}
 }
 
+func TestVariantMarkerForEngine(t *testing.T) {
+	cases := map[string]string{
+		"tachyon-core":                 "tachyon-core",
+		"sing-box-extended":            "extended",
+		"sing-box-extended-compressed": "extended-compressed",
+		"sing-box-lx":                  "lx",
+		"sing-box-tiny":                "tiny",
+		"sing-box":                     "stable",
+		"steer":                        "",
+		"steer-extended":               "",
+		"skip":                         "",
+	}
+	for eng, want := range cases {
+		if got := deploy.VariantMarkerForEngine(eng); got != want {
+			t.Errorf("VariantMarkerForEngine(%q) = %q, want %q", eng, got, want)
+		}
+	}
+
+	script := deploy.GenerateRunnerScript("tachyon-core", false)
+	if !strings.Contains(script, `VARIANT_MARKER="tachyon-core"`) {
+		t.Errorf("expected VARIANT_MARKER in runner script for tachyon-core")
+	}
+	if !strings.Contains(script, "/etc/tachyon/tachyon-core-variant") {
+		t.Errorf("expected variant marker file write in runner script")
+	}
+}
+
 func TestGenerateUninstallScript(t *testing.T) {
 	apkScript := deploy.GenerateUninstallScript(true)
 	if !strings.Contains(apkScript, "apk del") {

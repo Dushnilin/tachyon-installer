@@ -699,7 +699,7 @@ func TestAWGSection(client *gossh.Client, execFn sshutil.ExecFunc, sectionName s
 
 	// 1. Process check
 	procCheck := `
-if pgrep -x sing-box >/dev/null || pgrep -f "sing-box" >/dev/null; then
+if pgrep -x tachyon-core >/dev/null || pgrep -x sing-box >/dev/null || pgrep -f "tachyon-core" >/dev/null || pgrep -f "sing-box" >/dev/null; then
     echo "PROCESS:OK"
 else
     echo "PROCESS:FAILED"

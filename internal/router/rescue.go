@@ -30,11 +30,23 @@ func EmergencyRescue(client *gossh.Client, execFn sshutil.ExecFunc) RescueReport
 if [ -x /etc/init.d/tachyon ]; then
     /etc/init.d/tachyon stop >/dev/null 2>&1 || true
 fi
-killall -9 sing-box steer 2>/dev/null || true
+if [ -x /etc/init.d/tachyon-core ]; then
+    /etc/init.d/tachyon-core stop >/dev/null 2>&1 || true
+fi
+if [ -x /etc/init.d/sing-box ]; then
+    /etc/init.d/sing-box stop >/dev/null 2>&1 || true
+fi
+if [ -x /etc/init.d/steer ]; then
+    /etc/init.d/steer stop >/dev/null 2>&1 || true
+fi
+killall -9 tachyon-core sing-box steer 2>/dev/null || true
 
 # 2. Flush and delete nftables rules (fw4)
 if command -v nft >/dev/null 2>&1; then
+    nft delete table inet TachyonTable >/dev/null 2>&1 || true
+    nft delete table inet tachyon_table >/dev/null 2>&1 || true
     nft delete table inet tachyon >/dev/null 2>&1 || true
+    nft delete table inet steer >/dev/null 2>&1 || true
     nft delete table ip tachyon >/dev/null 2>&1 || true
     nft delete table ip6 tachyon >/dev/null 2>&1 || true
 fi

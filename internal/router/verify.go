@@ -82,16 +82,21 @@ func VerifyAndFallback(client *gossh.Client, execFn sshutil.ExecFunc, progressFn
 }
 
 func verifyProcessAndService(client *gossh.Client, execFn sshutil.ExecFunc, activeEngine string, onRetry func(attempt int)) bool {
+	procCheck := fmt.Sprintf(`pgrep -x %s >/dev/null || pgrep -f "%s" >/dev/null`, activeEngine, activeEngine)
+	if activeEngine == "sing-box" || activeEngine == "tachyon-core" || strings.HasPrefix(activeEngine, "sing-box") {
+		procCheck = `pgrep -x tachyon-core >/dev/null || pgrep -x sing-box >/dev/null || pgrep -f "tachyon-core" >/dev/null || pgrep -f "sing-box" >/dev/null`
+	}
+
 	checkCmd := fmt.Sprintf(`
 if [ -x /usr/bin/tachyon ]; then
     /usr/bin/tachyon get_status 2>/dev/null | grep -Eq '"running"[[:space:]]*:[[:space:]]*(1|true)' && echo "RUNNING" && exit 0
 fi
-if pgrep -x %s >/dev/null || pgrep -f "%s" >/dev/null; then
+if %s; then
     echo "RUNNING"
     exit 0
 fi
 echo "NOT_RUNNING"
-`, activeEngine, activeEngine)
+`, procCheck)
 
 	for i := 0; i < 10; i++ {
 		if onRetry != nil {
@@ -175,13 +180,17 @@ func TriggerFallback(client *gossh.Client, execFn sshutil.ExecFunc) {
 	fallbackCmds := []string{
 		"/usr/bin/tachyon stop >/dev/null 2>&1 || true",
 		"/etc/init.d/tachyon stop >/dev/null 2>&1 || true",
+		"/etc/init.d/tachyon-core stop >/dev/null 2>&1 || true",
 		"/etc/init.d/sing-box stop >/dev/null 2>&1 || true",
 		"/etc/init.d/steer stop >/dev/null 2>&1 || true",
+		"killall -9 tachyon-core sing-box steer 2>/dev/null || true",
 		"uci -q set tachyon.settings.enabled='0'",
 		"uci commit tachyon",
+		"nft delete table inet TachyonTable >/dev/null 2>&1 || true",
 		"nft delete table inet tachyon_table >/dev/null 2>&1 || true",
 		"nft delete table inet tachyon >/dev/null 2>&1 || true",
-		"/usr/bin/tachyon dnsmasq_restore >/dev/null 2>&1 || { uci -q delete dhcp.@dnsmasq[0].server ; uci -q add_list dhcp.@dnsmasq[0].server=1.1.1.1 ; uci -q add_list dhcp.@dnsmasq[0].server=8.8.8.8 ; uci -q set dhcp.@dnsmasq[0].noresolv=0 ; uci commit dhcp ; }",
+		"nft delete table inet steer >/dev/null 2>&1 || true",
+		"/usr/bin/tachyon restore_dnsmasq >/dev/null 2>&1 || /usr/bin/tachyon dnsmasq_restore >/dev/null 2>&1 || { uci -q delete dhcp.@dnsmasq[0].server ; uci -q add_list dhcp.@dnsmasq[0].server=1.1.1.1 ; uci -q add_list dhcp.@dnsmasq[0].server=8.8.8.8 ; uci -q set dhcp.@dnsmasq[0].noresolv=0 ; uci commit dhcp ; }",
 		"/etc/init.d/dnsmasq restart >/dev/null 2>&1 || true",
 	}
 	_, _ = execFn(client, strings.Join(fallbackCmds, " ; "))

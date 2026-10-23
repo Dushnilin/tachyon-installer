@@ -382,11 +382,11 @@ func checkService(run Exec) Result {
 
 func checkEngines(run Exec) Result {
 	r := Result{ID: "engines", Title: "Ядра прокси"}
-	out, _ := run(`for b in sing-box steer; do p=$(command -v $b 2>/dev/null) && echo "$b=$p"; done`)
+	out, _ := run(`for b in tachyon-core sing-box steer; do p=$(command -v $b 2>/dev/null) && echo "$b=$p"; done`)
 	out = strings.TrimSpace(out)
 	if out == "" {
 		r.Status = Warn
-		r.Detail = "sing-box и steer не найдены"
+		r.Detail = "tachyon-core, sing-box и steer не найдены"
 		r.Hint = "Установите ядро через мастер или в веб-интерфейсе Tachyon."
 		return r
 	}

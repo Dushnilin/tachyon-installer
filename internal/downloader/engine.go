@@ -137,7 +137,7 @@ func getArchCandidates(distribArch, normArch string) []string {
 			}
 		}
 	case "riscv64":
-		genericList := []string{"riscv64", "riscv64gc"}
+		genericList := []string{"riscv64_generic", "riscv64", "riscv64gc"}
 		for _, c := range genericList {
 			if !slices.Contains(candidates, c) {
 				candidates = append(candidates, c)
@@ -166,7 +166,7 @@ func isLinuxBinaryArchiveMatch(name, normArch string) bool {
 	if !strings.HasSuffix(n, ".tar.gz") && !strings.HasSuffix(n, ".tgz") {
 		return false
 	}
-	if !strings.Contains(n, "linux") {
+	if !strings.Contains(n, "linux") || strings.Contains(n, "-glibc") || strings.Contains(n, "android") {
 		return false
 	}
 
@@ -180,9 +180,14 @@ func isLinuxBinaryArchiveMatch(name, normArch string) bool {
 	case "mips":
 		return strings.Contains(n, "linux-mips") && !strings.Contains(n, "mipsle") && !strings.Contains(n, "mipsel")
 	case "armv7", "arm":
-		return strings.Contains(n, "linux-armv7") || strings.Contains(n, "linux-armhf") || strings.Contains(n, "linux-arm")
+		return (strings.Contains(n, "linux-armv7") || strings.Contains(n, "linux-armhf") || strings.Contains(n, "linux-arm")) &&
+			!strings.Contains(n, "arm64") && !strings.Contains(n, "aarch64") && !strings.Contains(n, "armv6")
+	case "armv6":
+		return strings.Contains(n, "linux-armv6")
+	case "riscv64":
+		return strings.Contains(n, "linux-riscv64")
 	case "386":
-		return strings.Contains(n, "linux-386") || strings.Contains(n, "linux-x86")
+		return (strings.Contains(n, "linux-386") || strings.Contains(n, "linux-x86")) && !strings.Contains(n, "x86_64")
 	}
 	return false
 }
@@ -427,42 +432,57 @@ func resolveSingBoxStable(ctx context.Context, client *Client, distribArch, rawA
 }
 
 func resolveSteer(ctx context.Context, client *Client, extended bool, distribArch, rawArch, ext string) ([]*EngineDownload, error) {
-	repo := "xyzmean/steer"
-	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", repo)
+	repos := []string{"splify2/steer", "xyzmean/steer"}
+	var lastErr error
 
-	var rel struct {
-		TagName string `json:"tag_name"`
-		Assets  []struct {
-			Name               string `json:"name"`
-			BrowserDownloadURL string `json:"browser_download_url"`
-		} `json:"assets"`
-	}
+	for _, repo := range repos {
+		apiURL := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", repo)
 
-	_, err := client.FetchJSON(ctx, apiURL, &rel)
-	if err != nil || len(rel.Assets) == 0 {
-		scraped, sErr := client.ScrapeExpandedAssets(ctx, repo, "latest")
-		if sErr == nil && len(scraped) > 0 {
-			rel.TagName = "latest"
-			for name, u := range scraped {
-				rel.Assets = append(rel.Assets, struct {
-					Name               string `json:"name"`
-					BrowserDownloadURL string `json:"browser_download_url"`
-				}{Name: name, BrowserDownloadURL: u})
-			}
-		} else {
-			return nil, fmt.Errorf("failed to fetch steer release: %v", err)
+		var rel struct {
+			TagName string `json:"tag_name"`
+			Assets  []struct {
+				Name               string `json:"name"`
+				BrowserDownloadURL string `json:"browser_download_url"`
+			} `json:"assets"`
 		}
+
+		_, err := client.FetchJSON(ctx, apiURL, &rel)
+		if err != nil || len(rel.Assets) == 0 {
+			scraped, sErr := client.ScrapeExpandedAssets(ctx, repo, "latest")
+			if sErr == nil && len(scraped) > 0 {
+				rel.TagName = "latest"
+				for name, u := range scraped {
+					rel.Assets = append(rel.Assets, struct {
+						Name               string `json:"name"`
+						BrowserDownloadURL string `json:"browser_download_url"`
+					}{Name: name, BrowserDownloadURL: u})
+				}
+			} else {
+				if err != nil {
+					lastErr = err
+				} else {
+					lastErr = sErr
+				}
+				continue
+			}
+		}
+
+		var assets []ReleaseAsset
+		for _, a := range rel.Assets {
+			assets = append(assets, ReleaseAsset{
+				Name:               a.Name,
+				BrowserDownloadURL: a.BrowserDownloadURL,
+			})
+		}
+
+		res, filterErr := FilterSteerAssets(assets, extended, distribArch, rawArch, ext, rel.TagName)
+		if filterErr == nil && len(res) > 0 {
+			return res, nil
+		}
+		lastErr = filterErr
 	}
 
-	var assets []ReleaseAsset
-	for _, a := range rel.Assets {
-		assets = append(assets, ReleaseAsset{
-			Name:               a.Name,
-			BrowserDownloadURL: a.BrowserDownloadURL,
-		})
-	}
-
-	return FilterSteerAssets(assets, extended, distribArch, rawArch, ext, rel.TagName)
+	return nil, fmt.Errorf("failed to fetch steer release from %v: %v", repos, lastErr)
 }
 
 // ReleaseAsset represents a GitHub release asset or scraped asset.
@@ -629,7 +649,20 @@ func resolveSingBoxLX(ctx context.Context, client *Client, distribArch, rawArch,
 		}
 	}
 
-	// 2. Binary archive match:
+	// 2. Binary archive match (prefer non-UPX archive first, then allow UPX archive as fallback):
+	for _, a := range rel.Assets {
+		if strings.HasPrefix(a.Name, "sing-box-") &&
+			!strings.HasSuffix(strings.ToLower(a.Name), ".upx.tar.gz") &&
+			isLinuxBinaryArchiveMatch(a.Name, normArch) {
+			return []*EngineDownload{{
+				EngineType: EngineSingBoxLX,
+				Version:    rel.TagName,
+				URL:        a.BrowserDownloadURL,
+				Filename:   a.Name,
+				IsPackage:  false,
+			}}, nil
+		}
+	}
 	for _, a := range rel.Assets {
 		if strings.HasPrefix(a.Name, "sing-box-") && isLinuxBinaryArchiveMatch(a.Name, normArch) {
 			return []*EngineDownload{{
@@ -733,7 +766,7 @@ func DownloadEnginePackage(
 	logFn(fmt.Sprintf("[#22c55e]✓ Ядро %s успешно скачано (зеркало: %s)[-]\n", engine.Filename, usedMirror))
 
 	// If tar.gz archive was downloaded, extract binary locally and remove the archive
-	if strings.HasSuffix(destPath, ".tar.gz") {
+	if strings.HasSuffix(destPath, ".tar.gz") || strings.HasSuffix(destPath, ".tgz") {
 		logFn("[#cbd5e1]Распаковка архива ядра...[-]\n")
 		binTarget := "sing-box"
 		if engine.EngineType == EngineTachyonCore {
@@ -743,13 +776,6 @@ func DownloadEnginePackage(
 		if err == nil {
 			logFn(fmt.Sprintf("[#22c55e]✓ Бинарный файл ядра распакован: %s[-]\n", filepath.Base(binPath)))
 			_ = os.Remove(destPath)
-			if engine.EngineType == EngineTachyonCore {
-				// Also create a copy as sing-box for universal compatibility with any tachyon LuCI calls
-				sbPath := filepath.Join(destDir, "sing-box")
-				if data, rErr := os.ReadFile(binPath); rErr == nil {
-					_ = os.WriteFile(sbPath, data, 0755)
-				}
-			}
 			return binPath, nil
 		}
 		logFn(fmt.Sprintf("[#eab308]⚠️ Не удалось распаковать архив локально: %v[-]\n", err))
@@ -785,6 +811,16 @@ func extractTarGzBinary(tarGzPath, destDir, binName string) (string, error) {
 		}
 
 		baseName := filepath.Base(header.Name)
+		lowerBase := strings.ToLower(baseName)
+		if strings.HasSuffix(lowerBase, ".sha256") ||
+			strings.HasSuffix(lowerBase, ".sig") ||
+			strings.HasSuffix(lowerBase, ".txt") ||
+			strings.HasSuffix(lowerBase, ".md") ||
+			strings.HasSuffix(lowerBase, ".json") ||
+			lowerBase == "license" {
+			continue
+		}
+
 		isMatch := false
 		if header.Typeflag == tar.TypeReg || header.Typeflag == tar.TypeRegA || header.Typeflag == 0 {
 			if header.Name == binName || strings.HasSuffix(header.Name, "/"+binName) || baseName == binName {

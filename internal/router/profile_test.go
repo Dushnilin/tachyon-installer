@@ -66,6 +66,8 @@ func TestClassifyArch(t *testing.T) {
 		{"mipsle", "mipsle", "mipsle"},
 		{"mips", "mips", "mips"},
 		{"armv7", "armv7l", "arm"},
+		{"armv6", "arm_arm1176jzf-s_vfp", "armv6"},
+		{"riscv64", "riscv64_generic", "riscv64"},
 		{"unknown", "sparc64", ""},
 		{"empty", "", ""},
 	}

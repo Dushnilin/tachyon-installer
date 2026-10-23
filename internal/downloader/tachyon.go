@@ -67,7 +67,7 @@ func FetchTachyonReleaseByTag(ctx context.Context, client *Client, tag string) (
 		}
 
 		// Fallback: try scraping expanded_assets or direct release page
-		targetTag := "1.4.9" // fallback latest
+		targetTag := "1.5.21" // fallback latest
 		scraped, sErr := client.ScrapeExpandedAssets(ctx, "Dushnilin/tachyon", targetTag)
 		if sErr == nil && len(scraped) > 0 {
 			rel.TagName = targetTag

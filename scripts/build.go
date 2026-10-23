@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -99,7 +100,7 @@ func main() {
 		defer f.Close()
 		entries, _ := os.ReadDir(distDir)
 		for _, e := range entries {
-			if e.IsDir() || e.Name() == "sha256sums.txt" {
+			if e.IsDir() || !strings.HasPrefix(e.Name(), "tachyon-installer-") {
 				continue
 			}
 			filePath := filepath.Join(distDir, e.Name())

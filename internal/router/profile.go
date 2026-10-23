@@ -228,6 +228,12 @@ func ClassifyArch(archStr string) string {
 	if strings.Contains(a, "mips") {
 		return "mips"
 	}
+	if strings.Contains(a, "riscv64") {
+		return "riscv64"
+	}
+	if strings.Contains(a, "armv6") || strings.Contains(a, "arm11") {
+		return "armv6"
+	}
 	if strings.Contains(a, "arm") {
 		return "arm"
 	}

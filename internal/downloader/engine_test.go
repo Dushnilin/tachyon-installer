@@ -20,6 +20,8 @@ func TestArchNormalization(t *testing.T) {
 		{"mipsel_24kc", "mipsle"},
 		{"mips_24kc", "mips"},
 		{"arm_cortex-a7_neon-vfpv4", "armv7"},
+		{"arm_arm1176jzf-s_vfp", "armv6"},
+		{"riscv64_generic", "riscv64"},
 		{"i386_pentium4", "386"},
 	}
 
