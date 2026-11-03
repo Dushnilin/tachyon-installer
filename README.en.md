@@ -2,63 +2,64 @@
 
 ![Tachyon Installer Banner](assets/readme/hero.svg)
 
-[![Go](https://img.shields.io/badge/Go-1.22%20%7C%201.23%20%7C%201.25-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://go.dev/)
-[![Releases](https://img.shields.io/github/v/release/Dushnilin/tachyon-installer?style=for-the-badge&color=818CF8)](https://github.com/Dushnilin/tachyon-installer/releases)
-[![Platforms](https://img.shields.io/badge/Platforms-Windows%20%7C%20Linux%20%7C%20macOS-38BDF8?style=for-the-badge)](https://github.com/Dushnilin/tachyon-installer/releases)
-[![OpenWrt](https://img.shields.io/badge/OpenWrt-23.05%20%7C%2024.10%20%7C%2025.x%20%7C%20SNAPSHOT-10B981?style=for-the-badge&logo=openwrt)](https://openwrt.org/)
-[![Telegram](https://img.shields.io/badge/Telegram-Channel-26A5E4?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/tachyon_proxy)
-[![License](https://img.shields.io/badge/License-GPL--3.0-C084FC?style=for-the-badge)](LICENSE)
+[![Go](https://img.shields.io/badge/Go-1.22%2B-0284c7?style=flat-square&logo=go&logoColor=white)](https://go.dev/)
+[![Releases](https://img.shields.io/github/v/release/Dushnilin/tachyon-installer?style=flat-square&color=38bdf8)](https://github.com/Dushnilin/tachyon-installer/releases)
+[![Platforms](https://img.shields.io/badge/Host-Windows%20%7C%20Linux%20%7C%20macOS-2e2e32?style=flat-square)](https://github.com/Dushnilin/tachyon-installer/releases)
+[![OpenWrt](https://img.shields.io/badge/OpenWrt-23.05%20%7C%2024.10%20%7C%2025.12%20%7C%20SNAPSHOT-4cc38a?style=flat-square&logo=openwrt)](https://openwrt.org/)
+[![Telegram](https://img.shields.io/badge/Telegram-@tachyon__proxy-0284c7?style=flat-square&logo=telegram&logoColor=white)](https://t.me/tachyon_proxy)
+[![License](https://img.shields.io/badge/License-GPL--3.0-2e2e32?style=flat-square)](LICENSE)
 
-[**🇷🇺 Русский**](README.md) | [**🇬🇧 English**](README.en.md)
+[**Русский**](README.md) · [**English**](README.en.md)
 
 </div>
 
-<p align="center">
-  <img src="assets/readme/divider_stream.svg" width="100%" alt="divider" />
-</p>
+---
 
-## 🔍 Key Highlights (v1.6)
+## Overview
 
-- **⚡ Instant 1-Line Bootstrap**: Launch directly in console without manual downloading via PowerShell (`irm ... | iex`) or Linux/macOS (`curl | bash`).
-- **🚀 Kernel & Network Optimization (BBR & Sysctl Tuning)**: Fine-tunes OpenWrt networking stack (TCP BBR + fq_codel queue, adaptive socket buffers based on router RAM, TCP Fast Open, faster conntrack cleanup, and Firewall Flow Offloading) persisted in `/etc/sysctl.d/99-tachyon-tune.conf` (`-tune-network` flag in CLI or `T` hotkey in TUI).
-- **🔄 Update Notifications**: Automatically checks GitHub for newer releases and shows a notification with a download link (`-check-update` flag, background check in TUI).
-- **🚑 Emergency Network Rescue**: Safely flushes deadlocked nftables/iptables interception rules, clears TProxy routes, restarts dnsmasq/firewall, and restores native internet access instantly (`-rescue` flag in CLI or `🚑 Rescue` button / `R` hotkey in TUI).
-- **🛡️ Conflict Auto-Fix**: Automatically detects, stops, and disables conflicting proxy/DNS tools (`passwall`, `openclash`, `zapret`, `xray`, `shadowsocksr`, etc.) via `-fix-conflicts` flag or `C` hotkey in TUI.
-- **📊 Real-Time Live Monitor**: Interactive telemetry dashboard displaying CPU loadavg, RAM usage (with visual bar), system uptime, active proxy core (PID, memory), open conntrack connections, and LAN RX/TX traffic live (`-monitor` flag in CLI or `M` hotkey in TUI).
-- **💾 Full System Snapshot**: Backs up entire router network configurations (`/etc/config/network`, `/etc/config/dhcp`, `/etc/config/firewall`, `/etc/nftables.d/`, `/etc/config/tachyon`) into a local `.tar.gz` archive on host PC (`-snapshot` flag or `B` hotkey in TUI).
-- **⚡ Subscription Benchmark & Latency Ping**: Concurrently measures TCP handshake latency to all nodes in a subscription (HTTPS URL, raw `vless://`, file, or base64), sorted from lowest to highest ping (`-test-sub "vless://..."`).
-- **📦 Offline Bundle Downloader**: Pre-downloads Tachyon releases (OPKG + APK, i18n, and cores for x86_64, arm64, mipsle, mips) into a local bundle directory for air-gapped / offline deployments (`-offline-bundle "offline_pkg/"`).
-- **🌐 Multi-Target Bypass Probes**: Verifies router Fake-IP DNS interception and tests response latency across YouTube, Discord, Telegram, and GitHub directly through the router pipeline, reporting egress GeoIP country and IP.
-- **⚡ Engine Hot-Swap**: Swap routing engines (`tachyon-core`, `sing-box-extended`, `sing-box-tiny`, `steer`, `steer-extended`) in ~3 seconds without reinstalling LuCI or clearing subscriptions — via `--switch-engine` or hotkey `S` in TUI.
-- **🌐 1-Click LuCI Launch**: Completion modal and global hotkey `O` instantly launch the Tachyon LuCI web panel in your default system browser.
-- **🖥️ Dual Mode (Interactive TUI + Headless CLI)**: Beautiful zinc terminal dashboard with mouse & arrow keys support, plus automated unattended CLI execution (`--yes`, `--ip`, `--pass`, `--engine`, `--zram`).
-- **🧠 Hardware-Aware Intelligence**: Real-time evaluation of router RAM/Flash with smart core recommendations; optional automatic activation of **zRAM-swap** for OOM prevention on constrained routers (<128 MB RAM).
-- **⏱️ Router Clock Sync & WAN Health**: Automatically synchronizes router clock with host PC UTC time (`date -u -s`) to prevent TLS/certificate validation failures; tests WAN routing and DNS.
-- **🌐 Universal Subscription Parser**: Supports HTTPS subscription URLs, raw configs (`vless://`, `hysteria2://`, `trojan://`, `ss://`, `vmess://`), and base64 bundles with live node counting and protocol breakdown.
-- **🛠️ Maintenance Suite**: Clean uninstaller (`--uninstall`), instant rollback from local backup archives (`--restore latest`), backup listing (`--list-backups`), and release update checker (`--check-update`).
-- **🔍 Deep Diagnostics**: Automatic post-install audit and standalone mode (dashboard button, `D` hotkey, or `--diag` flag) with export to file (`--export-diag`).
-- **LAN Router Discovery**: Automatically probes the local network for Dropbear OpenWrt routers.
-- **SSH Key Authentication**: Full support for passwordless or passphrase-protected SSH keys.
-- **Checksum Verification**: Validates SHA256 integrity and file formats before streaming to the router.
+**Tachyon Installer** is a standalone cross-platform utility (interactive TUI and headless CLI) for deploying, diagnosing, and maintaining the **[Tachyon](https://github.com/Dushnilin/tachyon)** (v1.7.9+) routing ecosystem on **OpenWrt** routers (23.05, 24.10, 25.12, and SNAPSHOT across both `opkg` and `apk`).
 
-## ⚡ About The Project
+### Why a Host-Side Installer
 
-**Tachyon Express Installer** is a standalone, cross-platform desktop utility and interactive Terminal User Interface (TUI) wizard designed for autonomous deployment and pre-flight hardware diagnostics of the **[Tachyon](https://github.com/Dushnilin/tachyon)** ecosystem on **OpenWrt** routers (compatible with 23.05, 24.10, 25.x, and SNAPSHOT).
+Under restrictive network conditions or on fresh OpenWrt installations, the router often cannot reach GitHub directly, causing router-side `curl | sh` scripts to time out. **Tachyon Installer** moves package acquisition and verification to your workstation (Windows, Linux, macOS):
 
-### 🎯 The Problem It Solves
-In restrictive censorship environments, OpenWrt routers frequently **lack direct access to GitHub**, or WAN connectivity is unstable prior to configuring anti-censorship routing. Standard router-side installation scripts (`curl | sh`) often hang or fail under these conditions.
+1. Benchmarks available GitHub mirrors in parallel and downloads `tachyon`, `luci-app-tachyon`, localization packages, `.trs`/`.srs` binary lists, and the selected routing engine onto your computer.
+2. Verifies **SHA-256** checksums and package headers (`.apk` / `.ipk`) before touching the router.
+3. Connects to the router over local SSH, profiles hardware and kernel modules, saves a configuration snapshot on the host PC, and streams packages directly into RAM (`/tmp` via `tar-over-SSH`) with zero NAND flash wear.
 
-**Tachyon Installer fundamentally eliminates this barrier:**
-1. The installer runs locally **on your workstation** (Windows, Linux, macOS).
-2. It fetches all necessary packages, LuCI web interfaces, and proxy core binaries through fast, verified GitHub mirrors.
-3. Automatically validates integrity using **SHA256 checksums**.
-4. Profiles router hardware over the local SSH network, backs up existing configurations, and **streams payloads directly into RAM (`/tmp`)**, ensuring zero NAND flash wear and completely autonomous installation.
+---
 
-<p align="center">
-  <img src="assets/readme/divider_stream.svg" width="100%" alt="divider" />
-</p>
+## Core Capabilities
 
-## 🔄 Deployment Architecture & Pipeline
+- **First-Class `tachyon-core` (Rust) & Multi-Engine Support**:
+  - `tachyon-core` — primary pure-Rust engine (~4.2 MB RAM, zero GC pauses, built-in Adaptive Desync 2.0, AmneziaWG 2.0, xHTTP, Reality, Hysteria2, TUIC, ShadowTLS, AnyTLS, Tailscale, Torrent Detector, and binary `.trs` rule-sets). Recommended for all routers with >= 64 MB RAM.
+  - `sing-box-extended` / `sing-box-tiny` / `sing-box-lx` — alternative `sing-box` builds (including compact and compressed variants).
+  - Engine hot-swap (`-switch-engine` or hotkey `S`) switches engines in seconds without reinstalling LuCI or resetting subscriptions.
+- **OpenWrt 25.12 (APK) & 23.05–24.10 (OPKG) Compatibility**:
+  - Offline local `.apk` installation (`apk add --allow-untrusted --no-network --repositories-file /dev/null`) with virtual package fallback for pinned APK world constraints.
+  - Automatic `/etc/apk/world` cleanup of legacy conflicting packages (`forkop`, `podkop`, `netshift`) and `ip-tiny` ↔ `ip-full` conflict resolution.
+  - Built-in kernel module detection via `/sys/module/` (`nft_tproxy`, `tun`, `inet_diag`, `netlink_diag`, `nft_nat`).
+- **Guided Setup (`-wizard` / hotkey `A`)**:
+  - Tests ISP UDP 53 DNS spoofing/poisoning and benchmarks clean DoH resolvers.
+  - Evaluates DPI bypass strategies: native **Tachyon Adaptive Desync 2.0** (`adaptive`, `fake_split`, `fake_disorder`, `multi_split` + UDP QUIC Fake) on `tachyon-core`, or `zapret2`/`nfqws2` profiles.
+  - Tunes kernel network parameters and runs end-to-end reachability probes through the router.
+- **AmneziaWG 2.0 & Cloudflare WARP (`-awg` / hotkey `W`)**:
+  - Registers Cloudflare WARP keys directly from the router, or imports `.conf` files and `vpn://` containers.
+  - Supports full AmneziaWG 2.0 CPS signature tags (`Jc`, `Jmin`, `Jmax`, `S1..S4`, `H1..H4`, `I1..I5`, `J1..J3`, `ITime`).
+- **Universal Subscription Manager (`-sub`, `-test-sub`)**:
+  - Supports HTTPS subscription URLs (`subscription_engine='core'`), `happ://crypt4/...`, `fptn:` / `fptnb:`, `vless://`, `vmess://`, `trojan://`, `ss://`, `hy2://`, `tuic://`, `anytls://`, `awg://`, `mieru://`, `snell://`, `sudoku://`, `masque://`, `trusttunnel://`, `naive+https://`, `tg://`, `mtproto://`, `warp://`, and multi-URI lines.
+  - Concurrent TCP handshake latency benchmark across all parsed nodes.
+- **Diagnostics, Speed Doctor & Emergency Rescue**:
+  - **7-Point Diagnostics (`-diag` / `D`)**: inspects CPU architecture, RAM/Flash, kernel modules, `nftables` chains, section quarantine state (`/var/run/tachyon/validator-quarantined.json`), DNS resolution, and conflicting services.
+  - **Speed & Bufferbloat Doctor (`-speedtest` / `P`)**: measures WAN and tunnel throughput, loaded ping delta (A+..F grade), and CPU SoftIRQ saturation without writing to flash.
+  - **Network Stack Tuning (`-tune-network` / `T`)**: enables TCP BBR + `fq_codel`, scales socket buffers (`rmem`/`wmem`) to router RAM, tunes `conntrack` timeouts, and disables incompatible `fw4` Flow Offloading so TProxy/nftables rules are not bypassed.
+  - **Emergency Rescue (`-rescue` / `R`)**: flushes `inet tachyon` and `inet tachyon_tailscale` tables, cleans policy routing (`fwmark`, tables `tachyon`/`105`/`100`/`4247`/`4248`, netns `fkpsc`), restores `dnsmasq` backups, and recovers direct WAN connectivity.
+- **Multi-Router Fleet Manager (`-fleet-scan`, `-fleet-deploy` / hotkey `F`)**:
+  - Scans local CIDR subnets for OpenWrt routers, builds a hardware/version inventory, and deploys or updates Tachyon concurrently.
+
+---
+
+## Deployment Pipeline
 
 <div align="center">
 
@@ -66,178 +67,142 @@ In restrictive censorship environments, OpenWrt routers frequently **lack direct
 
 </div>
 
-The installation executes across 5 autonomous stages:
+1. **SSH Router Audit**: detects router model, OpenWrt release, target architecture (`aarch64_cortex-a53`, `aarch64_generic`, `x86_64`, `mipsel_24kc`, `mips_24kc`, `arm_cortex-a7_neon-vfpv4`, `arm_cortex-a9`, `arm_cortex-a15_neon-vfpv4`), package manager (`apk` / `opkg`), free RAM/Flash, and synchronizes router UTC clock with the host PC.
+2. **Host-Side Package Acquisition**: benchmarks GitHub mirrors (`gh-proxy.com`, `ghfast.top`, `gh.ddlc.top`, `gh-proxy.org`, `direct`), downloads Tachyon packages, `.trs`/`.srs` rule-sets (`Dushnilin/tachyon-lists`), and engine binaries, and verifies SHA-256 checksums.
+3. **Snapshot & World Scrub**: backs up `/etc/config/tachyon` and `/etc/tachyon` to the host PC, triggers `tachyon snapshot-save`, clears stale locks, and scrubs `/etc/apk/world`.
+4. **RAM Streaming (`tar-over-SSH`)**: streams packages into `/tmp`, performs offline installation, and configures UCI (`engine='tachyon-core'`, `subscription_engine='core'`).
+5. **Verification**: verifies service startup, `nftables` tables, Fake-IP DNS resolution, and section quarantine status, automatically rolling back on critical failure.
 
-1. **🔍 Pre-Flight Router Audit**:
-   - Hardware detection: Router model, OpenWrt version, CPU architecture normalization (`arm64`, `mipsle`, `mips`, `x86_64`, `armv7`).
-   - Package manager detection (`apk` for OpenWrt 25+ / `opkg` for OpenWrt 24 and older).
-   - Flash and RAM memory inspection with safety warnings on low-memory routers.
-   - Firewall generation check (`fw4` nftables vs legacy `fw3` iptables).
-   - Conflicting package detection (`passwall`, `openclash`, `shadowsocksr`, `podkop`, `forkop`, `nextdns`).
-2. **🪞 Intelligent Mirror Download (Host-side)**:
-   - Automated parallel latency benchmarking across multiple verified GitHub mirrors.
-   - Fast failover recovery if an upstream mirror becomes unreachable.
-   - Strict SHA256 integrity verification against official release manifests.
-3. **💾 Safe Configuration Backup**:
-   - Dumps `/etc/config/tachyon` and stores a local backup on the host PC prior to making changes.
-4. **📦 tar-over-SSH Streaming**:
-   - Streams payload directly into router RAM `tmpfs` (`/tmp/tachyon-install`) via secure SSH pipe.
-   - Zero unnecessary flash read/write cycles, preserving NAND storage lifespan.
-5. **⚡ Service Activation & Health Verification**:
-   - Atomic package installation and placement of the selected routing engine.
-   - Validates systemd/procd service status, nftables rules, FakeIP DNS, and leak prevention.
-   - Optional 1-click subscription URL testing and configuration.
-6. **✨ Intelligent Autopilot Setup Wizard**:
-   - Automated DNS poisoning detection and fast DoH upstream benchmarking.
-   - Built-in **DPI Fuzzer** testing YouTube & Discord to detect the winning evasion strategy.
-   - 1-click TCP BBR network tuning and end-to-end scorecard verification.
+---
 
-<p align="center">
-  <img src="assets/readme/divider_stream.svg" width="100%" alt="divider" />
-</p>
+## Quick Start
 
-## 🚀 Quick Start
+### One-Line Launch
 
-### ⚡ Instant 1-Line Bootstrap (No Manual Download)
-
-Similar to Microsoft Activation Scripts (MAS), you can launch Tachyon Express Installer with a single command directly inside your terminal. It auto-detects OS and architecture (x64 / arm64 / Apple Silicon), downloads the binary via the nearest reliable mirror, and runs it right in your console:
+Detects your workstation OS and architecture (`amd64` / `arm64`), downloads the latest standalone binary via the fastest available mirror, and starts the interface:
 
 **Windows (PowerShell):**
 ```powershell
 irm https://raw.githubusercontent.com/Dushnilin/tachyon-installer/main/install.ps1 | iex
 ```
-*(Fallback mirror if GitHub is blocked:* `irm https://gh-proxy.com/https://raw.githubusercontent.com/Dushnilin/tachyon-installer/main/install.ps1 | iex`*)*
+*(Mirror fallback:* `irm https://gh-proxy.com/https://raw.githubusercontent.com/Dushnilin/tachyon-installer/main/install.ps1 | iex`*)*
 
-**Linux & macOS (Terminal):**
+**Linux & macOS:**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Dushnilin/tachyon-installer/main/install.sh | bash
 ```
-*(Fallback mirror:* `curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/Dushnilin/tachyon-installer/main/install.sh | bash`*)*
+*(Mirror fallback:* `curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/Dushnilin/tachyon-installer/main/install.sh | bash`*)*
 
 ---
 
-### 1. Download Pre-Built Binaries Manually (Optional)
+### Pre-Built Binaries
 
-Grab the executable for your OS from **[GitHub Releases](https://github.com/Dushnilin/tachyon-installer/releases)**:
+Standalone zero-dependency binaries are available on **[GitHub Releases](https://github.com/Dushnilin/tachyon-installer/releases)**:
 
-| Operating System | Architecture | Direct Executable Binary |
+| Operating System | Architecture | Binary |
 | :--- | :--- | :--- |
-| **Windows** | x86_64 (64-bit) | `tachyon-installer-windows-amd64.exe` |
+| **Windows** | x86_64 (amd64) | `tachyon-installer-windows-amd64.exe` |
 | **Windows** | ARM64 | `tachyon-installer-windows-arm64.exe` |
 | **Linux** | x86_64 (amd64) | `tachyon-installer-linux-amd64` |
 | **Linux** | ARM64 (aarch64) | `tachyon-installer-linux-arm64` |
-| **macOS** | Apple Silicon (M1/M2/M3/M4) | `tachyon-installer-darwin-arm64` |
+| **macOS** | Apple Silicon (M1–M4) | `tachyon-installer-darwin-arm64` |
 | **macOS** | Intel (x86_64) | `tachyon-installer-darwin-amd64` |
 
-### 2. Run the Installer
+### Interactive TUI
 
-Connect your computer to the router via Ethernet (LAN) or home Wi-Fi, and run:
+Run `./tachyon-installer` (or `.\tachyon-installer.exe` on Windows) with no flags:
 
-**Windows (PowerShell / Command Prompt):**
-```powershell
-.\tachyon-installer.exe
-```
+- `Tab` / `↑` `↓` — navigate fields and sections;
+- `←` `→` or keys `1`–`6` — select proxy engine, version, and mirror on the options screen;
+- `Space` — toggle options (`luci-i18n-tachyon-ru`, `zram-swap`);
+- Global shortcuts on the welcome and options screens:
+  - `A` — guided setup wizard (DNS + Adaptive Desync 2.0 + network tuning);
+  - `W` — AmneziaWG 2.0 / Cloudflare WARP setup;
+  - `P` — WAN/tunnel speed & Bufferbloat test;
+  - `F` — multi-router fleet discovery and batch deployment;
+  - `S` — hot-swap proxy engine;
+  - `D` — 7-point router diagnostics;
+  - `M` — live CPU/RAM/conntrack monitor;
+  - `T` — kernel network stack tuning (`sysctl` + BBR);
+  - `C` — disable conflicting proxy services (`passwall`, `openclash`, `zapret`, etc.);
+  - `B` — create full configuration snapshot;
+  - `R` — emergency network rescue.
 
-**Linux / macOS (Terminal):**
-```bash
-chmod +x ./tachyon-installer
-./tachyon-installer
-```
+---
 
-Follow the on-screen TUI wizard:
-1. Enter router IP (default `192.168.1.1`), SSH port (`22`), and username (`root`).
-2. Provide your router admin password.
-3. Review the live pre-flight hardware diagnostics summary.
-4. Select your preferred proxy engine, Tachyon version, and mirror on the dashboard (or press `S` to hot-swap engine only).
-5. Press **«Start Installation»** (`Enter`) to deploy.
-6. Upon completion, press `O` to launch the LuCI panel in your browser!
-
-### 3. Headless Automation (Unattended CLI)
-
-For script-based automation, CI/CD pipelines, or execution without launching the interactive TUI, use command-line flags:
+### Headless CLI Automation
 
 ```bash
-# Network & kernel optimization (TCP BBR, fq_codel, adaptive socket buffers)
-./tachyon-installer -ip 192.168.1.1 -pass "secret" -tune-network
-
-# Check installed Tachyon versions on the router and available updates
-./tachyon-installer -ip 192.168.1.1 -pass "secret" -check-router
-
-# Intelligent guided autopilot setup (DNS tester + DPI fuzzer + BBR network tuning)
-./tachyon-installer -ip 192.168.1.1 -pass "secret" -wizard
-
-# Emergency rescue: flush interception rules and recover native internet
-./tachyon-installer -ip 192.168.1.1 -pass "secret" -rescue
-
-# Auto-fix conflicts: stop and disable passwall, openclash, zapret, etc.
-./tachyon-installer -ip 192.168.1.1 -pass "secret" -fix-conflicts
-
-# Create full system snapshot (network, firewall, dhcp, tachyon)
-./tachyon-installer -ip 192.168.1.1 -pass "secret" -snapshot
-
-# Real-time live performance monitoring (CPU, RAM, core, traffic, conntrack)
-./tachyon-installer -ip 192.168.1.1 -pass "secret" -monitor
-
-# Benchmark and ping subscription nodes concurrently (URL / vless / base64)
-./tachyon-installer -test-sub "https://example.com/sub"
-
-# Pre-download complete offline package bundle for air-gapped routers
-./tachyon-installer -offline-bundle "offline_pack/"
-
-# Hot-swap routing engine to tachyon-core in ~3 seconds (Rust, 4.2 MB RAM, 0ms GC)
-./tachyon-installer -ip 192.168.1.1 -pass "secret" -switch-engine tachyon-core
-
-# Automated express installation with tachyon-core engine and zRAM-swap
+# Express installation with tachyon-core engine and zRAM-swap
 ./tachyon-installer -ip 192.168.1.1 -pass "secret" -engine tachyon-core -zram -yes
 
-# Express installation with immediate subscription link setup
-./tachyon-installer -ip 192.168.1.1 -pass "secret" -sub "vless://..." -yes
+# Express installation with immediate subscription import (HTTPS, vless://, happ://crypt4/..., fptn:)
+./tachyon-installer -ip 192.168.1.1 -pass "secret" -sub "https://example.com/sub" -yes
 
-# Standalone router diagnostics with report export
+# Hot-swap routing engine to tachyon-core without reinstalling LuCI
+./tachyon-installer -ip 192.168.1.1 -pass "secret" -switch-engine tachyon-core
+
+# Guided setup (DNS poisoning check, Adaptive Desync selection, BBR tuning)
+./tachyon-installer -ip 192.168.1.1 -pass "secret" -wizard
+
+# Configure and verify an AmneziaWG 2.0 section (Cloudflare WARP, .conf file, or vpn://)
+./tachyon-installer -ip 192.168.1.1 -pass "secret" -awg -awg-conf warp -awg-section warp
+
+# Run WAN/tunnel throughput, Bufferbloat, and CPU SoftIRQ test
+./tachyon-installer -ip 192.168.1.1 -pass "secret" -speedtest -speed-duration 5
+
+# Optimize kernel network stack (TCP BBR, fq_codel, socket buffers, disable flow offloading)
+./tachyon-installer -ip 192.168.1.1 -pass "secret" -tune-network
+
+# Check installed Tachyon/engine versions on the router against latest GitHub release
+./tachyon-installer -ip 192.168.1.1 -pass "secret" -check-router
+
+# Run router diagnostics and export report to file
 ./tachyon-installer -ip 192.168.1.1 -pass "secret" -diag -export-diag report.txt
 
-# List all local backup archives
-./tachyon-installer -list-backups
+# Scan subnet and deploy updates to outdated routers
+./tachyon-installer -fleet-scan -fleet-subnets "192.168.1.0/24"
+./tachyon-installer -pass "secret" -fleet-deploy -fleet-only-outdated
 
-# Restore configuration from the newest backup archive
+# Benchmark TCP latency across subscription nodes from host PC
+./tachyon-installer -test-sub "https://example.com/sub"
+
+# Download complete offline package bundle for air-gapped deployments
+./tachyon-installer -offline-bundle "offline_pkg/"
+
+# Emergency rescue: flush interception rules and restore direct internet
+./tachyon-installer -ip 192.168.1.1 -pass "secret" -rescue
+
+# Create full system snapshot or restore from latest local backup
+./tachyon-installer -ip 192.168.1.1 -pass "secret" -snapshot
 ./tachyon-installer -ip 192.168.1.1 -pass "secret" -restore latest
 
-# Completely uninstall Tachyon from the router
+# Cleanly uninstall Tachyon from the router
 ./tachyon-installer -ip 192.168.1.1 -pass "secret" -uninstall
-
-# Check for updates on GitHub
-./tachyon-installer -check-update
 ```
 
-<p align="center">
-  <img src="assets/readme/divider_stream.svg" width="100%" alt="divider" />
-</p>
+---
 
-## 🛠️ Building From Source
+## Building From Source
 
 Requires **Go 1.22+**:
 
 ```bash
-# Clone the repository
 git clone https://github.com/Dushnilin/tachyon-installer.git
 cd tachyon-installer
 
-# Build for current host platform
+# Build for current host OS/architecture
 go build -o tachyon-installer .
 
-# Build all 7 cross-platform desktop releases simultaneously
-go run scripts/build.go -v 1.0.0
+# Cross-compile all 6 desktop targets (windows/linux/darwin, amd64 + arm64) into dist/
+go run scripts/build.go -v 1.12.0
 ```
 
-Compiled archives along with `sha256sums.txt` will be generated in `dist/`.
+---
 
-<p align="center">
-  <img src="assets/readme/divider_stream.svg" width="100%" alt="divider" />
-</p>
-
-## 📜 License
+## License & Links
 
 Licensed under the **GNU General Public License v3.0 (GPL-3.0)**.
 
-* 🛰️ Core Repository: **[Tachyon](https://github.com/Dushnilin/tachyon)**
-* 💬 Community & Discussion: **[Tachyon Telegram Channel](https://t.me/tachyon_proxy)**
+- Core Router & LuCI Repository: **[Dushnilin/tachyon](https://github.com/Dushnilin/tachyon)**
+- Updates & Community: **[Telegram — Tachyon](https://t.me/tachyon_proxy)**

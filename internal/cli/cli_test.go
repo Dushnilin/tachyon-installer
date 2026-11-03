@@ -26,11 +26,11 @@ func TestParseFlags_HeadlessTriggers(t *testing.T) {
 	cfg := appconfig.DefaultConfig()
 
 	// 1. -yes
-	opts, err := ParseFlags([]string{"-yes", "-ip", "192.168.1.50", "-engine", "steer"}, cfg, "v1.3.0")
+	opts, err := ParseFlags([]string{"-yes", "-ip", "192.168.1.50", "-engine", "tachyon-core"}, cfg, "v1.3.0")
 	if err != nil || !opts.ShouldRunHeadless() {
 		t.Errorf("expected -yes to trigger ShouldRunHeadless")
 	}
-	if opts.RouterIP != "192.168.1.50" || opts.Engine != "steer" {
+	if opts.RouterIP != "192.168.1.50" || opts.Engine != "tachyon-core" {
 		t.Errorf("parsed options mismatch: ip=%s, engine=%s", opts.RouterIP, opts.Engine)
 	}
 

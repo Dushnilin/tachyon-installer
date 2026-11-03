@@ -17,10 +17,10 @@ func ShowLoadingWizard(ctx *AppContext) {
 	panel.SetDirection(tview.FlexRow)
 	panel.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
 	panel.SetBorder(true).
-		SetTitle(" ⏳ ДИАГНОСТИКА РОУТЕРА ").
+		SetTitle(FormatStepTitle("Диагностика роутера")).
 		SetTitleAlign(tview.AlignCenter).
-		SetTitleColor(tcell.NewRGBColor(234, 179, 8)).
-		SetBorderColor(tcell.NewRGBColor(234, 179, 8))
+		SetTitleColor(ColorCyanElectric).
+		SetBorderColor(ColorBorderNormal)
 
 	checklist := []widgets.CheckItem{
 		{Text: "Проверка SSH-подключения", Checked: false, DelayMs: 0},
@@ -46,25 +46,25 @@ func ShowErrorWizard(ctx *AppContext, err error) {
 	panel.SetDirection(tview.FlexRow)
 	panel.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
 	panel.SetBorder(true).
-		SetTitle(" ❌ ОШИБКА ПОДКЛЮЧЕНИЯ ").
+		SetTitle(" Ошибка подключения ").
 		SetTitleAlign(tview.AlignCenter).
-		SetTitleColor(tcell.NewRGBColor(239, 68, 68)).
-		SetBorderColor(tcell.NewRGBColor(239, 68, 68))
+		SetTitleColor(ColorStatusError).
+		SetBorderColor(ColorStatusError)
 
-	hint := "Убедитесь, что ваш компьютер подключен к LAN-порту роутера или по Wi-Fi."
+	hint := "Убедитесь, что компьютер подключен к LAN-порту роутера или по Wi-Fi."
 	errStr := err.Error()
 	if strings.Contains(errStr, "authenticate") || strings.Contains(errStr, "handshake") {
-		hint = "Неверное имя пользователя или пароль. Пожалуйста, введите верные учетные данные роутера."
+		hint = "Неверное имя пользователя или пароль. Введите актуальные учетные данные роутера."
 	} else if strings.Contains(errStr, "timeout") {
-		hint = "Превышено время ожидания. Проверьте, что указан правильный IP-адрес роутера."
+		hint = "Превышено время ожидания. Проверьте IP-адрес роутера."
 	} else if strings.Contains(errStr, "refused") {
-		hint = "Подключение отклонено. Возможно, служба SSH отключена на роутере или порт указан неверно."
+		hint = "Подключение отклонено. Проверьте, что служба SSH включена на роутере."
 	}
 
 	text := fmt.Sprintf(
-		"\n  [#ef5350]❌ Не удалось подключиться к роутеру по SSH[-]\n\n"+
-			"  [#cbd5e1]Техническая деталь:[-] [#94a3b8]%s[-]\n\n"+
-			"  [#38bdf8]💡 Рекомендация:[-]\n  %s\n",
+		"\n  [#e5484d]✗ Не удалось подключиться к роутеру по SSH[-]\n\n"+
+			"  [#a1a1a6]Детали:[-] [#71717a]%s[-]\n\n"+
+			"  [#38bdf8]Рекомендация:[-]\n  %s\n",
 		errStr,
 		hint,
 	)
@@ -75,7 +75,7 @@ func ShowErrorWizard(ctx *AppContext, err error) {
 	textView.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
 
 	form := tview.NewForm()
-	form.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
+	StyleForm(form)
 	form.AddButton("← Назад к вводу пароля", func() {
 		ctx.Pages.SwitchToPage("password_wizard")
 		ctx.App.SetFocus(ctx.Pages.GetPage("password_wizard"))
@@ -156,11 +156,11 @@ func ShowFinishDialog(ctx *AppContext, success bool, luciURL string) {
 	panel.SetDirection(tview.FlexRow)
 	panel.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
 
-	title := " 🎉 УСТАНОВКА TACHYON УСПЕШНО ЗАВЕРШЕНА "
-	titleColor := tcell.NewRGBColor(34, 197, 94) // Green
+	title := " Установка Tachyon завершена "
+	titleColor := ColorStatusSuccess
 	if !success {
-		title = " ⚠️ УСТАНОВКА ЗАВЕРШЕНА С ЗАМЕЧАНИЯМИ "
-		titleColor = tcell.NewRGBColor(234, 179, 8) // Yellow
+		title = " Установка завершена с замечаниями "
+		titleColor = ColorStatusWarning
 	}
 
 	panel.SetBorder(true).
@@ -169,9 +169,9 @@ func ShowFinishDialog(ctx *AppContext, success bool, luciURL string) {
 		SetTitleColor(titleColor).
 		SetBorderColor(titleColor)
 
-	text := fmt.Sprintf("\n  [#f8fafc]Служба Tachyon успешно настроена и проверена на роутере.[-]\n\n"+
-		"  [#94a3b8]Веб-интерфейс LuCI:[-] [#38bdf8]%s[-]\n\n"+
-		"  [#cbd5e1]Нажмите кнопку ниже или клавишу [O], чтобы открыть панель управления в браузере.[-]", luciURL)
+	text := fmt.Sprintf("\n  [#ededed]Служба Tachyon настроена и проверена на роутере.[-]\n\n"+
+		"  [#71717a]Веб-интерфейс LuCI:[-] [#38bdf8]%s[-]\n\n"+
+		"  [#a1a1a6]Нажмите кнопку ниже или клавишу [O], чтобы открыть панель управления в браузере.[-]", luciURL)
 
 	textView := tview.NewTextView().
 		SetDynamicColors(true).
@@ -179,17 +179,17 @@ func ShowFinishDialog(ctx *AppContext, success bool, luciURL string) {
 	textView.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
 
 	form := tview.NewForm()
-	form.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
+	StyleForm(form)
 
-	form.AddButton("🌐 Открыть LuCI в браузере (Enter)", func() {
+	form.AddButton("Открыть LuCI в браузере (Enter)", func() {
 		_ = browser.OpenURL(luciURL)
-		ctx.ConsoleWritef("[#22c55e]✓ Открытие веб-интерфейса в браузере: %s[-]\n", luciURL)
+		ctx.ConsoleWritef("[#4cc38a]✓ Открытие веб-интерфейса в браузере: %s[-]\n", luciURL)
 	})
-	form.AddButton("📊 Просмотр лога", func() {
+	form.AddButton("Просмотр лога", func() {
 		ctx.Pages.RemovePage("finish_dialog")
 		ctx.App.SetFocus(ctx.ConsoleView)
 	})
-	form.AddButton("🚪 Выйти (Esc)", func() {
+	form.AddButton("Выйти (Esc)", func() {
 		ctx.App.Stop()
 	})
 

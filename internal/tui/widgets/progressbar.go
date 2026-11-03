@@ -16,19 +16,19 @@ var blockChars = []rune{'▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'}
 // Braille spinner frames for animation.
 var spinnerFrames = []rune{'⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'}
 
-// Color palette matching Tachyon Core design language.
+// Color palette matching Tachyon Graphite design language.
 var (
-	gradientStart = tcell.NewRGBColor(0, 240, 255)   // #00f0ff - Tachyon Neon Cyan
-	gradientEnd   = tcell.NewRGBColor(56, 189, 248)  // #38bdf8 - Cyber Sky
-	subGradStart  = tcell.NewRGBColor(129, 140, 248) // #818cf8 - Tachyon Indigo
-	subGradEnd    = tcell.NewRGBColor(168, 85, 247)  // #a855f7 - Quantum Violet
-	spinnerColor  = tcell.NewRGBColor(0, 240, 255)   // #00f0ff - Neon Cyan
-	subSpinColor  = tcell.NewRGBColor(192, 132, 252) // #c084fc - Holographic Lilac
-	labelColor    = tcell.NewRGBColor(248, 250, 252) // #f8fafc - Crisp White (Slate 50)
-	subLabelColor = tcell.NewRGBColor(226, 232, 240) // #e2e8f0 - Readable Secondary (Slate 200)
-	percentColor  = tcell.NewRGBColor(255, 255, 255) // white
-	trackColor    = tcell.NewRGBColor(30, 41, 59)    // #1e293b - Slate 800
-	sepColor      = tcell.NewRGBColor(51, 65, 85)    // #334155 - Slate 700
+	gradientStart = tcell.NewRGBColor(2, 132, 199)   // #0284c7 - Sky 600
+	gradientEnd   = tcell.NewRGBColor(56, 189, 248)  // #38bdf8 - Sky 400
+	subGradStart  = tcell.NewRGBColor(71, 85, 105)   // #475569 - Slate 600
+	subGradEnd    = tcell.NewRGBColor(148, 163, 184) // #94a3b8 - Slate 400
+	spinnerColor  = tcell.NewRGBColor(56, 189, 248)  // #38bdf8 - Sky 400
+	subSpinColor  = tcell.NewRGBColor(148, 163, 184) // #94a3b8 - Slate 400
+	labelColor    = tcell.NewRGBColor(237, 237, 237) // #ededed - Primary Text
+	subLabelColor = tcell.NewRGBColor(161, 161, 166) // #a1a1a6 - Secondary Text
+	percentColor  = tcell.NewRGBColor(237, 237, 237) // #ededed
+	trackColor    = tcell.NewRGBColor(25, 25, 27)    // #19191b - Input/Track Surface
+	sepColor      = tcell.NewRGBColor(46, 46, 50)    // #2e2e32 - Hairline Border
 )
 
 // ProgressBar renders an animated dual progress bar:

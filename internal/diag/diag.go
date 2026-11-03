@@ -81,7 +81,7 @@ func RunRouter(run Exec, progress ProgressFn) []Result {
 	loadPkgs := func() string {
 		if !pkgsLoaded {
 			pkgsLoaded = true
-			out, _ := run(`if command -v apk >/dev/null 2>&1; then apk info 2>/dev/null; else opkg list-installed 2>/dev/null; fi`)
+			out, _ := run(`(if command -v apk >/dev/null 2>&1; then apk info 2>/dev/null; else opkg list-installed 2>/dev/null; fi); [ -d /sys/module/nft_tproxy ] && echo kmod-nft-tproxy; [ -d /sys/module/tun ] && echo kmod-tun; [ -d /sys/module/inet_diag ] && echo kmod-inet-diag`)
 			pkgs = out
 		}
 		return pkgs
@@ -102,6 +102,7 @@ func RunRouter(run Exec, progress ProgressFn) []Result {
 	if installed.Status != Fail {
 		emit(checkService(run))
 		emit(checkEngines(run))
+		emit(checkQuarantine(run))
 		emit(checkLogs(run))
 	}
 	return results
@@ -192,10 +193,10 @@ func checkMemory(run Exec) Result {
 	switch {
 	case availMB < minFreeRAMFail:
 		r.Status = Fail
-		r.Hint = "Критически мало ОЗУ: ядро прокси может падать. Выберите steer или освободите память."
+		r.Hint = "Критически мало ОЗУ: ядро прокси может падать. Выберите tachyon-core + zRAM или освободите память."
 	case availMB < minFreeRAMWarn:
 		r.Status = Warn
-		r.Hint = "Мало свободной ОЗУ. Рекомендуется steer вместо sing-box."
+		r.Hint = "Мало свободной ОЗУ. Рекомендуется tachyon-core вместо sing-box."
 	default:
 		r.Status = OK
 	}
@@ -382,11 +383,11 @@ func checkService(run Exec) Result {
 
 func checkEngines(run Exec) Result {
 	r := Result{ID: "engines", Title: "Ядра прокси"}
-	out, _ := run(`for b in tachyon-core sing-box steer; do p=$(command -v $b 2>/dev/null) && echo "$b=$p"; done`)
+	out, _ := run(`for b in tachyon-core sing-box; do p=$(command -v $b 2>/dev/null) && echo "$b=$p"; done`)
 	out = strings.TrimSpace(out)
 	if out == "" {
 		r.Status = Warn
-		r.Detail = "tachyon-core, sing-box и steer не найдены"
+		r.Detail = "tachyon-core и sing-box не найдены"
 		r.Hint = "Установите ядро через мастер или в веб-интерфейсе Tachyon."
 		return r
 	}
@@ -395,9 +396,26 @@ func checkEngines(run Exec) Result {
 	return r
 }
 
+func checkQuarantine(run Exec) Result {
+	r := Result{ID: "quarantine", Title: "Валидация секций (карантин)"}
+	out, _ := run(`if [ -s /var/run/tachyon/validator-quarantined.json ]; then cat /var/run/tachyon/validator-quarantined.json 2>/dev/null; elif [ -s /var/run/tachyon/section-errors.json ]; then cat /var/run/tachyon/section-errors.json 2>/dev/null; fi`)
+	out = strings.TrimSpace(out)
+	if out == "" || out == "[]" || out == "{}" {
+		r.Status, r.Detail = OK, "все секции валидны, карантин пуст"
+		return r
+	}
+	r.Status = Warn
+	if len(out) > 200 {
+		out = out[:200] + "..."
+	}
+	r.Detail = "обнаружены изолированные секции: " + out
+	r.Hint = "Проверьте проблемные секции в LuCI или выполните: tachyon doctor"
+	return r
+}
+
 func checkLogs(run Exec) Result {
 	r := Result{ID: "logs", Title: "Последние записи в системном логе"}
-	out, _ := run(`logread 2>/dev/null | grep -iE 'tachyon|sing-box|steer' | tail -n 8`)
+	out, _ := run(`logread 2>/dev/null | grep -iE 'tachyon|sing-box' | tail -n 8`)
 	out = strings.TrimSpace(out)
 	if out == "" {
 		r.Status, r.Detail = Info, "записей нет"

@@ -14,8 +14,8 @@ func TestComputeRecommendations(t *testing.T) {
 		FlashFreeMB: 4,
 	}
 	lowNode.ComputeRecommendations("1.6.2")
-	if lowNode.RecommendedEngine != "steer" {
-		t.Errorf("expected steer for 32MB router, got %s", lowNode.RecommendedEngine)
+	if lowNode.RecommendedEngine != "tachyon-core" {
+		t.Errorf("expected tachyon-core for 32MB router, got %s", lowNode.RecommendedEngine)
 	}
 	if !lowNode.RecommendedZRAM {
 		t.Errorf("expected zram=true for 32MB router")
@@ -38,13 +38,13 @@ func TestComputeRecommendations(t *testing.T) {
 	if midNode.Status != StatusOutdated {
 		t.Errorf("expected StatusOutdated for v1.4.8 vs 1.6.2, got %s", midNode.Status)
 	}
-	if midNode.RecommendedEngine != "sing-box-lx" {
-		t.Errorf("expected sing-box-lx, got %s", midNode.RecommendedEngine)
+	if midNode.RecommendedEngine != "tachyon-core" {
+		t.Errorf("expected tachyon-core, got %s", midNode.RecommendedEngine)
 	}
 
 	// Router already up-to-date
 	upToDateNode := &FleetNode{
-		IP:               "192.168.1.205",
+		IP:               "192.168.1.2",
 		Model:            "Keenetic Giga",
 		Arch:             "mips",
 		RAMTotalMB:       512,

@@ -62,13 +62,13 @@ func ShowWelcomeWizard(ctx *AppContext) {
 	// ==========================================
 	// --- ШАГ 1: TACHYON CONTROL CENTER & MENU ---
 	// ==========================================
-	step1Panel := buildStepPanel(" ⚡ TACHYON CONTROL CENTER & INSTALLER ⚡ ")
+	step1Panel := buildStepPanel("Панель управления и установки")
 
 	welcomeInfoView := tview.NewTextView().
 		SetDynamicColors(true).
 		SetScrollable(false)
 	welcomeInfoView.SetBackgroundColor(ColorBgSpace)
-	welcomeInfoView.SetText(fmt.Sprintf("  %s🛰️  Tachyon Express Hub%s  •  %sВыберите действие стрелками [↑/↓] или нажав цифру/клавишу%s\n",
+	welcomeInfoView.SetText(fmt.Sprintf("  %sTachyon Installer%s  ·  %sВыберите действие стрелками [↑/↓] или клавишей быстрого доступа%s\n",
 		TagCyanBold, TagReset, TagSubText, TagReset))
 
 	menuList = tview.NewList()
@@ -121,43 +121,43 @@ func ShowWelcomeWizard(ctx *AppContext) {
 		ctx.App.SetFocus(step2Form)
 	}
 
-	menuList.AddItem("🚀 [1] Экспресс-установка Tachyon", "Выбор ядра (sing-box / steer), версии, зеркал и параметров установки", '1', func() {
+	menuList.AddItem("[1] Установка Tachyon", "Выбор ядра (tachyon-core / sing-box), версии, зеркал и параметров", '1', func() {
 		startAction(ActionInstall)
 	})
-	menuList.AddItem("✨ [2] Авто-мастер (Настройка под ключ)", "Полный автопилот: аудит роутера, установка и конфигурация в 1 клик", '2', func() {
+	menuList.AddItem("[2] Авто-мастер (настройка под ключ)", "Аудит роутера, подбор DNS и стратегии обхода, настройка подписки", '2', func() {
 		startAction(ActionGuided)
 	})
-	menuList.AddItem("🛡️ [W] AmneziaWG (Генератор WARP & Конфигов)", "Встроенный генератор AmneziaWG/WARP, импорт .conf/vpn:// и проверка обхода", 'w', func() {
+	menuList.AddItem("[W] AmneziaWG (WARP и конфиги)", "Генератор AmneziaWG 2.0 / WARP, импорт .conf / vpn:// и проверка обхода", 'w', func() {
 		startAction(ActionAWG)
 	})
-	menuList.AddItem("🌐 [3] Флот роутеров (Multi-Router Fleet)", "Массовый поиск роутеров в сети, аудит версий и параллельная установка", '3', func() {
+	menuList.AddItem("[3] Управление роутерами (Fleet)", "Поиск роутеров в локальной сети, аудит версий и параллельная установка", '3', func() {
 		startAction(ActionFleet)
 	})
-	menuList.AddItem("⚡ [4] Скорость & Bufferbloat Doctor", "Замер задержки в покое/нагрузке, Bufferbloat Grade и троттлинг CPU", '4', func() {
+	menuList.AddItem("[4] Скорость и Bufferbloat", "Замер задержки в покое и под нагрузкой, оценка Bufferbloat и загрузки CPU", '4', func() {
 		startAction(ActionSpeed)
 	})
-	menuList.AddItem("🔍 [5] Расширенная диагностика", "Анализ служб, firewall (fw4/fw3), DNS перехвата и маршрутизации", '5', func() {
+	menuList.AddItem("[5] Диагностика роутера", "Проверка служб, firewall (fw4), модулей ядра, карантина секций и DNS", '5', func() {
 		startAction(ActionDiag)
 	})
-	menuList.AddItem("📊 [6] Мониторинг в реальном времени", "Живой монитор нагрузки CPU, памяти, сетевых соединений и ячеек", '6', func() {
+	menuList.AddItem("[6] Мониторинг в реальном времени", "Нагрузка CPU, использование памяти, сетевой трафик и таблица conntrack", '6', func() {
 		startAction(ActionMonitor)
 	})
-	menuList.AddItem("🚀 [7] Оптимизация сети (BBR & fq_codel)", "Тюнинг сетевого стека, очередей fq_codel, TCP BBR и сокетов", '7', func() {
+	menuList.AddItem("[7] Оптимизация сети (BBR и fq_codel)", "Настройка сетевого стека, очередей fq_codel, TCP BBR и сокетов", '7', func() {
 		startAction(ActionTune)
 	})
-	menuList.AddItem("🚑 [8] Аварийный Rescue (Сброс сети)", "Экстренное восстановление прямого интернета и сброс правил перехвата", '8', func() {
+	menuList.AddItem("[8] Аварийное восстановление (Rescue)", "Восстановление прямого интернета и очистка правил перехвата трафика", '8', func() {
 		startAction(ActionRescue)
 	})
-	menuList.AddItem("🛡️ [9] Устранение конфликтов", "Поиск и отключение Passwall, OpenClash, Zapret и дублирующих DNS", '9', func() {
+	menuList.AddItem("[9] Устранение конфликтов", "Поиск и отключение Passwall, OpenClash, Zapret и конфликтующих DNS-служб", '9', func() {
 		startAction(ActionConflicts)
 	})
-	menuList.AddItem("💾 [B] Полный бэкап и снимки (Snapshot)", "Резервная копия настроек сети, dhcp, firewall и конфигурации Tachyon", 'b', func() {
+	menuList.AddItem("[B] Резервная копия и снимки (Snapshot)", "Архивация настроек сети, dhcp, firewall и конфигурации Tachyon", 'b', func() {
 		startAction(ActionSnapshot)
 	})
-	menuList.AddItem("🆙 [U] Обновление установщика", "Проверка новых версий на GitHub и ссылка на загрузку", 'u', func() {
+	menuList.AddItem("[U] Обновление установщика", "Проверка новых версий установщика на GitHub", 'u', func() {
 		startAction(ActionSelfUpdate)
 	})
-	menuList.AddItem("🚪 [Q] Выход из программы", "Завершить работу Tachyon Express Installer", 'q', func() {
+	menuList.AddItem("[Q] Выход", "Завершить работу программы", 'q', func() {
 		ctx.App.Stop()
 	})
 
@@ -198,11 +198,11 @@ func ShowWelcomeWizard(ctx *AppContext) {
 	// ==========================================
 	// --- ШАГ 2: НАСТРОЙКА SSH ПОДКЛЮЧЕНИЯ ---
 	// ==========================================
-	step2Panel := buildStepPanel(" ШАГ 2/4 ")
+	step2Panel := buildStepPanel("Шаг 2/4 · Подключение по SSH")
 
-	step2Text := "\n  [#38bdf8]🔑  Параметры подключения к роутеру[-]\n\n" +
-		"  [#cbd5e1]Укажите IP-адрес роутера (обычно 192.168.1.1), порт SSH[-]\n" +
-		"  [#cbd5e1]и имя учетной записи (по умолчанию root).[-]"
+	step2Text := "\n  [#38bdf8]Параметры подключения к роутеру[-]\n\n" +
+		"  [#a1a1a6]Укажите IP-адрес роутера (обычно 192.168.1.1), порт SSH[-]\n" +
+		"  [#a1a1a6]и имя учетной записи (по умолчанию root).[-]"
 
 	step2TextView := tview.NewTextView().
 		SetDynamicColors(true).
@@ -244,7 +244,7 @@ func ShowWelcomeWizard(ctx *AppContext) {
 	}
 
 	step2Form.AddButton("Продолжить →", goStep3)
-	step2Form.AddButton("🔎 Найти роутер", func() {
+	step2Form.AddButton("Найти роутер", func() {
 		step2Err.SetText("  [#38bdf8]Поиск роутеров в локальной сети…[-]")
 		port, _ := strconv.Atoi(strings.TrimSpace(portInput.GetText()))
 		if port < 1 || port > 65535 {
@@ -292,12 +292,12 @@ func ShowWelcomeWizard(ctx *AppContext) {
 	// ==========================================
 	// --- ШАГ 3: ВВОД SSH ПАРОЛЯ ---
 	// ==========================================
-	step3Panel := buildStepPanel(" ШАГ 3/4 ")
+	step3Panel := buildStepPanel("Шаг 3/4 · Аутентификация")
 
-	step3Text := "\n  [#38bdf8]🔒  Аутентификация администратора[-]\n\n" +
-		"  [#cbd5e1]Введите системный пароль администратора (root) роутера.[-]\n" +
-		"  [#94a3b8]Пароль используется только для SSH-сессии и не сохраняется на диск.[-]\n" +
-		"  [#94a3b8]Вход по ключу: укажите путь к ключу (пароль станет его парольной фразой).[-]"
+	step3Text := "\n  [#38bdf8]Аутентификация администратора[-]\n\n" +
+		"  [#a1a1a6]Введите системный пароль администратора (root) роутера.[-]\n" +
+		"  [#71717a]Пароль используется только для SSH-сессии и не сохраняется на диск.[-]\n" +
+		"  [#71717a]Вход по ключу: укажите путь к ключу (пароль станет его парольной фразой).[-]"
 
 	step3TextView := tview.NewTextView().
 		SetDynamicColors(true).
@@ -416,7 +416,7 @@ type ProfileData struct {
 
 // ShowOptionsWizard displays step 4/4 with all router specs and visible installation parameters.
 func ShowOptionsWizard(ctx *AppContext, profile ProfileData) {
-	panel := buildStepPanel(" ШАГ 4/4: ПАРАМЕТРЫ УСТАНОВКИ ")
+	panel := buildStepPanel("Шаг 4/4 · Параметры установки")
 
 	optSelector := NewOptionsSelector(profile)
 
@@ -611,19 +611,19 @@ func (p ProfileData) ConflictDot() string {
 func (p ProfileData) Warnings() []string {
 	var warnings []string
 	if p.RAMTotal < 128.0 {
-		warnings = append(warnings, "[#eab308]⚠️  ВНИМАНИЕ: ОЗУ менее 128 МБ. Возможны зависания при пиковых нагрузках.[-]")
+		warnings = append(warnings, "[#eab308]! ОЗУ менее 128 МБ. Возможна нехватка памяти при пиковых нагрузках.[-]")
 	}
 	if p.RAMFree < 35.0 {
-		warnings = append(warnings, "[#ef5350]❌  КРИТИЧЕСКИ: Свободного ОЗУ менее 35 МБ! sing-box может аварийно завершиться.[-]")
+		warnings = append(warnings, "[#e5484d]✗ Свободного ОЗУ менее 35 МБ. Рекомендуется выбрать ядро tachyon-core + zRAM.[-]")
 	}
 	if p.FlashFree > 0 && p.FlashFree < 8.0 {
-		warnings = append(warnings, "[#ef5350]❌  КРИТИЧЕСКИ: Мало места на диске (< 8 МБ). Освободите память или подключите USB ExtRoot.[-]")
+		warnings = append(warnings, "[#e5484d]✗ Мало места на Flash (< 8 МБ). Освободите память или подключите USB ExtRoot.[-]")
 	}
 	if p.Firewall == "fw3" {
-		warnings = append(warnings, "[#eab308]⚠️  ПРЕДУПРЕЖДЕНИЕ: Обнаружен старый брандмауэр fw3. Рекомендуется обновить OpenWrt.[-]")
+		warnings = append(warnings, "[#eab308]! Обнаружен устаревший брандмауэр fw3. Рекомендуется обновить OpenWrt до 22.03+.[-]")
 	}
 	if len(p.Conflicts) > 0 {
-		warnings = append(warnings, fmt.Sprintf("[#eab308]⚠️  Конфликтующие пакеты: %s[-]", strings.Join(p.Conflicts, ", ")))
+		warnings = append(warnings, fmt.Sprintf("[#eab308]! Конфликтующие пакеты: %s[-]", strings.Join(p.Conflicts, ", ")))
 	}
 	return warnings
 }
@@ -636,7 +636,7 @@ func buildStepPanel(title string) *SolidFlex {
 		SetTitle(FormatStepTitle(title)).
 		SetTitleAlign(tview.AlignCenter).
 		SetTitleColor(ColorCyanElectric).
-		SetBorderColor(ColorBorderFocused)
+		SetBorderColor(ColorBorderNormal)
 	return panel
 }
 
@@ -661,7 +661,7 @@ func EnableFormArrowNavigation(form *tview.Form) {
 
 // showManualVersionModal displays a prompt modal to enter a custom Tachyon git tag or version.
 func showManualVersionModal(ctx *AppContext, current string, callback func(newVer string), onClose func()) {
-	panel := buildStepPanel(" ВВОД ВЕРСИИ TACHYON ")
+	panel := buildStepPanel("Ввод версии Tachyon")
 
 	closeModal := func() {
 		ctx.Pages.RemovePage("manual_version_modal")
@@ -687,7 +687,7 @@ func showManualVersionModal(ctx *AppContext, current string, callback func(newVe
 		closeModal()
 	}
 
-	form.AddButton("✅ Применить", apply)
+	form.AddButton("Применить", apply)
 	form.AddButton("Отмена", func() {
 		closeModal()
 	})

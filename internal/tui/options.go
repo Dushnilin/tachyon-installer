@@ -129,13 +129,11 @@ func NewOptionsSelector(profile ProfileData) *OptionsSelector {
 	initialEngIdx := 0
 
 	engines := []EngineItem{
-		{Key: "tachyon-core", Name: "tachyon-core", Badge: "Rust ⚡", Desc: "Ультрабыстрое ядро на Rust (4.2 МБ RAM, 0ms GC, xHTTP/VLESS)"},
+		{Key: "tachyon-core", Name: "tachyon-core", Badge: "Rust", Desc: "Нативное ядро на Rust (4.2 МБ RAM, 0ms GC, Desync, xHTTP/VLESS)"},
 		{Key: "sing-box-extended", Name: "sing-box-extended", Badge: "xHTTP", Desc: "xHTTP, Reality, ShadowTLS, gRPC, TUIC, Hy2"},
 		{Key: "sing-box-extended-compressed", Name: "sing-box-ext-compressed", Badge: "xHTTP (сжат)", Desc: "sing-box-extended в сжатом бинарнике (минимум Flash)"},
 		{Key: "sing-box-tiny", Name: "sing-box-tiny", Badge: "Tiny", Desc: "Минималистичная сборка OpenWrt (минимум RAM)"},
 		{Key: "sing-box-lx", Name: "sing-box-lx", Badge: "Leadaxe", Desc: "Компактная сборка sing-box от Leadaxe"},
-		{Key: "steer", Name: "steer", Badge: "C-движок", Desc: "Ультра-легковесный модульный C-движок (минимум RAM)"},
-		{Key: "steer-extended", Name: "steer-extended", Badge: "C-движок+", Desc: "Модульный steer на C + xHTTP, оптимизация под нагрузку"},
 		{Key: "skip", Name: "Без ядра", Badge: "Пропустить", Desc: "Настроить или загрузить ядро позже в LuCI"},
 	}
 
@@ -164,7 +162,7 @@ func NewOptionsSelector(profile ProfileData) *OptionsSelector {
 		customVersionText: "latest",
 
 		mirrors: []MirrorItem{
-			{Key: "auto", Name: "Автовыбор ★", Badge: "быстрейшее"},
+			{Key: "auto", Name: "Автовыбор", Badge: "быстрейшее"},
 			{Key: "https://gh-proxy.com/", Name: "gh-proxy.com", Badge: "зеркало"},
 			{Key: "https://ghfast.top/", Name: "ghfast.top", Badge: "зеркало"},
 			{Key: "https://gh.ddlc.top/", Name: "gh.ddlc.top", Badge: "зеркало"},
@@ -252,13 +250,13 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 
 	_, recHint := routerpkg.HardwareRecommendation(opt.Profile.RAMTotal, opt.Profile.RAMFree, opt.Profile.FlashFree)
 	if recHint != "" {
-		opt.printClip(screen, fmt.Sprintf("  %s💡 Совет:%s %s%s%s", TagAmberBold, TagReset, TagSubText, recHint, TagReset),
+		opt.printClip(screen, fmt.Sprintf("  %sРекомендация:%s %s%s%s", TagAmberBold, TagReset, TagSubText, recHint, TagReset),
 			x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 		curY++
 	}
 
 	if opt.Profile.InstalledTachyonVer != "" {
-		opt.printClip(screen, fmt.Sprintf("  %s●%s %sУже установлено:%s %sTachyon v%s%s", TagCyan, TagReset, TagMuted, TagReset, TagGreenBold, opt.Profile.InstalledTachyonVer, TagReset),
+		opt.printClip(screen, fmt.Sprintf("  %s●%s %sУстановлено:%s %sTachyon v%s%s", TagCyan, TagReset, TagMuted, TagReset, TagGreenBold, opt.Profile.InstalledTachyonVer, TagReset),
 			x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 		curY++
 	}
@@ -270,9 +268,9 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 	// -------------------------------------------------------------
 	// SECTION 1: PROXY ENGINE
 	// -------------------------------------------------------------
-	sec1Header := fmt.Sprintf("  %s⚡ 1. ЯДРО ПРОКСИ%s  %s↑↓ или 1-%d%s", TagMuted, TagReset, TagDark, len(opt.engines), TagReset)
+	sec1Header := fmt.Sprintf("  %s1. Ядро прокси%s  %s↑↓ или 1-%d%s", TagMuted, TagReset, TagDark, len(opt.engines), TagReset)
 	if opt.activeSection == SectionEngine {
-		sec1Header = fmt.Sprintf("  %s▶ 1. ЯДРО ПРОКСИ%s  %s↑↓ или 1-%d%s", TagCyanBold, TagReset, TagSubText, len(opt.engines), TagReset)
+		sec1Header = fmt.Sprintf("  %s▶ 1. Ядро прокси%s  %s↑↓ или 1-%d%s", TagCyanBold, TagReset, TagSubText, len(opt.engines), TagReset)
 	}
 	opt.printClip(screen, sec1Header, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	curY++
@@ -300,8 +298,6 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 			badgeColor = TagAmberBold
 		} else if strings.Contains(eng.Badge, "xHTTP") {
 			badgeColor = TagSkyBold
-		} else if strings.Contains(eng.Badge, "C-движок") {
-			badgeColor = TagGreenBold
 		} else if strings.Contains(eng.Badge, "Tiny") {
 			badgeColor = TagGreen
 		} else if strings.Contains(eng.Badge, "Leadaxe") {
@@ -345,9 +341,9 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 	// -------------------------------------------------------------
 	// SECTION 2: TACHYON VERSION (Prominent latest + sub-grid)
 	// -------------------------------------------------------------
-	sec2Header := fmt.Sprintf("  %s📦 2. ВЕРСИЯ TACHYON%s", TagMuted, TagReset)
+	sec2Header := fmt.Sprintf("  %s2. Версия Tachyon%s", TagMuted, TagReset)
 	if opt.activeSection == SectionVersion {
-		sec2Header = fmt.Sprintf("  %s▶ 2. ВЕРСИЯ TACHYON%s  %s↑↓←→ выбор, Space/цифры 1-7, Enter на «Вручную»%s", TagCyanBold, TagReset, TagSubText, TagReset)
+		sec2Header = fmt.Sprintf("  %s▶ 2. Версия Tachyon%s  %s↑↓←→ выбор, Space/цифры 1-7, Enter на «Вручную»%s", TagCyanBold, TagReset, TagSubText, TagReset)
 	}
 	opt.printClip(screen, sec2Header, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	curY++
@@ -374,9 +370,9 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 
 		badge0 := ""
 		if ver0.Badge != "" {
-			badge0 = fmt.Sprintf(" %s%s%s", TagVioletBold, ver0.Badge, TagReset)
+			badge0 = fmt.Sprintf(" %s%s%s", TagCyanBold, ver0.Badge, TagReset)
 		} else if strings.Contains(ver0.Name, "★") {
-			badge0 = fmt.Sprintf(" %s★ Рекомендуется%s", TagVioletBold, TagReset)
+			badge0 = fmt.Sprintf(" %sРекомендуется%s", TagCyanBold, TagReset)
 		}
 
 		desc0 := ""
@@ -467,9 +463,9 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 	// -------------------------------------------------------------
 	// SECTION 3: DOWNLOAD MIRRORS (Adaptive Grid)
 	// -------------------------------------------------------------
-	sec3Header := fmt.Sprintf("  %s🌐 3. ЗЕРКАЛО ЗАГРУЗКИ GITHUB%s", TagMuted, TagReset)
+	sec3Header := fmt.Sprintf("  %s3. Зеркало загрузки GitHub%s", TagMuted, TagReset)
 	if opt.activeSection == SectionMirror {
-		sec3Header = fmt.Sprintf("  %s▶ 3. ЗЕРКАЛО ЗАГРУЗКИ GITHUB%s  %sстрелки или 1-6%s", TagCyanBold, TagReset, TagSubText, TagReset)
+		sec3Header = fmt.Sprintf("  %s▶ 3. Зеркало загрузки GitHub%s  %sстрелки или 1-6%s", TagCyanBold, TagReset, TagSubText, TagReset)
 	}
 	opt.printClip(screen, sec3Header, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	curY++
@@ -526,9 +522,9 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 	// -------------------------------------------------------------
 	// SECTION 4: LOCALIZATION & SYSTEM
 	// -------------------------------------------------------------
-	sec4Header := fmt.Sprintf("  %s⚙️ 4. СИСТЕМА И ЛОКАЛИЗАЦИЯ%s", TagMuted, TagReset)
+	sec4Header := fmt.Sprintf("  %s4. Система и локализация%s", TagMuted, TagReset)
 	if opt.activeSection == SectionLang {
-		sec4Header = fmt.Sprintf("  %s▶ 4. СИСТЕМА И ЛОКАЛИЗАЦИЯ%s  %s↑↓ выбор, Space/Enter переключение%s", TagCyanBold, TagReset, TagSubText, TagReset)
+		sec4Header = fmt.Sprintf("  %s▶ 4. Система и локализация%s  %s↑↓ выбор, Space/Enter переключение%s", TagCyanBold, TagReset, TagSubText, TagReset)
 	}
 	opt.printClip(screen, sec4Header, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	curY++
@@ -587,15 +583,15 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 	// SECTION 5 & 6: ACTION BUTTONS
 	// -------------------------------------------------------------
 	if opt.hasInstalledTachyon() {
-		btnInstall := " [#f8fafc:#1e293b] 🚀 Полная установка [-] "
+		btnInstall := " [#ededed:#19191b] Полная установка [-] "
 		if opt.activeSection == SectionBtnInstall {
-			btnInstall = " [#ffffff:#0284c7:b] ▶ 🚀 Полная установка (Enter) [-] "
+			btnInstall = " [#ffffff:#0284c7:b] ▶ Полная установка (Enter) [-] "
 		}
-		btnSwap := " [#f8fafc:#1e293b] ⚡ Сменить ядро (S) [-] "
+		btnSwap := " [#ededed:#19191b] Сменить ядро (S) [-] "
 		if opt.activeSection == SectionBtnHotSwap {
-			btnSwap = " [#ffffff:#d97706:b] ▶ ⚡ Сменить ядро (Enter) [-] "
+			btnSwap = " [#ffffff:#d97706:b] ▶ Сменить ядро (Enter) [-] "
 		}
-		btnBack := " [#94a3b8:#1e293b] ← Назад к SSH [-] "
+		btnBack := " [#a1a1a6:#19191b] ← Назад к SSH [-] "
 		if opt.activeSection == SectionBtnBack {
 			btnBack = " [#ffffff:#0284c7:b] ▶ ← Назад к SSH (Enter) [-] "
 		}
@@ -637,13 +633,13 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 		}
 		opt.printClip(screen, footer, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	} else {
-		btnInstall := "  [#f8fafc:#1e293b]  🚀  Начать установку  [-]  "
+		btnInstall := "  [#ededed:#19191b]  Начать установку  [-]  "
 		if opt.activeSection == SectionBtnInstall {
-			btnInstall = "  [#ffffff:#0284c7:b] ▶ 🚀  Начать установку (Enter)  [-]  "
+			btnInstall = "  [#ffffff:#0284c7:b] ▶ Начать установку (Enter)  [-]  "
 		}
-		btnBack := "  [#94a3b8:#1e293b]  ←  Назад к SSH  [-]  "
+		btnBack := "  [#a1a1a6:#19191b]  ← Назад к SSH  [-]  "
 		if opt.activeSection == SectionBtnBack {
-			btnBack = "  [#ffffff:#0284c7:b] ▶ ←  Назад к SSH (Enter)  [-]  "
+			btnBack = "  [#ffffff:#0284c7:b] ▶ ← Назад к SSH (Enter)  [-]  "
 		}
 
 		buttonsLine := fmt.Sprintf("        %s        %s", btnInstall, btnBack)
@@ -1126,7 +1122,7 @@ func (opt *OptionsSelector) mirrorGridCols(width int) int {
 // SetReleases replaces the version list with fetched release tags (newest first).
 // Must be called from the UI goroutine.
 func (opt *OptionsSelector) SetReleases(tags []string) {
-	list := []VersionItem{{Key: "latest", Name: "latest", Badge: "★ Рекомендуется"}}
+	list := []VersionItem{{Key: "latest", Name: "latest", Badge: "Рекомендуется"}}
 	if len(tags) > 0 {
 		list[0].Name = fmt.Sprintf("latest (%s)", tags[0])
 	}

@@ -46,12 +46,12 @@ func TestStagingArea_Lifecycle(t *testing.T) {
 }
 
 func TestGenerateRunnerScript_APK(t *testing.T) {
-	script := deploy.GenerateRunnerScript("steer", true, true)
+	script := deploy.GenerateRunnerScript("tachyon-core", true, true)
 	if !strings.Contains(script, "apk add --allow-untrusted") {
 		t.Errorf("expected apk command in runner script for isAPK=true")
 	}
-	if !strings.Contains(script, "steer") {
-		t.Errorf("expected steer engine configured")
+	if !strings.Contains(script, "tachyon-core") {
+		t.Errorf("expected tachyon-core engine configured")
 	}
 	if !strings.Contains(script, "zram-swap") {
 		t.Errorf("expected zram-swap configuration in runner script when installZRAM=true")
@@ -69,8 +69,6 @@ func TestVariantMarkerForEngine(t *testing.T) {
 		"sing-box-lx":                  "lx",
 		"sing-box-tiny":                "tiny",
 		"sing-box":                     "stable",
-		"steer":                        "",
-		"steer-extended":               "",
 		"skip":                         "",
 	}
 	for eng, want := range cases {

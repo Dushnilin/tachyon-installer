@@ -166,7 +166,7 @@ func TestBuildRecommendations(t *testing.T) {
 	if !strings.Contains(allRecs, "Bufferbloat") {
 		t.Errorf("missing Bufferbloat recommendation")
 	}
-	if !strings.Contains(allRecs, "steer") {
-		t.Errorf("missing steer recommendation for throttled CPU")
+	if !strings.Contains(allRecs, "tachyon-core") {
+		t.Errorf("missing tachyon-core recommendation for throttled CPU")
 	}
 }

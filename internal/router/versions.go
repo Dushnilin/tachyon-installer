@@ -70,16 +70,15 @@ func GetInstalledVersions(client *gossh.Client, isAPK bool, packages []string) m
 			if sbVer != "" {
 				versions["sing-box-extended"] = sbVer
 				versions["sing-box"] = sbVer
-				versions["tachyon-core"] = sbVer
 			}
 		}
 		sessionSB.Close()
 	}
 
-	// Also check tachyon-core binary
+	// Also check tachyon-core version file or binary
 	sessionTC, errTC := client.NewSession()
 	if errTC == nil {
-		outBytesTC, errTCB := sessionTC.CombinedOutput("/usr/bin/tachyon-core version 2>/dev/null | head -1 | awk '{print $3}' || /usr/bin/tachyon-core --version 2>/dev/null | head -1 | awk '{print $2}'")
+		outBytesTC, errTCB := sessionTC.CombinedOutput("cat /etc/tachyon/tachyon-core-version 2>/dev/null | head -1 || /usr/bin/tachyon-core --version 2>/dev/null | head -1 | awk '{print $NF}' || /usr/bin/tachyon-core version 2>/dev/null | head -1 | awk '{print $3}'")
 		if errTCB == nil {
 			tcVer := strings.TrimSpace(string(outBytesTC))
 			if tcVer != "" {
@@ -87,20 +86,6 @@ func GetInstalledVersions(client *gossh.Client, isAPK bool, packages []string) m
 			}
 		}
 		sessionTC.Close()
-	}
-
-	// Also check steer
-	sessionSteer, err := client.NewSession()
-	if err == nil {
-		outBytesSteer, errSteer := sessionSteer.CombinedOutput("steer version 2>/dev/null || /usr/sbin/steer version 2>/dev/null || /usr/bin/steer version 2>/dev/null || /usr/sbin/steer -v 2>/dev/null || /usr/bin/steer -v 2>/dev/null || echo ''")
-		if errSteer == nil {
-			stVer := strings.TrimSpace(string(outBytesSteer))
-			if stVer != "" {
-				versions["steer"] = stVer
-				versions["steer-extended"] = stVer
-			}
-		}
-		sessionSteer.Close()
 	}
 
 	return versions

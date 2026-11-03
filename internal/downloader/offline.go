@@ -114,10 +114,10 @@ func CreateOfflineBundle(
 		}
 	}
 
-	// 2. Download sing-box and steer for requested architectures
-	logFn("⚡ [2/2] Загрузка ядер для распространенных архитектур...\n")
+	// 2. Download tachyon-core and sing-box-extended for requested architectures
+	logFn("→ [2/2] Загрузка ядер для распространенных архитектур...\n")
 	for _, arch := range archList {
-		for _, eng := range []EngineType{EngineTachyonCore, EngineSingBoxExtended, EngineSteer} {
+		for _, eng := range []EngineType{EngineTachyonCore, EngineSingBoxExtended} {
 			engAssets, errEng := ResolveEngineAssets(ctx, dlClient, eng, arch, arch, false)
 			if errEng != nil || len(engAssets) == 0 {
 				continue

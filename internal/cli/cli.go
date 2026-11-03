@@ -90,10 +90,10 @@ func ParseFlags(args []string, defaultCfg *appconfig.Config, appVersion string) 
 	fs.StringVar(&opts.Username, "user", defaultCfg.Username, "SSH имя пользователя")
 	fs.StringVar(&opts.Password, "pass", "", "SSH пароль")
 	fs.StringVar(&opts.KeyPath, "key", defaultCfg.KeyPath, "Путь к SSH приватному ключу")
-	fs.StringVar(&opts.Engine, "engine", defaultCfg.SelectedEngine, "Ядро прокси: tachyon-core, sing-box-extended, sing-box-extended-compressed, sing-box-tiny, sing-box-lx, steer, steer-extended, skip")
+	fs.StringVar(&opts.Engine, "engine", defaultCfg.SelectedEngine, "Ядро прокси: tachyon-core, sing-box-extended, sing-box-extended-compressed, sing-box-tiny, sing-box-lx, skip")
 	fs.StringVar(&opts.SwitchEngine, "switch-engine", "", "Горячая смена ядра прокси на роутере без переустановки LuCI")
 	fs.StringVar(&opts.Mirror, "mirror", defaultCfg.SelectedMirror, "Зеркало загрузки GitHub: auto, direct, https://gh-proxy.com/ и др.")
-	fs.StringVar(&opts.Version, "version", defaultCfg.TachyonVersion, "Версия Tachyon: latest или тег релиза (например 1.4.9)")
+	fs.StringVar(&opts.Version, "version", defaultCfg.TachyonVersion, "Версия Tachyon: latest или тег релиза (например 1.7.9)")
 	fs.BoolVar(&opts.InstallI18n, "i18n", defaultCfg.InstallI18n, "Установить русскую локализацию LuCI")
 	fs.BoolVar(&opts.InstallZRAM, "zram", defaultCfg.InstallZRAM, "Включить zRAM-swap (сжатый SWAP в ОЗУ)")
 	fs.StringVar(&opts.Subscription, "sub", "", "Ссылка на подписку (HTTPS, vless:// или base64)")
@@ -145,31 +145,31 @@ func (o *Options) ShouldRunHeadless() bool {
 
 // Run executes non-interactive CLI operations.
 func Run(opts *Options) int {
-	fmt.Printf("==> Tachyon Express Installer %s (Headless Mode)\n\n", opts.AppVersion)
+	fmt.Printf("==> Tachyon Installer %s (Headless Mode)\n\n", opts.AppVersion)
 
 	// 1. Check Update (-self-update is a legacy alias: it only notifies, never replaces the binary)
 	if opts.CheckUpdate || opts.SelfUpdate {
-		fmt.Println("⚡ Проверка наличия обновлений на GitHub...")
+		fmt.Println("→ Проверка наличия обновлений на GitHub...")
 		hasUpdate, latestVer, relURL, err := updater.CheckForUpdate(context.Background(), opts.AppVersion)
 		if err != nil {
-			fmt.Printf("⚠️ Ошибка проверки обновлений: %v\n", err)
+			fmt.Printf("[!] Ошибка проверки обновлений: %v\n", err)
 			return 1
 		}
 		if hasUpdate {
-			fmt.Printf("💡 Доступна новая версия: %s (текущая: %s)\nСсылка для загрузки: %s\n", latestVer, opts.AppVersion, relURL)
+			fmt.Printf("[!] Доступна новая версия: %s (текущая: %s)\nСсылка для загрузки: %s\n", latestVer, opts.AppVersion, relURL)
 			fmt.Println("Обновление: повторно запустите скрипт установки (install.sh / install.ps1).")
 		} else {
-			fmt.Printf("✓ У вас установлена актуальная версия Tachyon Installer (%s)\n", opts.AppVersion)
+			fmt.Printf("[✓] Установлена актуальная версия Tachyon Installer (%s)\n", opts.AppVersion)
 		}
 		return 0
 	}
 
 	// 2. List Backups
 	if opts.ListBackups {
-		fmt.Println("⚡ Поиск сохраненных локальных резервных копий (backups/)...")
+		fmt.Println("→ Поиск сохраненных локальных резервных копий (backups/)...")
 		backups, err := backuppkg.ListBackups()
 		if err != nil {
-			fmt.Printf("❌ Ошибка чтения директории бэкапов: %v\n", err)
+			fmt.Printf("[✗] Ошибка чтения директории бэкапов: %v\n", err)
 			return 1
 		}
 		if len(backups) == 0 {
@@ -190,7 +190,7 @@ func Run(opts *Options) int {
 
 	// 3. Offline Bundle Downloader
 	if opts.OfflineBundle != "" {
-		fmt.Printf("⚡ Создание оффлайн-пакета в директории: %s...\n", opts.OfflineBundle)
+		fmt.Printf("→ Создание оффлайн-пакета в директории: %s...\n", opts.OfflineBundle)
 		mirrorMgr := dlpkg.NewMirrorManager(opts.Mirror)
 		dlClient := dlpkg.NewClient(mirrorMgr)
 		manifest, err := dlpkg.CreateOfflineBundle(
@@ -202,26 +202,26 @@ func Run(opts *Options) int {
 			func(msg string) { fmt.Print(msg) },
 		)
 		if err != nil {
-			fmt.Printf("❌ Ошибка создания оффлайн-пакета: %v\n", err)
+			fmt.Printf("[✗] Ошибка создания оффлайн-пакета: %v\n", err)
 			return 1
 		}
-		fmt.Printf("\n✓ Оффлайн-бандл успешно сформирован! Всего пакетов: %d\n", len(manifest.Packages))
+		fmt.Printf("\n[✓] Оффлайн-бандл сформирован. Всего пакетов: %d\n", len(manifest.Packages))
 		return 0
 	}
 
 	// 4. Test Subscription Nodes (Ping & Benchmark)
 	if opts.TestSub != "" {
-		fmt.Println("⚡ Анализ и тестирование задержки узлов подписки...")
+		fmt.Println("→ Анализ и тестирование задержки узлов подписки...")
 		nodes, err := routerpkg.ResolveNodesFromInput(context.Background(), opts.TestSub)
 		if err != nil {
-			fmt.Printf("❌ Ошибка разбора подписки: %v\n", err)
+			fmt.Printf("[✗] Ошибка разбора подписки: %v\n", err)
 			return 1
 		}
 		if len(nodes) == 0 {
-			fmt.Println("❌ В подписке не найдено поддерживаемых узлов")
+			fmt.Println("[✗] В подписке не найдено поддерживаемых узлов")
 			return 1
 		}
-		fmt.Printf("✓ Найдено узлов: %d. Запуск TCP handshake пинга...\n\n", len(nodes))
+		fmt.Printf("[✓] Найдено узлов: %d. Запуск TCP handshake пинга...\n\n", len(nodes))
 		results := routerpkg.BenchmarkNodes(context.Background(), nodes, 3*time.Second)
 
 		fmt.Printf(" %-4s | %-28s | %-8s | %-24s | %s\n", "#", "Имя узла", "Протокол", "Хост:Порт", "Пинг / Статус")
@@ -238,7 +238,7 @@ func Run(opts *Options) int {
 
 	// 5. Fleet Scan
 	if opts.FleetScan {
-		fmt.Println("⚡ Поиск и опрос OpenWrt роутеров в локальной сети...")
+		fmt.Println("→ Поиск и опрос OpenWrt роутеров в локальной сети...")
 		subnets := fleet.SplitSubnets(opts.FleetSubnets)
 		scanCfg := fleet.DefaultScanConfig(opts.Password, opts.Version)
 		scanCfg.Subnets = subnets
@@ -255,7 +255,7 @@ func Run(opts *Options) int {
 		fmt.Print("\r" + strings.Repeat(" ", 60) + "\r")
 
 		if err != nil {
-			fmt.Printf("❌ Ошибка сканирования сети: %v\n", err)
+			fmt.Printf("[✗] Ошибка сканирования сети: %v\n", err)
 			return 1
 		}
 
@@ -264,8 +264,8 @@ func Run(opts *Options) int {
 			return 0
 		}
 
-		fmt.Printf("\n=== TACHYON FLEET INVENTORY (Найдено: %d) ===\n\n", len(nodes))
-		fmt.Printf("%-16s %-24s %-10s %-10s %-26s %s\n", "IP-АДРЕС", "МОДЕЛЬ", "АРХ", "ОЗУ (СВОБ)", "СТАТУС TACHYON", "РЕКОМ. ЯДРО")
+		fmt.Printf("\n=== Инвентарь роутеров Tachyon (найдено: %d) ===\n\n", len(nodes))
+		fmt.Printf("%-16s %-24s %-10s %-10s %-26s %s\n", "IP-Адрес", "Модель", "Арх", "ОЗУ (своб)", "Статус Tachyon", "Реком. ядро")
 		fmt.Println(strings.Repeat("-", 100))
 		for _, n := range nodes {
 			model := n.Model
@@ -289,7 +289,7 @@ func Run(opts *Options) int {
 
 	// 6. Fleet Mass Deploy
 	if opts.FleetDeploy {
-		fmt.Println("⚡ Запуск массового развертывания Tachyon на роутеры сети...")
+		fmt.Println("→ Запуск пакетного развертывания Tachyon на роутеры сети...")
 		subnets := fleet.SplitSubnets(opts.FleetSubnets)
 		scanCfg := fleet.DefaultScanConfig(opts.Password, opts.Version)
 		scanCfg.Subnets = subnets
@@ -302,7 +302,7 @@ func Run(opts *Options) int {
 
 		nodes, err := fleet.ScanFleet(context.Background(), scanCfg, nil)
 		if err != nil {
-			fmt.Printf("❌ Ошибка обнаружения роутеров: %v\n", err)
+			fmt.Printf("[✗] Ошибка обнаружения роутеров: %v\n", err)
 			return 1
 		}
 
@@ -324,11 +324,11 @@ func Run(opts *Options) int {
 		}
 
 		if len(selected) == 0 {
-			fmt.Println("ℹ️  Нет подходящих роутеров для установки или обновления.")
+			fmt.Println("[i] Нет подходящих роутеров для установки или обновления.")
 			return 0
 		}
 
-		fmt.Printf("⚡ Выбрано роутеров для установки: %d шт.\n", len(selected))
+		fmt.Printf("→ Выбрано роутеров для установки: %d шт.\n", len(selected))
 		for _, s := range selected {
 			fmt.Printf("  • %-16s %-24s (%s, %s)\n", s.IP, s.Model, s.Arch, s.RecommendedEngine)
 		}
@@ -345,23 +345,23 @@ func Run(opts *Options) int {
 			fmt.Printf("[%s] [%3.0f%%] %s\n", node.IP, node.DeployProgress*100, node.DeployStage)
 		})
 		if err != nil {
-			fmt.Printf("❌ Ошибка массового развертывания: %v\n", err)
+			fmt.Printf("[✗] Ошибка пакетного развертывания: %v\n", err)
 			return 1
 		}
 
-		fmt.Println("\n🎉 Массовое развертывание Tachyon успешно завершено!")
+		fmt.Println("\n[✓] Пакетное развертывание Tachyon завершено.")
 		return 0
 	}
 
 	// Connect to router over SSH
-	fmt.Printf("⚡ Подключение к роутеру %s:%d (%s)...\n", opts.RouterIP, opts.SSHPort, opts.Username)
+	fmt.Printf("→ Подключение к роутеру %s:%d (%s)...\n", opts.RouterIP, opts.SSHPort, opts.Username)
 	client, err := sshpkg.Connect(opts.RouterIP, opts.SSHPort, opts.Username, opts.Password)
 	if err != nil {
-		fmt.Printf("❌ Ошибка SSH-подключения: %v\n", err)
+		fmt.Printf("[✗] Ошибка SSH-подключения: %v\n", err)
 		return 1
 	}
 	defer client.Close()
-	fmt.Println("✓ SSH подключение установлено.")
+	fmt.Println("[✓] SSH-подключение установлено.")
 
 	// Router update check: what's installed vs latest release
 	if opts.CheckRouter {
@@ -376,8 +376,8 @@ func Run(opts *Options) int {
 		if dur <= 0 {
 			dur = 5
 		}
-		fmt.Printf("⚡ ЗАПУСК BUFFERBLOAT & SPEED DOCTOR (Длительность: %d сек)...\n", dur)
-		fmt.Println("  Измерение прямой задержки в покое, скорости WAN и задержки под насыщением...")
+		fmt.Printf("→ Тест скорости и Bufferbloat (длительность: %d сек)...\n", dur)
+		fmt.Println("  Измерение прямой задержки в покое, скорости WAN и задержки под нагрузкой...")
 		fmt.Println("  (Замер потоковый, без записи во Flash-память)")
 		fmt.Println()
 
@@ -395,7 +395,7 @@ func Run(opts *Options) int {
 			DurationSec: dur,
 		})
 		if err != nil {
-			fmt.Printf("❌ Ошибка выполнения теста: %v\n", err)
+			fmt.Printf("[✗] Ошибка выполнения теста: %v\n", err)
 			return 1
 		}
 
@@ -405,7 +405,7 @@ func Run(opts *Options) int {
 
 	// 5. Emergency Rescue
 	if opts.RunRescue {
-		fmt.Println("⚡ АВАРИЙНЫЙ СБРОС И ВОССТАНОВЛЕНИЕ СЕТИ РОУТЕРА...")
+		fmt.Println("→ Аварийный сброс и восстановление сети роутера...")
 		execCmd := func(_ *gossh.Client, cmd string) (string, error) {
 			sess, err := client.NewSession()
 			if err != nil {
@@ -420,23 +420,23 @@ func Run(opts *Options) int {
 			fmt.Printf("  • %s\n", a)
 		}
 		if rep.Success {
-			fmt.Println("\n✓ Правила перехвата и службы сброшены.")
+			fmt.Println("\n[✓] Правила перехвата и службы сброшены.")
 			fmt.Printf("  • Пинг до шлюза провайдера: %v\n", rep.GatewayPing)
 			fmt.Printf("  • Пинг в интернет (8.8.8.8): %v\n", rep.InternetPing)
 			if rep.InternetPing {
-				fmt.Println("✓ Доступ в Интернет успешно восстановлен напрямую!")
+				fmt.Println("[✓] Доступ в Интернет восстановлен напрямую.")
 			} else {
-				fmt.Println("⚠️ Интернет не отвечает по прямому пингу (проверьте WAN/кабель).")
+				fmt.Println("[!] Интернет не отвечает по прямому пингу (проверьте WAN/кабель).")
 			}
 			return 0
 		}
-		fmt.Printf("❌ Сбой аварийного сброса: %s\n", rep.Detail)
+		fmt.Printf("[✗] Сбой аварийного сброса: %s\n", rep.Detail)
 		return 1
 	}
 
 	// 6. Conflict Auto-Fix
 	if opts.FixConflicts {
-		fmt.Println("⚡ Поиск и отключение конфликтующих прокси-пакетов...")
+		fmt.Println("→ Поиск и отключение конфликтующих прокси-пакетов...")
 		execCmd := func(_ *gossh.Client, cmd string) (string, error) {
 			sess, err := client.NewSession()
 			if err != nil {
@@ -448,32 +448,32 @@ func Run(opts *Options) int {
 		}
 		rep := routerpkg.DisableConflicts(client, execCmd, nil)
 		if !rep.Success {
-			fmt.Printf("❌ Ошибка: %s\n", rep.Details)
+			fmt.Printf("[✗] Ошибка: %s\n", rep.Details)
 			return 1
 		}
 		if rep.DisabledCount > 0 {
-			fmt.Printf("✓ %s\n", rep.Details)
+			fmt.Printf("[✓] %s\n", rep.Details)
 		} else {
-			fmt.Println("✓ Конфликтующих служб (passwall, openclash, zapret и др.) не обнаружено.")
+			fmt.Println("[✓] Конфликтующих служб (passwall, openclash, zapret и др.) не обнаружено.")
 		}
 		return 0
 	}
 
 	// 7. Full System Snapshot
 	if opts.FullSnapshot {
-		fmt.Println("⚡ Создание полного снимка настроек роутера (сеть, firewall, dhcp, tachyon)...")
+		fmt.Println("→ Создание полного снимка настроек роутера (сеть, firewall, dhcp, tachyon)...")
 		msg, err := backuppkg.CreateFullSnapshot(client, opts.RouterIP)
 		if err != nil {
-			fmt.Printf("❌ Ошибка создания полного бэкапа: %v\n", err)
+			fmt.Printf("[✗] Ошибка создания полного бэкапа: %v\n", err)
 			return 1
 		}
-		fmt.Printf("✓ %s\n", msg)
+		fmt.Printf("[✓] %s\n", msg)
 		return 0
 	}
 
 	// 8. Live Real-Time Monitor
 	if opts.RunMonitor {
-		fmt.Printf("⚡ Запуск мониторинга роутера %s (Ctrl+C для выхода)...\n\n", opts.RouterIP)
+		fmt.Printf("→ Запуск мониторинга роутера %s (Ctrl+C для выхода)...\n\n", opts.RouterIP)
 		execCmd := func(_ *gossh.Client, cmd string) (string, error) {
 			sess, err := client.NewSession()
 			if err != nil {
@@ -487,7 +487,7 @@ func Run(opts *Options) int {
 		for {
 			stats, err := routerpkg.CollectLiveStats(client, execCmd)
 			if err != nil {
-				fmt.Printf("⚠️ Ошибка сбора метрик: %v\n", err)
+				fmt.Printf("[!] Ошибка сбора метрик: %v\n", err)
 			} else {
 				ramPercent := float64(0)
 				if stats.RAMTotalMB > 0 {
@@ -511,7 +511,7 @@ func Run(opts *Options) int {
 
 	// 9. Network Optimization & Sysctl Tuning
 	if opts.TuneNetwork {
-		fmt.Println("⚡ ОПТИМИЗАЦИЯ СЕТЕВОГО СТЕКА И SYSCTL РОУТЕРА...")
+		fmt.Println("→ Оптимизация сетевого стека и sysctl роутера...")
 		execCmd := func(_ *gossh.Client, cmd string) (string, error) {
 			sess, err := client.NewSession()
 			if err != nil {
@@ -523,14 +523,14 @@ func Run(opts *Options) int {
 		}
 		rep := routerpkg.TuneNetwork(client, execCmd)
 		if !rep.Success {
-			fmt.Printf("❌ Сбой оптимизации: %s\n", rep.Details)
+			fmt.Printf("[✗] Сбой оптимизации: %s\n", rep.Details)
 			return 1
 		}
 		for _, r := range rep.AppliedRules {
 			fmt.Printf("  • %s\n", r)
 		}
-		fmt.Printf("\n✓ Конфигурация сохранена в %s\n", rep.PersistPath)
-		fmt.Printf("✓ %s\n", rep.Details)
+		fmt.Printf("\n[✓] Конфигурация сохранена в %s\n", rep.PersistPath)
+		fmt.Printf("[✓] %s\n", rep.Details)
 		return 0
 	}
 
@@ -552,22 +552,22 @@ func Run(opts *Options) int {
 		}
 
 		if opts.AWGSetup {
-			fmt.Printf("⚡ [AWG] Настройка секции AmneziaWG '%s' на роутере...\n", secName)
+			fmt.Printf("→ [AWG] Настройка секции AmneziaWG '%s' на роутере...\n", secName)
 			var awgConf *routerpkg.AWGConfig
 			var err error
 
 			src := strings.TrimSpace(opts.AWGType)
 			if src == "" || strings.EqualFold(src, "warp") {
-				fmt.Println("⚡ Генерация конфигурации Cloudflare WARP via AWG...")
+				fmt.Println("→ Генерация конфигурации Cloudflare WARP via AWG...")
 				awgConf, err = routerpkg.GenerateWarpAWG(client, execCmd)
 			} else if strings.EqualFold(src, "custom") {
-				fmt.Println("⚡ Генерация кастомных ключей Curve25519 и параметров обфускации AWG...")
+				fmt.Println("→ Генерация ключей Curve25519 и параметров обфускации AWG...")
 				awgConf, err = routerpkg.GenerateCustomAWGConfig("", 0, "")
 			} else if strings.HasPrefix(src, "vpn://") {
-				fmt.Println("⚡ Разбор Amnezia vpn:// контейнера...")
+				fmt.Println("→ Разбор Amnezia vpn:// контейнера...")
 				awgConf, err = routerpkg.ParseAWGConfig(src)
 			} else if _, statErr := os.Stat(src); statErr == nil {
-				fmt.Printf("⚡ Чтение файла конфигурации %s...\n", src)
+				fmt.Printf("→ Чтение файла конфигурации %s...\n", src)
 				data, readErr := os.ReadFile(src)
 				if readErr != nil {
 					err = readErr
@@ -579,40 +579,40 @@ func Run(opts *Options) int {
 			}
 
 			if err != nil {
-				fmt.Printf("❌ Ошибка подготовки конфигурации AWG: %v\n", err)
+				fmt.Printf("[✗] Ошибка подготовки конфигурации AWG: %v\n", err)
 				return 1
 			}
 
-			fmt.Printf("✓ Параметры AWG:\n  Сервер: %s:%d\n  IP: %s\n  Jc: %d, Jmin: %d, Jmax: %d, S1: %d, S2: %d, H1: %s\n",
+			fmt.Printf("[✓] Параметры AWG:\n  Сервер: %s:%d\n  IP: %s\n  Jc: %d, Jmin: %d, Jmax: %d, S1: %d, S2: %d, H1: %s\n",
 				awgConf.ServerAddress, awgConf.ServerPort, awgConf.Address,
 				awgConf.Jc, awgConf.Jmin, awgConf.Jmax, awgConf.S1, awgConf.S2, awgConf.H1)
 
-			fmt.Println("⚡ Применение секции в /etc/config/tachyon и перезапуск службы...")
+			fmt.Println("→ Применение секции в /etc/config/tachyon и перезапуск службы...")
 			err = routerpkg.ApplyAWGSection(client, execCmd, awgConf, secName, true)
 			if err != nil {
-				fmt.Printf("❌ Сбой применения секции AWG: %v\n", err)
+				fmt.Printf("[✗] Сбой применения секции AWG: %v\n", err)
 				return 1
 			}
-			fmt.Printf("✓ Секция tachyon.%s успешно сохранена и активирована!\n", secName)
+			fmt.Printf("[✓] Секция tachyon.%s сохранена и активирована.\n", secName)
 		}
 
 		if opts.AWGTest || opts.AWGSetup {
-			fmt.Printf("\n⚡ [AWG] Сквозная проверка работы секции '%s' через роутер...\n", secName)
+			fmt.Printf("\n→ [AWG] Сквозная проверка работы секции '%s' через роутер...\n", secName)
 			testRes, err := routerpkg.TestAWGSection(client, execCmd, secName)
 			if err != nil {
-				fmt.Printf("⚠️ Ошибка тестирования секции AWG: %v\n", err)
+				fmt.Printf("[!] Ошибка тестирования секции AWG: %v\n", err)
 			}
 
-			fmt.Println("\n--- РЕЗУЛЬТАТЫ ПРОВЕРКИ ---")
-			sbStatus := "❌ ОСТАНОВЛЕНА"
+			fmt.Println("\n--- Результаты проверки ---")
+			sbStatus := "[✗] Остановлена"
 			if testRes.ServiceRunning {
-				sbStatus = "✓ РАБОТАЕТ"
+				sbStatus = "[✓] Работает"
 			}
-			fakeIPStatus := "⚠️ НЕ ОТВЕЧАЕТ"
+			fakeIPStatus := "[!] Не отвечает"
 			if testRes.FakeIPActive {
-				fakeIPStatus = "✓ РАБОТАЕТ (" + testRes.ResolvedIP + ")"
+				fakeIPStatus = "[✓] Работает (" + testRes.ResolvedIP + ")"
 			}
-			fmt.Printf("Служба sing-box:   %s\n", sbStatus)
+			fmt.Printf("Служба ядра:       %s\n", sbStatus)
 			fmt.Printf("Fake-IP DNS:       %s\n", fakeIPStatus)
 			if testRes.EgressIP != "" {
 				loc := testRes.EgressLocation
@@ -622,22 +622,22 @@ func Run(opts *Options) int {
 				fmt.Printf("Внешний IP:        %s%s\n", testRes.EgressIP, loc)
 			}
 			if testRes.IsWARP {
-				fmt.Println("Cloudflare WARP:   ✓ ВКЛЮЧЕН (warp=on)")
+				fmt.Println("Cloudflare WARP:   [✓] Включен (warp=on)")
 			}
 
 			fmt.Println("\nТестирование доступности ресурсов через роутер:")
 			for _, p := range testRes.Probes {
-				statusIcon := "✓"
+				statusIcon := "[✓]"
 				if !p.Success {
-					statusIcon = "❌"
+					statusIcon = "[✗]"
 				}
 				fmt.Printf("  • %-16s %s HTTP %d (%d мс)\n", p.Name+":", statusIcon, p.HTTPStatus, p.LatencyMs)
 			}
 			fmt.Println("---------------------------")
 			if testRes.Success {
-				fmt.Println("🎉 Проверка успешно пройдена! Трафик идет через AmneziaWG.")
+				fmt.Println("[✓] Проверка пройдена. Трафик идет через AmneziaWG.")
 			} else {
-				fmt.Printf("⚠️ %s\n", testRes.Details)
+				fmt.Printf("[!] %s\n", testRes.Details)
 			}
 		}
 
@@ -646,7 +646,7 @@ func Run(opts *Options) int {
 
 	// 10. Guided Autopilot Setup
 	if opts.GuidedSetup {
-		fmt.Printf("==> 🚀 МАСТЕР БЫСТРОЙ НАСТРОЙКИ (АВТОПИЛОТ ПОД КЛЮЧ)\n\n")
+		fmt.Printf("==> Мастер быстрой настройки\n\n")
 		execCmd := func(_ *gossh.Client, cmd string) (string, error) {
 			sess, err := client.NewSession()
 			if err != nil {
@@ -657,92 +657,93 @@ func Run(opts *Options) int {
 			return string(out), err
 		}
 
-		fmt.Println("⚡ [1/5] Сканирование оборудования и роутера...")
+		fmt.Println("→ [1/5] Сканирование оборудования и роутера...")
 		profile, err := routerpkg.RunPreConnectionCheck(client)
 		if err == nil {
 			fmt.Printf("  • Модель: %s, Архитектура: %s, ОЗУ: %.0f МБ\n", profile.Model, profile.Arch, profile.RAMTotal)
 		}
 
-		fmt.Println("⚡ [2/5] DNS-тестирование: проверка отравления UDP 53 и подбор резолвера...")
+		fmt.Println("→ [2/5] DNS-тестирование: проверка отравления UDP 53 и подбор резолвера...")
 		dnsReport := routerpkg.RunDNSTest(client, execCmd)
 		if dnsReport.UDPPoisoned {
-			fmt.Printf("  ⚠️ Провайдер подменяет обычный DNS (спуфинг): %s\n", dnsReport.PoisonDetail)
+			fmt.Printf("  [!] Провайдер подменяет обычный DNS (спуфинг): %s\n", dnsReport.PoisonDetail)
 		} else {
-			fmt.Println("  ✓ Прямой DNS не отравлен провайдером")
+			fmt.Println("  [✓] Прямой DNS не отравлен провайдером")
 		}
 		var chosenDNS routerpkg.DNSResolver
 		if dnsReport.Fastest != nil {
 			chosenDNS = *dnsReport.Fastest
-			fmt.Printf("  ✓ Выбран быстрейший защищенный DNS: %s (%d мс)\n", chosenDNS.Name, chosenDNS.LatencyMs)
+			fmt.Printf("  [✓] Выбран защищенный DNS: %s (%d мс)\n", chosenDNS.Name, chosenDNS.LatencyMs)
 		} else {
 			chosenDNS = routerpkg.DefaultDNSResolvers()[0]
-			fmt.Printf("  ✓ Выбран DNS по умолчанию: %s\n", chosenDNS.Name)
+			fmt.Printf("  [✓] Выбран DNS по умолчанию: %s\n", chosenDNS.Name)
 		}
 
-		fmt.Println("⚡ [3/5] DPI Fuzzer: подбор оптимальной стратегии обхода YouTube и Discord...")
+		fmt.Println("→ [3/5] Подбор оптимальной стратегии обхода DPI...")
 		fuzzReport := routerpkg.RunDPIFuzzer(client, execCmd, nil)
 		var chosenStrat routerpkg.DPIStrategy
 		if fuzzReport.WinningStrategy != nil {
 			chosenStrat = *fuzzReport.WinningStrategy
-			fmt.Printf("  ✓ Выбрана победившая стратегия: %s (Успех: %d%%, Задержка: %d мс)\n", chosenStrat.Name, chosenStrat.SuccessRate, chosenStrat.AvgLatencyMs)
+			fmt.Printf("  [✓] Выбрана стратегия: %s (Успех: %d%%, Задержка: %d мс)\n", chosenStrat.Name, chosenStrat.SuccessRate, chosenStrat.AvgLatencyMs)
 		} else {
 			chosenStrat = routerpkg.DefaultDPIStrategies()[0]
-			fmt.Printf("  ✓ Выбрана базовая стратегия: %s\n", chosenStrat.Name)
+			fmt.Printf("  [✓] Выбрана базовая стратегия: %s\n", chosenStrat.Name)
 		}
 
-		fmt.Println("⚡ [4/5] Применение конфигурации под ключ и сетевой тюнинг...")
+		fmt.Println("→ [4/5] Применение конфигурации и сетевой тюнинг...")
+		defaultEng := "tachyon-core"
 		plan := routerpkg.GuidedSetupPlan{
 			Mode:           routerpkg.ModeStandaloneDPI,
 			ChosenDNS:      chosenDNS,
 			ChosenStrategy: chosenStrat,
-			SelectedEngine: "steer",
+			SelectedEngine: defaultEng,
 			EnableTune:     true,
 		}
 		if opts.Subscription != "" {
 			plan.Mode = routerpkg.ModeTunnel
 			plan.SubscriptionURL = opts.Subscription
-			plan.SelectedEngine = "sing-box"
+			plan.SelectedEngine = defaultEng
 		}
 
 		res, err := routerpkg.RunGuidedSetup(client, execCmd, plan, func(title string, frac float64) {
 			fmt.Printf("  • %s\n", title)
 		})
 		if err != nil {
-			fmt.Printf("❌ Сбой применения: %v\n", err)
+			fmt.Printf("[✗] Сбой применения: %v\n", err)
 			return 1
 		}
 
-		fmt.Println("\n⚡ [5/5] Финальный скоркарт результатов:")
-		fmt.Printf("  • DNS: %s (Задержка: %d мс) ✓\n", res.DNSName, res.DNSLatencyMs)
+		fmt.Println("\n→ [5/5] Итоги настройки:")
+		fmt.Printf("  • DNS: %s (Задержка: %d мс) [✓]\n", res.DNSName, res.DNSLatencyMs)
 		if res.StrategyApplied {
-			fmt.Printf("  • DPI-стратегия: %s ✓\n", res.StrategyName)
+			fmt.Printf("  • DPI-стратегия: %s [✓]\n", res.StrategyName)
 		}
 		if res.NetworkTuned {
-			fmt.Println("  • Сетевой стек: TCP BBR + адаптивные буферы + flow offloading ✓")
+			fmt.Println("  • Сетевой стек: TCP BBR + адаптивные буферы + отключение flow offloading [✓]")
 		}
 		for _, p := range res.VerifyResult.Probes {
 			if p.Success {
-				fmt.Printf("  • %-16s HTTP %d (%d мс) ✓\n", p.Name+":", p.HTTPStatus, p.LatencyMs)
+				fmt.Printf("  • %-16s HTTP %d (%d мс) [✓]\n", p.Name+":", p.HTTPStatus, p.LatencyMs)
 			} else {
 				fmt.Printf("  • %-16s HTTP %d\n", p.Name+":", p.HTTPStatus)
 			}
 		}
 
-		fmt.Println("\n🎉 НАСТРОЙКА ПОД КЛЮЧ УСПЕШНО ЗАВЕРШЕНА!")
-		fmt.Printf("Веб-интерфейс LuCI доступен: http://%s\n", opts.RouterIP)
+		fmt.Println("\n[✓] Настройка завершена.")
+		fmt.Printf("Веб-интерфейс LuCI: http://%s\n", opts.RouterIP)
 		return 0
 	}
 
 	// 11. Uninstall
 	if opts.RunUninstall {
-		fmt.Println("⚡ Запуск чистого удаления Tachyon...")
+		fmt.Println("→ Запуск чистого удаления Tachyon...")
 		out, err := deploypkg.UninstallTachyon(client, isAPK)
 		fmt.Println(out)
 		if err != nil {
-			fmt.Printf("❌ Сбой удаления: %v\n", err)
+			fmt.Printf("[✗] Сбой удаления: %v\n", err)
 			return 1
 		}
-		fmt.Println("✓ Tachyon успешно удален с роутера.")
+		fmt.Println("[✓] Tachyon удален с роутера.")
 		return 0
 	}
 
@@ -752,24 +753,24 @@ func Run(opts *Options) int {
 		if strings.ToLower(backupPath) == "latest" {
 			backups, err := backuppkg.ListBackups()
 			if err != nil || len(backups) == 0 {
-				fmt.Println("❌ Не найдены локальные файлы резервных копий в папке backups/")
+				fmt.Println("[✗] Не найдены локальные файлы резервных копий в папке backups/")
 				return 1
 			}
 			backupPath = backups[0]
 		}
-		fmt.Printf("⚡ Восстановление конфигурации из архива: %s...\n", backupPath)
+		fmt.Printf("→ Восстановление конфигурации из архива: %s...\n", backupPath)
 		msg, err := backuppkg.RestoreBackup(client, backupPath)
 		if err != nil {
-			fmt.Printf("❌ Ошибка восстановления: %v\n", err)
+			fmt.Printf("[✗] Ошибка восстановления: %v\n", err)
 			return 1
 		}
-		fmt.Printf("✓ %s\n", msg)
+		fmt.Printf("[✓] %s\n", msg)
 		return 0
 	}
 
 	// 5. Diagnostics Only
 	if opts.RunDiag {
-		fmt.Println("⚡ Запуск диагностики роутера...")
+		fmt.Println("→ Запуск диагностики роутера...")
 		execCmd := func(cmd string) (string, error) {
 			sess, err := client.NewSession()
 			if err != nil {
@@ -788,9 +789,9 @@ func Run(opts *Options) int {
 		if opts.ExportDiagPath != "" {
 			p, err := diag.ExportToFile("Диагностика роутера "+opts.RouterIP, results, opts.ExportDiagPath)
 			if err != nil {
-				fmt.Printf("⚠️ Ошибка экспорта отчета: %v\n", err)
+				fmt.Printf("[!] Ошибка экспорта отчета: %v\n", err)
 			} else {
-				fmt.Printf("✓ Отчет успешно сохранен в файл: %s\n", p)
+				fmt.Printf("[✓] Отчет сохранен в файл: %s\n", p)
 			}
 		}
 		return 0
@@ -798,7 +799,7 @@ func Run(opts *Options) int {
 
 	// 6. Switch Engine (Hot-Swap)
 	if opts.SwitchEngine != "" {
-		fmt.Printf("⚡ Горячая смена ядра на [%s]...\n", opts.SwitchEngine)
+		fmt.Printf("→ Горячая смена ядра на [%s]...\n", opts.SwitchEngine)
 		detectedArch := routerpkg.DetectArch(client)
 		distribArch := routerpkg.DetectRawArch(client)
 		if distribArch == "" {
@@ -816,7 +817,7 @@ func Run(opts *Options) int {
 			logFn,
 		)
 		if err != nil {
-			fmt.Printf("❌ Сбой горячей смены ядра: %v\n", err)
+			fmt.Printf("[✗] Сбой горячей смены ядра: %v\n", err)
 			return 1
 		}
 
@@ -830,16 +831,16 @@ func Run(opts *Options) int {
 			return string(out), err
 		}
 
-		fmt.Println("\n⚡ Проверка сквозного обхода через роутер...")
+		fmt.Println("\n→ Проверка сквозного обхода через роутер...")
 		bypassRes := routerpkg.TestBypass(client, execFn)
 		if bypassRes.Success {
-			fmt.Printf("  ✓ %s\n", bypassRes.Details)
+			fmt.Printf("  [✓] %s\n", bypassRes.Details)
 		} else {
-			fmt.Printf("  ⚠️ %s\n", bypassRes.Details)
+			fmt.Printf("  [!] %s\n", bypassRes.Details)
 		}
 
 		luciURL := fmt.Sprintf("http://%s/cgi-bin/luci/admin/services/tachyon", opts.RouterIP)
-		fmt.Printf("\n✓ Горячая смена ядра завершена!\nВеб-интерфейс: %s\n", luciURL)
+		fmt.Printf("\n[✓] Горячая смена ядра завершена.\nВеб-интерфейс: %s\n", luciURL)
 		return 0
 	}
 
@@ -852,20 +853,20 @@ func Run(opts *Options) int {
 }
 
 func runHeadlessInstall(client *gossh.Client, isAPK bool, opts *Options) int {
-	fmt.Println("\n==========================================")
-	fmt.Println("🚀 ЗАПУСК АВТОМАТИЧЕСКОЙ ЭКСПРЕСС-УСТАНОВКИ")
-	fmt.Println("==========================================")
+	fmt.Println("\n──────────────────────────────────────────")
+	fmt.Println("Запуск автоматической установки Tachyon")
+	fmt.Println("──────────────────────────────────────────")
 
 	// Step 1: Clock synchronization
-	fmt.Println("⚡ [1/7] Синхронизация системного времени роутера с ПК (защита TLS)...")
+	fmt.Println("→ [1/7] Синхронизация системного времени роутера с ПК (защита TLS)...")
 	if dateStr, err := routerpkg.SyncRouterTime(client); err == nil {
-		fmt.Printf("✓ Время синхронизировано: %s\n", dateStr)
+		fmt.Printf("[✓] Время синхронизировано: %s\n", dateStr)
 	} else {
-		fmt.Printf("⚠️ Не удалось синхронизировать время: %v (продолжаем)\n", err)
+		fmt.Printf("[!] Не удалось синхронизировать время: %v (продолжаем)\n", err)
 	}
 
 	// Step 2: System and Connectivity Checks
-	fmt.Println("⚡ [2/7] Оценка ресурсов и сетевой связности роутера...")
+	fmt.Println("→ [2/7] Оценка ресурсов и сетевой связности роутера...")
 	_, _, connDetails, _ := routerpkg.CheckRouterConnectivity(client)
 	fmt.Printf("  • Сеть роутера: %s\n", connDetails)
 
@@ -881,50 +882,50 @@ func runHeadlessInstall(client *gossh.Client, isAPK bool, opts *Options) int {
 	installZRAM := opts.InstallZRAM
 
 	// Step 3: Mirrors & Downloads
-	fmt.Printf("⚡ [3/7] Подготовка зеркал загрузки (%s)...\n", opts.Mirror)
+	fmt.Printf("→ [3/7] Подготовка зеркал загрузки (%s)...\n", opts.Mirror)
 	mirrorMgr := dlpkg.NewMirrorManager(opts.Mirror)
 	if opts.Mirror == "auto" {
 		fastest := mirrorMgr.TestFastestMirrorDetailed(context.Background(), func(res dlpkg.MirrorPingResult) {
 			if res.Err == nil {
-				fmt.Printf("    %-30s %d ms ✓\n", res.Mirror, res.Latency.Milliseconds())
+				fmt.Printf("    %-30s %d ms [✓]\n", res.Mirror, res.Latency.Milliseconds())
 			}
 		})
-		fmt.Printf("✓ Выбрано быстрейшее зеркало: %s\n", fastest)
+		fmt.Printf("[✓] Выбрано зеркало: %s\n", fastest)
 	}
 	dlClient := dlpkg.NewClient(mirrorMgr)
 
 	staging, err := deploypkg.NewStagingArea()
 	if err != nil {
-		fmt.Printf("❌ Ошибка создания папки staging: %v\n", err)
+		fmt.Printf("[✗] Ошибка создания папки staging: %v\n", err)
 		return 1
 	}
 	defer staging.Cleanup()
 
-	fmt.Printf("⚡ Получение информации о релизе Tachyon (%s)...\n", opts.Version)
+	fmt.Printf("→ Получение информации о релизе Tachyon (%s)...\n", opts.Version)
 	rel, err := dlpkg.FetchTachyonReleaseByTag(context.Background(), dlClient, opts.Version)
 	if err != nil {
-		fmt.Printf("❌ Ошибка запроса релиза Tachyon: %v\n", err)
+		fmt.Printf("[✗] Ошибка запроса релиза Tachyon: %v\n", err)
 		return 1
 	}
-	fmt.Printf("✓ Релиз: %s\n", rel.TagName)
+	fmt.Printf("[✓] Релиз: %s\n", rel.TagName)
 
 	assets, err := dlpkg.ResolveTachyonAssets(rel, isAPK, opts.InstallI18n)
 	if err != nil {
-		fmt.Printf("❌ Ошибка разрешения файлов Tachyon: %v\n", err)
+		fmt.Printf("[✗] Ошибка разрешения файлов Tachyon: %v\n", err)
 		return 1
 	}
 
-	fmt.Println("⚡ Скачивание пакетов Tachyon на компьютер...")
+	fmt.Println("→ Скачивание пакетов Tachyon на компьютер...")
 	logFn := func(msg string) { fmt.Print(msg) }
 	progFn := func(label string, frac float64) {}
 	_, err = dlpkg.DownloadTachyonPackages(context.Background(), dlClient, assets, opts.InstallI18n, staging.Dir, logFn, progFn)
 	if err != nil {
-		fmt.Printf("❌ Сбой скачивания Tachyon: %v\n", err)
+		fmt.Printf("[✗] Сбой скачивания Tachyon: %v\n", err)
 		return 1
 	}
 
 	if opts.Engine != "skip" && opts.Engine != "" {
-		fmt.Printf("⚡ Поиск и скачивание пакетов ядра (%s)...\n", opts.Engine)
+		fmt.Printf("→ Поиск и скачивание пакетов ядра (%s)...\n", opts.Engine)
 		engAssets, err := dlpkg.ResolveEngineAssets(context.Background(), dlClient, dlpkg.EngineType(opts.Engine), distribArch, detectedArch, isAPK)
 		if err == nil && len(engAssets) > 0 {
 			for _, ea := range engAssets {
@@ -938,35 +939,35 @@ func runHeadlessInstall(client *gossh.Client, isAPK bool, opts *Options) int {
 	}
 
 	// Step 4: Checksum integrity
-	fmt.Println("\n⚡ [4/7] Проверка целостности SHA256...")
+	fmt.Println("\n→ [4/7] Проверка целостности SHA256...")
 	if !verifyFiles(staging.Dir) {
-		fmt.Println("❌ Ошибка целостности скачанных пакетов")
+		fmt.Println("[✗] Ошибка целостности скачанных пакетов")
 		return 1
 	}
-	fmt.Println("✓ Все файлы проверены и целостны.")
+	fmt.Println("[✓] Все файлы проверены и целостны.")
 
 	// Step 5: Backup
-	fmt.Println("⚡ [5/7] Создание локальной резервной копии настроек...")
+	fmt.Println("→ [5/7] Создание локальной резервной копии настроек...")
 	msg, _ := backuppkg.CreateLocalBackup(client, opts.RouterIP)
-	fmt.Printf("✓ %s\n", msg)
+	fmt.Printf("[✓] %s\n", msg)
 
 	// Step 6: Deploy & Execute
-	fmt.Println("⚡ [6/7] Загрузка и выполнение установки на роутере...")
+	fmt.Println("→ [6/7] Загрузка и выполнение установки на роутере...")
 	_, err = staging.WriteRunnerScript(opts.Engine, isAPK, installZRAM)
 	if err != nil {
-		fmt.Printf("❌ Ошибка генерации runner скрипта: %v\n", err)
+		fmt.Printf("[✗] Ошибка генерации runner скрипта: %v\n", err)
 		return 1
 	}
 
 	err = deploypkg.UploadStagingAndExecute(client, staging.Dir, os.Stdout, logFn)
 	if err != nil {
-		fmt.Printf("❌ Сбой установки на роутере: %v\n", err)
+		fmt.Printf("[✗] Сбой установки на роутере: %v\n", err)
 		return 1
 	}
-	fmt.Println("\n✓ Пакеты успешно развернуты на роутере!")
+	fmt.Println("\n[✓] Пакеты развернуты на роутере.")
 
 	// Step 7: Subscription & Service check
-	fmt.Println("⚡ [7/7] Проверка и настройка службы...")
+	fmt.Println("→ [7/7] Проверка и настройка службы...")
 	execCmd := func(c *gossh.Client, cmd string) (string, error) {
 		sess, err := c.NewSession()
 		if err != nil {
@@ -978,33 +979,33 @@ func runHeadlessInstall(client *gossh.Client, isAPK bool, opts *Options) int {
 	}
 
 	if opts.Subscription != "" {
-		fmt.Printf("⚡ Сохранение подписки: %s...\n", opts.Subscription)
+		fmt.Printf("→ Сохранение подписки: %s...\n", opts.Subscription)
 		if err := routerpkg.SaveSubscription(client, execCmd, opts.Subscription); err != nil {
-			fmt.Printf("⚠️ Ошибка сохранения подписки: %v\n", err)
+			fmt.Printf("[!] Ошибка сохранения подписки: %v\n", err)
 		} else {
-			fmt.Println("✓ Подписка сохранена.")
+			fmt.Println("[✓] Подписка сохранена.")
 		}
 	}
 
 	time.Sleep(3 * time.Second)
 	checkRes := routerpkg.VerifyAndFallback(client, execCmd, progFn)
 
-	fmt.Println("\n⚡ Проверка сквозного обхода блокировок через роутер...")
+	fmt.Println("\n→ Проверка сквозного обхода блокировок через роутер...")
 	bypassRes := routerpkg.TestBypass(client, execCmd)
 	if bypassRes.Success {
-		fmt.Printf("  ✓ %s\n", bypassRes.Details)
+		fmt.Printf("  [✓] %s\n", bypassRes.Details)
 	} else {
-		fmt.Printf("  ⚠️ %s\n", bypassRes.Details)
+		fmt.Printf("  [!] %s\n", bypassRes.Details)
 	}
 
 	luciURL := fmt.Sprintf("http://%s/cgi-bin/luci/admin/services/tachyon", opts.RouterIP)
 	if checkRes.OK {
-		fmt.Println("\n🎉 УСТАНОВКА УСПЕШНО ЗАВЕРШЕНА!")
+		fmt.Println("\n[✓] Установка завершена.")
 		fmt.Printf("Панель управления доступна в веб-интерфейсе LuCI: %s\n", luciURL)
 		return 0
 	}
 
-	fmt.Printf("\n⚠️ Установка завершена, но служба сообщила: %s\nВеб-интерфейс: %s\n", checkRes.Reason, luciURL)
+	fmt.Printf("\n[!] Установка завершена, но служба сообщила: %s\nВеб-интерфейс: %s\n", checkRes.Reason, luciURL)
 	return 0
 }
 
@@ -1019,15 +1020,15 @@ func verifyFiles(dir string) bool {
 		}
 		p := filepath.Join(dir, e.Name())
 		if err := dlpkg.SanityCheckPackage(p); err != nil {
-			fmt.Printf("  ✗ %s: %v\n", e.Name(), err)
+			fmt.Printf("  [✗] %s: %v\n", e.Name(), err)
 			return false
 		}
 		sum, size, err := fileSHA256Sum(p)
 		if err != nil {
-			fmt.Printf("  ✗ %s: %v\n", e.Name(), err)
+			fmt.Printf("  [✗] %s: %v\n", e.Name(), err)
 			return false
 		}
-		fmt.Printf("  ✓ %-42s (%.1f МБ, sha256:%s…)\n", e.Name(), float64(size)/1024/1024, sum[:12])
+		fmt.Printf("  [✓] %-42s (%.1f МБ, sha256:%s…)\n", e.Name(), float64(size)/1024/1024, sum[:12])
 	}
 	return true
 }
@@ -1049,34 +1050,34 @@ func fileSHA256Sum(path string) (string, int64, error) {
 func printSpeedDoctorCLIReport(report *routerpkg.SpeedDoctorReport) {
 	if report.Direct != nil {
 		d := report.Direct
-		fmt.Printf("================================================================================\n")
-		fmt.Printf("  BUFFERBLOAT GRADE:  [ %s ]  —  %s\n", d.Grade, d.Verdict)
-		fmt.Printf("================================================================================\n")
+		fmt.Printf("────────────────────────────────────────────────────────────────────────────────\n")
+		fmt.Printf("  Оценка Bufferbloat: [ %s ] — %s\n", d.Grade, d.Verdict)
+		fmt.Printf("────────────────────────────────────────────────────────────────────────────────\n")
 		fmt.Printf("  • Скорость скачивания (WAN):  %.1f Мбит/с\n", d.SpeedMbps)
 		fmt.Printf("  • Задержка в покое (Idle):    %.1f мс (мин: %.1f, макс: %.1f, джиттер: %.1f мс)\n",
 			d.IdlePingAvg, d.IdlePingMin, d.IdlePingMax, d.IdleJitter)
 		fmt.Printf("  • Задержка под нагрузкой:     %.1f мс\n", d.LoadedPingAvg)
-		fmt.Printf("  • Bufferbloat Оверхед:        +%.1f мс (Оценка: %s)\n", d.BufferbloatDelta, d.Grade)
+		fmt.Printf("  • Bufferbloat оверхед:        +%.1f мс (Оценка: %s)\n", d.BufferbloatDelta, d.Grade)
 
 		throttledMsg := ""
 		if d.CPU.Throttled {
-			throttledMsg = " [ВНИМАНИЕ: CPU Throttling / Перегрузка SoftIRQ!]"
+			throttledMsg = " [Внимание: CPU Throttling / перегрузка SoftIRQ]"
 		}
 		fmt.Printf("  • Загрузка CPU роутера:       %.0f%% (sys: %.0f%%, softirq: %.0f%%)%s\n",
 			d.CPU.TotalPct, d.CPU.SystemPct, d.CPU.SoftIRQPct, throttledMsg)
-		fmt.Printf("================================================================================\n")
+		fmt.Printf("────────────────────────────────────────────────────────────────────────────────\n")
 	}
 
 	if report.Tunnel != nil {
 		t := report.Tunnel
-		fmt.Printf("\n--- ТУННЕЛЬ TACHYON (PROXY) ---\n")
+		fmt.Printf("\n--- Туннель Tachyon (Proxy) ---\n")
 		fmt.Printf("  • Скорость:            %.1f Мбит/с\n", t.SpeedMbps)
 		fmt.Printf("  • Пинг в туннеле:      %.1f мс (Bufferbloat: +%.1f мс)\n", t.IdlePingAvg, t.BufferbloatDelta)
 		fmt.Printf("  • Загрузка CPU:        %.0f%%\n", t.CPU.TotalPct)
 	}
 
 	if len(report.Recommendations) > 0 {
-		fmt.Printf("\n💡 Рекомендации сетевого доктора:\n")
+		fmt.Printf("\nРекомендации:\n")
 		for _, rec := range report.Recommendations {
 			fmt.Printf("  • %s\n", rec)
 		}

@@ -52,7 +52,7 @@ func TestRunDPIFuzzer(t *testing.T) {
 		if strings.Contains(cmd, "probe_target") {
 			return "FUZZ_RES:yt:200 0.035\nFUZZ_RES:dc:200 0.040\nFUZZ_RES:ru:200 0.010\n", nil
 		}
-		return "steer", nil
+		return "tachyon-core", nil
 	}
 
 	progressCalls := 0
@@ -85,10 +85,10 @@ func TestGenerateApplyDPIStrategyScript(t *testing.T) {
 	if !strings.Contains(script, "test_strat") {
 		t.Errorf("script missing strategy ID")
 	}
-	if !strings.Contains(script, "steer_tcp_args='--filter-tcp=443 --lua-desync=split2'") {
+	if !strings.Contains(script, `DESYNC_TCP_ARGS="--filter-tcp=443 --lua-desync=split2"`) {
 		t.Errorf("script missing TCP args: %s", script)
 	}
-	if !strings.Contains(script, "steer_udp_args='--filter-udp=443 --lua-desync=fake'") {
+	if !strings.Contains(script, `DESYNC_UDP_ARGS="--filter-udp=443 --lua-desync=fake"`) {
 		t.Errorf("script missing UDP args: %s", script)
 	}
 }

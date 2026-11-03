@@ -14,12 +14,13 @@ import (
 
 // DPIStrategy represents a distinct DPI bypass strategy profile.
 type DPIStrategy struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Badge       string `json:"badge"`
-	Description string `json:"description"`
-	TCPArgs     string `json:"tcp_args"`
-	UDPArgs     string `json:"udp_args"`
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Badge        string `json:"badge"`
+	Description  string `json:"description"`
+	TCPArgs      string `json:"tcp_args"`
+	UDPArgs      string `json:"udp_args"`
+	DesyncPreset string `json:"desync_preset,omitempty"`
 
 	// Benchmark results
 	SuccessRate     int   `json:"success_rate"` // 0..100%
@@ -46,36 +47,40 @@ type DPIFuzzerProgress func(strategy DPIStrategy, current, total int)
 func DefaultDPIStrategies() []DPIStrategy {
 	return []DPIStrategy{
 		{
-			ID:          "fakesplit_diso",
-			Name:        "FakeSplit + Disorder (Рекомендуемая)",
-			Badge:       "★ Элитная",
-			Description: "Обход новейших ТСПУ РКН: комбинация фейковых пакетов и перестановки сегментов",
-			TCPArgs:     "--filter-tcp=443 --filter-l7=tls --payload=tls_client_hello --lua-desync=fakedsplit:pos=1:tcp_ack=-66000",
-			UDPArgs:     "--filter-udp=443,50000-50099 --lua-desync=fake:repeats=2",
+			ID:           "fakesplit_diso",
+			Name:         "Adaptive Desync 2.0 (FakeSplit + Disorder)",
+			Badge:        "Адаптивная",
+			Description:  "Адаптивная десинхронизация TLS/QUIC: фейковые пакеты и перестановка сегментов",
+			TCPArgs:      "--filter-tcp=443 --filter-l7=tls --payload=tls_client_hello --lua-desync=fakedsplit:pos=1:tcp_ack=-66000",
+			UDPArgs:      "--filter-udp=443,50000-50099 --lua-desync=fake:repeats=2",
+			DesyncPreset: "adaptive",
 		},
 		{
-			ID:          "split2_fake",
-			Name:        "Базовая: Fake SNI + Split2",
-			Badge:       "Быстрая",
-			Description: "Классический сплит SNI заголовка с фейковым пакетом TTL=1-3, минимальная нагрузка на CPU",
-			TCPArgs:     "--filter-tcp=443 --filter-l7=tls --payload=tls_client_hello --lua-desync=split2:pos=2",
-			UDPArgs:     "--filter-udp=443,50000-50099 --lua-desync=fake",
+			ID:           "split2_fake",
+			Name:         "Fake SNI + Split2",
+			Badge:        "Быстрая",
+			Description:  "Классический сплит SNI заголовка с фейковым пакетом, минимальная нагрузка на CPU",
+			TCPArgs:      "--filter-tcp=443 --filter-l7=tls --payload=tls_client_hello --lua-desync=split2:pos=2",
+			UDPArgs:      "--filter-udp=443,50000-50099 --lua-desync=fake",
+			DesyncPreset: "fake_split",
 		},
 		{
-			ID:          "multidisorder",
-			Name:        "Multi-Disorder + Voice STUN",
-			Badge:       "Discord/Медиа",
-			Description: "Специализирована под голосовые каналы Discord и CDN YouTube с агрессивным троттлингом",
-			TCPArgs:     "--filter-tcp=443 --filter-l7=tls --payload=tls_client_hello --lua-desync=multidisorder:pos=2",
-			UDPArgs:     "--filter-udp=443,50000-50099 --lua-desync=multidisorder",
+			ID:           "multidisorder",
+			Name:         "Multi-Disorder + Voice STUN",
+			Badge:        "Discord/Медиа",
+			Description:  "Профиль для голосовых каналов Discord и CDN YouTube с агрессивным троттлингом",
+			TCPArgs:      "--filter-tcp=443 --filter-l7=tls --payload=tls_client_hello --lua-desync=multidisorder:pos=2",
+			UDPArgs:      "--filter-udp=443,50000-50099 --lua-desync=multidisorder",
+			DesyncPreset: "fake_disorder",
 		},
 		{
-			ID:          "mss_syndata",
-			Name:        "MSS 1200 + SYN Data Payload",
-			Badge:       "Анти-ТСПУ",
-			Description: "Занижение MSS до 1200 для обхода DPI-правил, проверяющих размер первого TCP-сегмента",
-			TCPArgs:     "--filter-tcp=443 --filter-l7=tls --payload=tls_client_hello --lua-desync=fakesplit:pos=2:mss=1200",
-			UDPArgs:     "--filter-udp=443,50000-50099 --lua-desync=fake",
+			ID:           "mss_syndata",
+			Name:         "MSS 1200 + Multi-Split",
+			Badge:        "Анти-ТСПУ",
+			Description:  "Занижение MSS до 1200 и мульти-сплит первого TCP-сегмента",
+			TCPArgs:      "--filter-tcp=443 --filter-l7=tls --payload=tls_client_hello --lua-desync=fakesplit:pos=2:mss=1200",
+			UDPArgs:      "--filter-udp=443,50000-50099 --lua-desync=fake",
+			DesyncPreset: "multi_split",
 		},
 	}
 }
@@ -85,11 +90,11 @@ func RunDPIFuzzer(client *gossh.Client, execFn sshutil.ExecFunc, progressFn DPIF
 	strategies := DefaultDPIStrategies()
 
 	// 1. Detect active router engine
-	engineCmd := `uci -q get tachyon.settings.engine 2>/dev/null || echo "steer"`
+	engineCmd := `uci -q get tachyon.settings.engine 2>/dev/null || echo "tachyon-core"`
 	engOut, _ := execFn(client, engineCmd)
 	activeEngine := strings.TrimSpace(engOut)
 	if activeEngine == "" {
-		activeEngine = "steer"
+		activeEngine = "tachyon-core"
 	}
 
 	report := DPIFuzzerReport{
@@ -100,8 +105,8 @@ func RunDPIFuzzer(client *gossh.Client, execFn sshutil.ExecFunc, progressFn DPIF
 	// 2. Check if Tachyon's native router-side combinatorial fuzzer is available
 	checkNativeCmd := `[ -x /usr/bin/tachyon ] && /usr/bin/tachyon fuzzer_status >/dev/null 2>&1 && echo "NATIVE_FUZZER" || echo ""`
 	if nativeCheck, err := execFn(client, checkNativeCmd); err == nil && strings.Contains(nativeCheck, "NATIVE_FUZZER") {
-		// Trigger native router-side fuzzer
-		_, _ = execFn(client, `/usr/bin/tachyon fuzzer_start zapret2 youtube 2>/dev/null || /usr/bin/tachyon fuzzer_start all 2>/dev/null || true`)
+		// Trigger native router-side fuzzer (desync for tachyon-core, zapret2 otherwise)
+		_, _ = execFn(client, `/usr/bin/tachyon fuzzer_start desync youtube 2>/dev/null || /usr/bin/tachyon fuzzer_start zapret2 youtube 2>/dev/null || /usr/bin/tachyon fuzzer_start all 2>/dev/null || true`)
 		for i := 0; i < 5; i++ {
 			time.Sleep(1 * time.Second)
 			rawStatus, err := execFn(client, `/usr/bin/tachyon fuzzer_status 2>/dev/null`)
@@ -126,9 +131,10 @@ func RunDPIFuzzer(client *gossh.Client, execFn sshutil.ExecFunc, progressFn DPIF
 					win := DPIStrategy{
 						ID:           status.BestStrategy.ID,
 						Name:         status.BestStrategy.Name,
-						Badge:        "★ Роутерный фаззер",
-						Description:  "Подобрана встроенным комбинаторным фаззером Tachyon прямо на роутере",
+						Badge:        "Роутерный фаззер",
+						Description:  "Подобрана встроенным комбинаторным фаззером Tachyon на роутере",
 						TCPArgs:      status.BestStrategy.Args,
+						DesyncPreset: "adaptive",
 						SuccessRate:  status.BestStrategy.Score,
 						AvgLatencyMs: status.BestStrategy.LatencyMs,
 						YouTubeOK:    true,
@@ -146,7 +152,7 @@ func RunDPIFuzzer(client *gossh.Client, execFn sshutil.ExecFunc, progressFn DPIF
 							AvgLatencyMs: s.LatencyMs,
 						})
 					}
-					report.Details = fmt.Sprintf("Родной фаззер Tachyon на роутере: %s (Успех: %d%%, %d мс)", win.Name, win.SuccessRate, win.AvgLatencyMs)
+					report.Details = fmt.Sprintf("Встроенный фаззер Tachyon: %s (Успех: %d%%, %d мс)", win.Name, win.SuccessRate, win.AvgLatencyMs)
 					return report
 				}
 			}
@@ -288,13 +294,40 @@ func parseFuzzLine(out, prefix string) (bool, int64) {
 
 // GenerateApplyDPIStrategyScript creates UCI / configuration update commands for the strategy.
 func GenerateApplyDPIStrategyScript(strategy DPIStrategy) string {
+	preset := strategy.DesyncPreset
+	if preset == "" {
+		switch strategy.ID {
+		case "split2_fake":
+			preset = "fake_split"
+		case "multidisorder":
+			preset = "fake_disorder"
+		case "mss_syndata":
+			preset = "multi_split"
+		default:
+			preset = "adaptive"
+		}
+	}
+	autoTune := "0"
+	if preset == "adaptive" || preset == "auto" {
+		autoTune = "1"
+	}
+
 	script := fmt.Sprintf(`
 # 1. Update Tachyon UCI configuration with DPI section for YouTube and Discord
 if command -v uci >/dev/null 2>&1 && uci -q get tachyon.settings >/dev/null; then
     uci -q get tachyon.dpi_bypass >/dev/null || uci set tachyon.dpi_bypass=section
     uci -q set tachyon.dpi_bypass.label='DPI Bypass' 2>/dev/null || true
     uci -q set tachyon.dpi_bypass.enabled='1' 2>/dev/null || true
-    if [ -x /opt/zapret2/nfqws2 ] || [ -x /usr/bin/nfqws2 ] || (command -v opkg >/dev/null 2>&1 && opkg list-installed 2>/dev/null | grep -q zapret2); then
+    ACTIVE_ENG="$(uci -q get tachyon.settings.engine 2>/dev/null)"
+    if [ "$ACTIVE_ENG" = "tachyon-core" ] || [ "$(cat /etc/tachyon/tachyon-core-variant 2>/dev/null)" = "tachyon-core" ]; then
+        uci -q set tachyon.dpi_bypass.action='desync' 2>/dev/null || true
+        uci -q set tachyon.dpi_bypass.source_type='desync' 2>/dev/null || true
+        uci -q set tachyon.dpi_bypass.desync_preset='%s' 2>/dev/null || true
+        uci -q set tachyon.dpi_bypass.desync_auto_tune='%s' 2>/dev/null || true
+        uci -q set tachyon.dpi_bypass.desync_udp_fake='1' 2>/dev/null || true
+    elif [ -x /opt/zapret2/nfqws2 ] || [ -x /opt/zapret2/nfq2/nfqws2 ] || [ -x /usr/bin/nfqws2 ] || (command -v opkg >/dev/null 2>&1 && opkg list-installed 2>/dev/null | grep -q zapret2) || (command -v apk >/dev/null 2>&1 && apk info 2>/dev/null | grep -q zapret2); then
+        chmod 0755 /opt /opt/zapret2 /opt/zapret2/nfq2 /opt/zapret2/nfq2/nfqws2 2>/dev/null || true
+        sed -i '/^::1$/d' /opt/zapret2/ipset/zapret-ip-exclude.txt 2>/dev/null || true
         uci -q set tachyon.dpi_bypass.action='zapret2' 2>/dev/null || true
     else
         uci -q set tachyon.dpi_bypass.action='zapret' 2>/dev/null || true
@@ -302,8 +335,6 @@ if command -v uci >/dev/null 2>&1 && uci -q get tachyon.settings >/dev/null; the
     uci -q del_list tachyon.dpi_bypass.community_lists 2>/dev/null || true
     uci -q add_list tachyon.dpi_bypass.community_lists='youtube' 2>/dev/null || true
     uci -q add_list tachyon.dpi_bypass.community_lists='discord' 2>/dev/null || true
-    uci -q set tachyon.settings.steer_tcp_args='%s' 2>/dev/null || true
-    uci -q set tachyon.settings.steer_udp_args='%s' 2>/dev/null || true
     uci -q set tachyon.settings.dpi_profile='%s' 2>/dev/null || true
     uci commit tachyon 2>/dev/null || true
 fi
@@ -317,15 +348,15 @@ fi
 mkdir -p /etc/tachyon 2>/dev/null || true
 cat << 'EOF' > /etc/tachyon/dpi_strategy.conf
 # Tachyon DPI Auto-Fuzzer Profile: %s
-STEER_TCP_ARGS="%s"
-STEER_UDP_ARGS="%s"
+DESYNC_TCP_ARGS="%s"
+DESYNC_UDP_ARGS="%s"
 EOF
 
 # 3. Reload Tachyon / proxy engine to activate new bypass rules
 if [ -x /etc/init.d/tachyon ]; then
     /etc/init.d/tachyon restart >/dev/null 2>&1 || true
 fi
-`, strategy.TCPArgs, strategy.UDPArgs, strategy.ID, strategy.TCPArgs, strategy.Name, strategy.TCPArgs, strategy.UDPArgs)
+`, preset, autoTune, strategy.ID, strategy.TCPArgs, strategy.Name, strategy.TCPArgs, strategy.UDPArgs)
 
 	return strings.ReplaceAll(script, "\r\n", "\n")
 }

@@ -49,6 +49,10 @@ type AWGConfig struct {
 	I3   string `json:"i3,omitempty"` // Decoy payload 3
 	I4   string `json:"i4,omitempty"` // Decoy payload 4
 	I5   string `json:"i5,omitempty"` // Decoy payload 5
+	J1   string `json:"j1,omitempty"` // Junk CPS payload 1
+	J2   string `json:"j2,omitempty"` // Junk CPS payload 2
+	J3   string `json:"j3,omitempty"` // Junk CPS payload 3
+	ITime int   `json:"itime,omitempty"` // Handshake CPS timeout (seconds)
 
 	// AWG 3.1 parameters
 	HeaderProtectionKey    string `json:"header_protection_key,omitempty"`
@@ -238,6 +242,10 @@ func GenerateWarpAWG(client *gossh.Client, execFn sshutil.ExecFunc) (*AWGConfig,
 					AWGI3         string `json:"awg_i3"`
 					AWGI4         string `json:"awg_i4"`
 					AWGI5         string `json:"awg_i5"`
+					AWGJ1         string `json:"awg_j1"`
+					AWGJ2         string `json:"awg_j2"`
+					AWGJ3         string `json:"awg_j3"`
+					AWGITime      any    `json:"awg_itime"`
 				}
 
 				if jsonErr := json.Unmarshal([]byte(out), &r); jsonErr == nil && r.Success {
@@ -281,6 +289,10 @@ func GenerateWarpAWG(client *gossh.Client, execFn sshutil.ExecFunc) (*AWGConfig,
 						I3:            r.AWGI3,
 						I4:            r.AWGI4,
 						I5:            r.AWGI5,
+						J1:            r.AWGJ1,
+						J2:            r.AWGJ2,
+						J3:            r.AWGJ3,
+						ITime:         toInt(r.AWGITime),
 						MTU:           1280,
 						Keepalive:     "25",
 					}
@@ -546,6 +558,14 @@ func ParseAWGConfig(raw string) (*AWGConfig, error) {
 			cfg.I4 = val
 		case "i5":
 			cfg.I5 = val
+		case "j1":
+			cfg.J1 = val
+		case "j2":
+			cfg.J2 = val
+		case "j3":
+			cfg.J3 = val
+		case "itime":
+			cfg.ITime, _ = strconv.Atoi(val)
 		case "headerprotectionkey", "header_protection_key":
 			cfg.HeaderProtectionKey = val
 			cfg.Version = "3.1"
@@ -646,6 +666,27 @@ uci set tachyon.%s.awg_h4='%s'
 	if cfg.I2 != "" {
 		cmd.WriteString(fmt.Sprintf("uci set tachyon.%s.awg_i2='%s'\n", sec, cfg.I2))
 	}
+	if cfg.I3 != "" {
+		cmd.WriteString(fmt.Sprintf("uci set tachyon.%s.awg_i3='%s'\n", sec, cfg.I3))
+	}
+	if cfg.I4 != "" {
+		cmd.WriteString(fmt.Sprintf("uci set tachyon.%s.awg_i4='%s'\n", sec, cfg.I4))
+	}
+	if cfg.I5 != "" {
+		cmd.WriteString(fmt.Sprintf("uci set tachyon.%s.awg_i5='%s'\n", sec, cfg.I5))
+	}
+	if cfg.J1 != "" {
+		cmd.WriteString(fmt.Sprintf("uci set tachyon.%s.awg_j1='%s'\n", sec, cfg.J1))
+	}
+	if cfg.J2 != "" {
+		cmd.WriteString(fmt.Sprintf("uci set tachyon.%s.awg_j2='%s'\n", sec, cfg.J2))
+	}
+	if cfg.J3 != "" {
+		cmd.WriteString(fmt.Sprintf("uci set tachyon.%s.awg_j3='%s'\n", sec, cfg.J3))
+	}
+	if cfg.ITime > 0 {
+		cmd.WriteString(fmt.Sprintf("uci set tachyon.%s.awg_itime='%d'\n", sec, cfg.ITime))
+	}
 	if cfg.HeaderProtectionKey != "" {
 		cmd.WriteString(fmt.Sprintf("uci set tachyon.%s.awg_header_protection_key='%s'\n", sec, cfg.HeaderProtectionKey))
 	}
@@ -666,12 +707,17 @@ uci -q add_list tachyon.%s.community_lists='twitter' 2>/dev/null || true
 	}
 
 	cmd.WriteString(`
-# 3. Ensure sing-box engine is active and enabled
-uci -q set tachyon.settings.engine='sing-box' 2>/dev/null || true
+# 3. Ensure active engine (tachyon-core or sing-box) is enabled
+if [ "$(uci -q get tachyon.settings.engine 2>/dev/null)" = "tachyon-core" ] || [ "$(cat /etc/tachyon/tachyon-core-variant 2>/dev/null)" = "tachyon-core" ]; then
+    uci -q set tachyon.settings.engine='tachyon-core' 2>/dev/null || true
+    uci -q set tachyon.settings.subscription_engine='core' 2>/dev/null || true
+else
+    uci -q set tachyon.settings.engine='sing-box' 2>/dev/null || true
+fi
 uci -q set tachyon.settings.enabled='1' 2>/dev/null || true
 uci commit tachyon 2>/dev/null || true
 
-# 4. Synchronously fetch rulesets (.srs)
+# 4. Synchronously fetch rulesets (.trs / .srs)
 if [ -x /usr/bin/tachyon ]; then
     /usr/bin/tachyon list_update_async >/dev/null 2>&1 || /usr/bin/tachyon list_update >/dev/null 2>&1 || true
 fi
@@ -699,15 +745,24 @@ func TestAWGSection(client *gossh.Client, execFn sshutil.ExecFunc, sectionName s
 
 	// 1. Process check
 	procCheck := `
-if pgrep -x tachyon-core >/dev/null || pgrep -x sing-box >/dev/null || pgrep -f "tachyon-core" >/dev/null || pgrep -f "sing-box" >/dev/null; then
-    echo "PROCESS:OK"
+if pgrep -x tachyon-core >/dev/null || pgrep -f "tachyon-core" >/dev/null || [ "$(cat /etc/tachyon/tachyon-core-variant 2>/dev/null)" = "tachyon-core" ]; then
+    if pgrep -x tachyon-core >/dev/null || pgrep -x sing-box >/dev/null || pgrep -f "tachyon-core" >/dev/null || pgrep -f "sing-box" >/dev/null; then
+        echo "PROCESS:OK:tachyon-core"
+    else
+        echo "PROCESS:FAILED:tachyon-core"
+    fi
+elif pgrep -x sing-box >/dev/null || pgrep -f "sing-box" >/dev/null; then
+    echo "PROCESS:OK:sing-box"
 else
-    echo "PROCESS:FAILED"
+    echo "PROCESS:FAILED:sing-box"
 fi
 `
 	procOut, _ := execFn(client, procCheck)
 	if strings.Contains(procOut, "PROCESS:OK") {
 		report.ServiceRunning = true
+	}
+	if strings.Contains(procOut, ":tachyon-core") {
+		report.EngineName = "tachyon-core"
 	}
 
 	// 2. DNS Fake-IP check

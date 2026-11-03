@@ -36,7 +36,7 @@ func main() {
 	var targetOS string
 	var targetArch string
 
-	flag.StringVar(&version, "v", "1.0.0", "Release version string")
+	flag.StringVar(&version, "v", "1.12.0", "Release version string")
 	flag.StringVar(&targetOS, "os", "all", "Target OS (windows, linux, darwin, all)")
 	flag.StringVar(&targetArch, "arch", "all", "Target Arch (amd64, arm64, all)")
 	flag.Parse()
@@ -66,7 +66,7 @@ func main() {
 		return
 	}
 
-	fmt.Printf("🚀 Building clean standalone Tachyon Installer binaries v%s for %d desktop targets...\n\n", version, len(targets))
+	fmt.Printf("==> Building standalone Tachyon Installer binaries v%s for %d desktop targets...\n\n", version, len(targets))
 
 	for _, t := range targets {
 		binName := fmt.Sprintf("tachyon-installer-%s-%s%s", t.OS, t.Arch, t.Ext)
@@ -83,17 +83,17 @@ func main() {
 
 		out, err := cmd.CombinedOutput()
 		if err != nil {
-			fmt.Printf("FAILED ❌\n%s\n", string(out))
+			fmt.Printf("FAILED [✗]\n%s\n", string(out))
 			os.Exit(1)
 		}
 
 		st, _ := os.Stat(binPath)
 		mb := float64(st.Size()) / 1024 / 1024
-		fmt.Printf("OK ✓ (%.1f MB)\n", mb)
+		fmt.Printf("OK (%.1f MB)\n", mb)
 	}
 
 	// Generate SHA256 sums
-	fmt.Printf("\n🔒 Generating SHA256 checksums (sha256sums.txt)...\n")
+	fmt.Printf("\n==> Generating SHA256 checksums (sha256sums.txt)...\n")
 	checksumFile := filepath.Join(distDir, "sha256sums.txt")
 	f, err := os.Create(checksumFile)
 	if err == nil {
@@ -109,10 +109,10 @@ func main() {
 				f.WriteString(fmt.Sprintf("%s  %s\n", hash, e.Name()))
 			}
 		}
-		fmt.Printf("✓ SHA256 checksums written to %s\n", checksumFile)
+		fmt.Printf("[✓] SHA256 checksums written to %s\n", checksumFile)
 	}
 
-	fmt.Printf("\n✨ All desktop binaries ready in %s/ (clean standalone binaries without archives)\n", distDir)
+	fmt.Printf("\n[✓] All desktop binaries ready in %s/\n", distDir)
 }
 
 func fileSHA256(path string) (string, error) {

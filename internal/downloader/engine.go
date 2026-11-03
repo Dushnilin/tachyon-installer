@@ -22,8 +22,6 @@ const (
 	EngineSingBoxTiny               EngineType = "sing-box-tiny"
 	EngineSingBoxLX                 EngineType = "sing-box-lx"
 	EngineSingBoxStable             EngineType = "sing-box"
-	EngineSteerExtended             EngineType = "steer-extended"
-	EngineSteer                     EngineType = "steer"
 	EngineSkip                      EngineType = "skip"
 )
 
@@ -37,7 +35,6 @@ type EngineDownload struct {
 }
 
 // ResolveEngineAssets finds all matching assets for the router architecture.
-// For modular engines like Steer 2.0+, this returns the core package and all protocol modules.
 func ResolveEngineAssets(
 	ctx context.Context,
 	client *Client,
@@ -66,10 +63,6 @@ func ResolveEngineAssets(
 		return resolveSingBoxTiny(ctx, client, distribArch, rawArch, ext)
 	case EngineSingBoxStable:
 		return resolveSingBoxStable(ctx, client, distribArch, rawArch, ext)
-	case EngineSteerExtended:
-		return resolveSteer(ctx, client, true, distribArch, rawArch, ext)
-	case EngineSteer:
-		return resolveSteer(ctx, client, false, distribArch, rawArch, ext)
 	case EngineSingBoxLX:
 		return resolveSingBoxLX(ctx, client, distribArch, rawArch, ext)
 	default:
@@ -431,172 +424,10 @@ func resolveSingBoxStable(ctx context.Context, client *Client, distribArch, rawA
 	}}, nil
 }
 
-func resolveSteer(ctx context.Context, client *Client, extended bool, distribArch, rawArch, ext string) ([]*EngineDownload, error) {
-	repos := []string{"splify2/steer", "xyzmean/steer"}
-	var lastErr error
-
-	for _, repo := range repos {
-		apiURL := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", repo)
-
-		var rel struct {
-			TagName string `json:"tag_name"`
-			Assets  []struct {
-				Name               string `json:"name"`
-				BrowserDownloadURL string `json:"browser_download_url"`
-			} `json:"assets"`
-		}
-
-		_, err := client.FetchJSON(ctx, apiURL, &rel)
-		if err != nil || len(rel.Assets) == 0 {
-			scraped, sErr := client.ScrapeExpandedAssets(ctx, repo, "latest")
-			if sErr == nil && len(scraped) > 0 {
-				rel.TagName = "latest"
-				for name, u := range scraped {
-					rel.Assets = append(rel.Assets, struct {
-						Name               string `json:"name"`
-						BrowserDownloadURL string `json:"browser_download_url"`
-					}{Name: name, BrowserDownloadURL: u})
-				}
-			} else {
-				if err != nil {
-					lastErr = err
-				} else {
-					lastErr = sErr
-				}
-				continue
-			}
-		}
-
-		var assets []ReleaseAsset
-		for _, a := range rel.Assets {
-			assets = append(assets, ReleaseAsset{
-				Name:               a.Name,
-				BrowserDownloadURL: a.BrowserDownloadURL,
-			})
-		}
-
-		res, filterErr := FilterSteerAssets(assets, extended, distribArch, rawArch, ext, rel.TagName)
-		if filterErr == nil && len(res) > 0 {
-			return res, nil
-		}
-		lastErr = filterErr
-	}
-
-	return nil, fmt.Errorf("failed to fetch steer release from %v: %v", repos, lastErr)
-}
-
 // ReleaseAsset represents a GitHub release asset or scraped asset.
 type ReleaseAsset struct {
 	Name               string `json:"name"`
 	BrowserDownloadURL string `json:"browser_download_url"`
-}
-
-// FilterSteerAssets matches and collects all required Steer packages for an architecture.
-// In Steer 2.0+, packages are modular (steer-core, steer-vless, steer-hysteria2, etc.).
-func FilterSteerAssets(assets []ReleaseAsset, extended bool, distribArch, rawArch, ext, tagName string) ([]*EngineDownload, error) {
-	targetEngine := EngineSteer
-	if extended {
-		targetEngine = EngineSteerExtended
-	}
-
-	normArch := NormalizeArch(rawArch)
-	if normArch == "" {
-		normArch = NormalizeArch(distribArch)
-	}
-	candidates := getArchCandidates(distribArch, normArch)
-
-	// 1. Find the best matching architecture candidate that exists in release assets
-	var matchedCand string
-	for _, cand := range candidates {
-		suffix := "_" + cand + "." + ext
-		for _, a := range assets {
-			name := a.Name
-			// Matches steer-core (2.0+) or steer- (1.x / monolithic)
-			if (strings.HasPrefix(name, "steer-core-") || strings.HasPrefix(name, "steer-")) &&
-				strings.HasSuffix(name, suffix) {
-				if !extended && strings.HasPrefix(name, "steer-extended-") {
-					continue
-				}
-				matchedCand = cand
-				break
-			}
-		}
-		if matchedCand != "" {
-			break
-		}
-	}
-
-	if matchedCand == "" {
-		return nil, fmt.Errorf("steer package not found for arch %s (candidates: %s, ext: .%s)",
-			distribArch, strings.Join(candidates, ", "), ext)
-	}
-
-	suffix := "_" + matchedCand + "." + ext
-	var results []*EngineDownload
-
-	isModular := false
-	for _, a := range assets {
-		if strings.HasPrefix(a.Name, "steer-core-") && strings.HasSuffix(a.Name, suffix) {
-			isModular = true
-			break
-		}
-	}
-
-	for _, a := range assets {
-		name := a.Name
-		if !strings.HasSuffix(name, suffix) {
-			continue
-		}
-		if !strings.HasPrefix(name, "steer-") {
-			continue
-		}
-
-		if isModular {
-			// Steer 2.0+: modular suite
-			if !extended && strings.HasPrefix(name, "steer-extended-") {
-				continue
-			}
-		} else {
-			// Steer 1.x: monolithic packages
-			if extended && !strings.HasPrefix(name, "steer-extended-") {
-				continue
-			}
-			if !extended && strings.HasPrefix(name, "steer-extended-") {
-				continue
-			}
-		}
-
-		results = append(results, &EngineDownload{
-			EngineType: targetEngine,
-			Version:    tagName,
-			URL:        a.BrowserDownloadURL,
-			Filename:   name,
-			IsPackage:  true,
-		})
-	}
-
-	if len(results) == 0 {
-		return nil, fmt.Errorf("steer packages not found for arch %s (suffix %s)", distribArch, suffix)
-	}
-
-	// Sort so steer-core is first, modules alphabetically, and steer-extended last
-	slices.SortStableFunc(results, func(a, b *EngineDownload) int {
-		if strings.HasPrefix(a.Filename, "steer-core-") {
-			return -1
-		}
-		if strings.HasPrefix(b.Filename, "steer-core-") {
-			return 1
-		}
-		if strings.HasPrefix(a.Filename, "steer-extended-") {
-			return 1
-		}
-		if strings.HasPrefix(b.Filename, "steer-extended-") {
-			return -1
-		}
-		return strings.Compare(a.Filename, b.Filename)
-	})
-
-	return results, nil
 }
 
 func resolveSingBoxLX(ctx context.Context, client *Client, distribArch, rawArch, ext string) ([]*EngineDownload, error) {

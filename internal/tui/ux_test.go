@@ -38,8 +38,8 @@ func TestRouterNoiseFilter(t *testing.T) {
 	w := &tviewWriter{}
 
 	noise := []string{
-		`Command failed: ubus call service delete { "name": "steer" } (Not found)`,
-		`Command failed: ubus call service delete { "name": "tachyon-steer-zapret" } (Not found)`,
+		`Command failed: ubus call service delete { "name": "tachyon-core" } (Not found)`,
+		`Command failed: ubus call service delete { "name": "sing-box" } (Not found)`,
 	}
 	for _, l := range noise {
 		if out := w.filterLine(l); out != "" {

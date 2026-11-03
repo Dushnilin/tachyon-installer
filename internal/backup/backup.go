@@ -35,7 +35,7 @@ func CreateLocalBackup(client *gossh.Client, routerIP string) (string, error) {
 	defer sess.Close()
 
 	// Tar existing tachyon config files if they exist on the router
-	remoteCmd := "tar -cz -C / etc/config/tachyon etc/tachyon 2>/dev/null || tar -cz -C / etc/config/tachyon 2>/dev/null || echo ''"
+	remoteCmd := "(if [ -x /usr/bin/tachyon ]; then /usr/bin/tachyon snapshot-save >/dev/null 2>&1 || true; fi); tar -cz -C / etc/config/tachyon etc/tachyon etc/tachyon-core etc/.tachyon 2>/dev/null || tar -cz -C / etc/config/tachyon etc/tachyon 2>/dev/null || tar -cz -C / etc/config/tachyon 2>/dev/null || echo ''"
 	stdout, err := sess.StdoutPipe()
 	if err != nil {
 		return "", fmt.Errorf("stdout pipe: %w", err)
@@ -110,7 +110,7 @@ func CreateFullSnapshot(client *gossh.Client, routerIP string) (string, error) {
 	}
 	defer sess.Close()
 
-	remoteCmd := "tar -cz -C / etc/config/tachyon etc/tachyon etc/config/network etc/config/dhcp etc/config/firewall etc/nftables.d etc/firewall.user 2>/dev/null || tar -cz -C / etc/config/ 2>/dev/null"
+	remoteCmd := "(if [ -x /usr/bin/tachyon ]; then /usr/bin/tachyon snapshot-save >/dev/null 2>&1 || true; fi); tar -cz -C / etc/config/tachyon etc/tachyon etc/tachyon-core etc/.tachyon etc/config/network etc/config/dhcp etc/config/firewall etc/nftables.d etc/firewall.user 2>/dev/null || tar -cz -C / etc/config/ 2>/dev/null"
 	stdout, err := sess.StdoutPipe()
 	if err != nil {
 		return "", fmt.Errorf("stdout pipe: %w", err)

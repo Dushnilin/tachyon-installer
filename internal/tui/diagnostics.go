@@ -44,10 +44,10 @@ func renderDiagResults(results []diag.Result, running bool) string {
 		}
 	}
 	if running {
-		b.WriteString("\n  [#eab308]⏳ Выполняются проверки…[-]\n")
+		b.WriteString("\n  [#eab308]Выполняются проверки…[-]\n")
 	} else if len(results) > 0 {
 		ok, warn, fail := diag.Summary(results)
-		fmt.Fprintf(&b, "\n  [#22c55e]OK: %d[-]   [#eab308]предупреждений: %d[-]   [#ef5350]ошибок: %d[-]\n", ok, warn, fail)
+		fmt.Fprintf(&b, "\n  [#4cc38a]OK: %d[-]   [#eab308]предупреждений: %d[-]   [#e5484d]ошибок: %d[-]\n", ok, warn, fail)
 	}
 	return b.String()
 }
@@ -55,7 +55,7 @@ func renderDiagResults(results []diag.Result, running bool) string {
 // ShowDiagnosticsWizard opens the built-in diagnostics screen and runs all checks.
 // back is the page to return to.
 func ShowDiagnosticsWizard(ctx *AppContext, back string) {
-	panel := buildStepPanel(" ДИАГНОСТИКА ")
+	panel := buildStepPanel("Диагностика")
 
 	tv := tview.NewTextView().SetDynamicColors(true).SetScrollable(true)
 	tv.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
@@ -152,8 +152,8 @@ func ShowDiagnosticsWizard(ctx *AppContext, back string) {
 	form := tview.NewForm()
 	StyleForm(form)
 	form.SetButtonsAlign(tview.AlignCenter)
-	form.AddButton("🔄 Повторить", func() { runChecks() })
-	form.AddButton("💾 Сохранить отчёт", saveReport)
+	form.AddButton("Повторить", func() { runChecks() })
+	form.AddButton("Сохранить отчёт", saveReport)
 	form.AddButton("← Назад", goBack)
 	form.SetInputCapture(func(ev *tcell.EventKey) *tcell.EventKey {
 		row, col := tv.GetScrollOffset()
@@ -197,7 +197,7 @@ func ShowDiagnosticsWizard(ctx *AppContext, back string) {
 // into the console and saves the full report to a file.
 func postInstallDiagnostics(ctx *AppContext, run diag.Exec) {
 	ctx.SetSubTask("Итоговая диагностика...", 0.5)
-	ctx.ConsoleWrite("\n[#cbd5e1]⚡ Итоговая диагностика роутера...[-]\n")
+	ctx.ConsoleWrite("\n[#a1a1a6]Итоговая диагностика роутера...[-]\n")
 
 	results := diag.RunRouter(run, nil)
 	for _, r := range results {

@@ -29,7 +29,7 @@ func HotSwapEngine(
 		logFn = func(string) {}
 	}
 
-	logFn(fmt.Sprintf("⚡ Горячая смена ядра на [%s]...\n", targetEngine))
+	logFn(fmt.Sprintf("→ Горячая смена ядра на [%s]...\n", targetEngine))
 
 	staging, err := NewStagingArea()
 	if err != nil {
@@ -42,7 +42,7 @@ func HotSwapEngine(
 		mirrorMgr := dlpkg.NewMirrorManager(mirror)
 		dlClient := dlpkg.NewClient(mirrorMgr)
 
-		logFn(fmt.Sprintf("⚡ Поиск пакетов ядра %s для %s (%s)...\n", targetEngine, detectedArch, distribArch))
+		logFn(fmt.Sprintf("→ Поиск пакетов ядра %s для %s (%s)...\n", targetEngine, detectedArch, distribArch))
 		assets, err := dlpkg.ResolveEngineAssets(ctx, dlClient, dlpkg.EngineType(targetEngine), distribArch, detectedArch, isAPK)
 		if err != nil {
 			return fmt.Errorf("resolve engine assets: %w", err)
@@ -66,10 +66,10 @@ func HotSwapEngine(
 	// 2. Generate hot-swap runner script
 	uciEngine := targetEngine
 	switch targetEngine {
-	case "tachyon-core", "sing-box-extended", "sing-box-extended-compressed", "sing-box-tiny", "sing-box-lx", "sing-box":
+	case "tachyon-core":
+		uciEngine = "tachyon-core"
+	case "sing-box-extended", "sing-box-extended-compressed", "sing-box-tiny", "sing-box-lx", "sing-box":
 		uciEngine = "sing-box"
-	case "steer", "steer-extended":
-		uciEngine = targetEngine
 	}
 
 	variantMarker := VariantMarkerForEngine(targetEngine)
@@ -93,6 +93,7 @@ func HotSwapEngine(
 	script := fmt.Sprintf(`#!/bin/sh
 set -e
 echo "==> [1/3] Остановка службы Tachyon..."
+rm -rf /var/run/tachyon/starting /var/run/tachyon/reloading /var/run/tachyon*.lock 2>/dev/null || true
 if [ -x /etc/init.d/tachyon ]; then
     /etc/init.d/tachyon stop >/dev/null 2>&1 || true
 fi
@@ -102,10 +103,7 @@ fi
 if [ -x /etc/init.d/sing-box ]; then
     /etc/init.d/sing-box stop >/dev/null 2>&1 || true
 fi
-if [ -x /etc/init.d/steer ]; then
-    /etc/init.d/steer stop >/dev/null 2>&1 || true
-fi
-killall -9 tachyon-core sing-box steer 2>/dev/null || true
+killall -9 tachyon-core sing-box 2>/dev/null || true
 
 ENGINE="%s"
 VARIANT_MARKER="%s"
@@ -119,7 +117,7 @@ fi
 case "$ENGINE" in
     tachyon-core|sing-box-extended-compressed|sing-box-lx)
         if [ "$PKG_MGR" = "apk" ]; then
-            apk del sing-box-extended sing-box-tiny sing-box >/dev/null 2>&1 || true
+            apk del --no-network --repositories-file /dev/null --force-broken-world sing-box-extended sing-box-tiny sing-box >/dev/null 2>&1 || true
         else
             opkg remove --force-depends sing-box-extended sing-box-tiny sing-box >/dev/null 2>&1 || true
         fi
@@ -127,20 +125,13 @@ case "$ENGINE" in
     sing-box-extended|sing-box-tiny|sing-box)
         rm -f /usr/bin/sing-box /usr/bin/tachyon-core 2>/dev/null || true
         if [ "$ENGINE" != "sing-box-extended" ]; then
-            if [ "$PKG_MGR" = "apk" ]; then apk del sing-box-extended >/dev/null 2>&1 || true; else opkg remove --force-depends sing-box-extended >/dev/null 2>&1 || true; fi
+            if [ "$PKG_MGR" = "apk" ]; then apk del --no-network --repositories-file /dev/null --force-broken-world sing-box-extended >/dev/null 2>&1 || true; else opkg remove --force-depends sing-box-extended >/dev/null 2>&1 || true; fi
         fi
         if [ "$ENGINE" != "sing-box-tiny" ]; then
-            if [ "$PKG_MGR" = "apk" ]; then apk del sing-box-tiny >/dev/null 2>&1 || true; else opkg remove --force-depends sing-box-tiny >/dev/null 2>&1 || true; fi
+            if [ "$PKG_MGR" = "apk" ]; then apk del --no-network --repositories-file /dev/null --force-broken-world sing-box-tiny >/dev/null 2>&1 || true; else opkg remove --force-depends sing-box-tiny >/dev/null 2>&1 || true; fi
         fi
         if [ "$ENGINE" != "sing-box" ]; then
-            if [ "$PKG_MGR" = "apk" ]; then apk del sing-box >/dev/null 2>&1 || true; else opkg remove --force-depends sing-box >/dev/null 2>&1 || true; fi
-        fi
-        ;;
-    steer)
-        if [ "$PKG_MGR" = "apk" ]; then
-            apk del steer-extended >/dev/null 2>&1 || true
-        else
-            opkg remove --force-depends steer-extended >/dev/null 2>&1 || true
+            if [ "$PKG_MGR" = "apk" ]; then apk del --no-network --repositories-file /dev/null --force-broken-world sing-box >/dev/null 2>&1 || true; else opkg remove --force-depends sing-box >/dev/null 2>&1 || true; fi
         fi
         ;;
 esac
@@ -185,9 +176,9 @@ elif ls /tmp/tachyon-install/sing-box*.tar.gz >/dev/null 2>&1; then
     fi
 fi
 
-# If IPK or APK packages exist (steer, sing-box-extended, etc.)
+# If IPK or APK packages exist (sing-box-extended, etc.)
 if [ "$PKG_MGR" = "apk" ]; then
-    ls /tmp/tachyon-install/*.apk >/dev/null 2>&1 && apk add --allow-untrusted --force-overwrite /tmp/tachyon-install/*.apk 2>&1 || true
+    ls /tmp/tachyon-install/*.apk >/dev/null 2>&1 && (apk add --allow-untrusted --force-overwrite --no-network --repositories-file /dev/null /tmp/tachyon-install/*.apk 2>&1 || apk add --allow-untrusted --force-overwrite /tmp/tachyon-install/*.apk 2>&1) || true
 else
     ls /tmp/tachyon-install/*.ipk >/dev/null 2>&1 && opkg install --force-reinstall --force-overwrite /tmp/tachyon-install/*.ipk 2>&1 || true
 fi
@@ -203,6 +194,10 @@ fi
 if [ -n "$VARIANT_MARKER" ]; then
     mkdir -p /etc/tachyon /etc/tachyon-core /tmp/tachyon-core /usr/share/tachyon-core /usr/share/sing-box 2>/dev/null || true
     printf '%%s\n' "$VARIANT_MARKER" > /etc/tachyon/tachyon-core-variant 2>/dev/null || true
+    if [ "$VARIANT_MARKER" = "tachyon-core" ] && [ -x /usr/bin/tachyon-core ]; then
+        _tc_ver=$(/usr/bin/tachyon-core --version 2>/dev/null | head -n 1 | awk '{print $NF}')
+        [ -n "$_tc_ver" ] && printf '%%s\n' "$_tc_ver" > /etc/tachyon/tachyon-core-version 2>/dev/null || true
+    fi
     rm -f /tmp/tachyon-core/cache.db* /usr/share/tachyon-core/cache.db* /usr/share/sing-box/cache.db* /etc/tachyon-core/cache.db* /var/run/sing-box/cache.db* 2>/dev/null || true
     if [ -x /etc/init.d/sing-box ]; then
         /etc/init.d/sing-box stop >/dev/null 2>&1 || true
@@ -213,19 +208,17 @@ if [ -n "$VARIANT_MARKER" ]; then
     fi
 fi
 
-# Ensure /usr/bin/steer symlink
-if [ -x /usr/sbin/steer ] && [ ! -e /usr/bin/steer ]; then
-    ln -sf /usr/sbin/steer /usr/bin/steer 2>/dev/null || true
-fi
-
 echo "==> [3/3] Переключение UCI (engine=%s) и перезапуск службы..."
 uci -q set tachyon.settings.engine="%s"
+if [ "%s" = "tachyon-core" ]; then
+    uci -q set tachyon.settings.subscription_engine="core"
+fi
 uci commit tachyon 2>/dev/null || true
 /etc/init.d/tachyon enable >/dev/null 2>&1 || true
 /etc/init.d/tachyon restart 2>&1 || /usr/bin/tachyon start 2>&1 || true
 rm -rf /tmp/tachyon-install 2>/dev/null || true
-echo "==> Горячая смена ядра завершена успешно!"
-`, targetEngine, variantMarker, targetEngine, repoInstallCmd, uciEngine, uciEngine)
+echo "==> Горячая смена ядра завершена."
+`, targetEngine, variantMarker, targetEngine, repoInstallCmd, uciEngine, uciEngine, uciEngine)
 
 	scriptPath := filepath.Join(staging.Dir, "install_on_router.sh")
 	if err := os.WriteFile(scriptPath, []byte(strings.ReplaceAll(script, "\r\n", "\n")), 0755); err != nil {
@@ -233,7 +226,7 @@ echo "==> Горячая смена ядра завершена успешно!"
 	}
 
 	// 3. Upload & execute
-	logFn("⚡ Загрузка и активация на роутере...\n")
+	logFn("→ Загрузка и активация на роутере...\n")
 	if err := UploadStagingAndExecute(client, staging.Dir, os.Stdout, logFn); err != nil {
 		return fmt.Errorf("swap execute failed: %w", err)
 	}
@@ -250,9 +243,9 @@ echo "==> Горячая смена ядра завершена успешно!"
 		}
 		out, _ := sess.CombinedOutput(checkCmd)
 		if strings.Contains(string(out), "RUNNING") {
-			logFn(fmt.Sprintf("[#22c55e]✓ Новое ядро [%s] успешно запущено и активно![-]\n", targetEngine))
+			logFn(fmt.Sprintf("[#4cc38a]✓ Новое ядро [%s] запущено и активно[-]\n", targetEngine))
 		} else {
-			logFn(fmt.Sprintf("[#eab308]⚠️ Ядро переключено на [%s], статус: %s[-]\n", targetEngine, strings.TrimSpace(string(out))))
+			logFn(fmt.Sprintf("[#eab308]! Ядро переключено на [%s], статус: %s[-]\n", targetEngine, strings.TrimSpace(string(out))))
 		}
 	}
 

@@ -83,6 +83,10 @@ fi
 set -e
 
 echo "==> [1/5] Подготовка системы и остановка служб..."
+# Release stale procd/tachyon locks
+rm -rf /var/run/tachyon/starting /var/run/tachyon/reloading /var/run/tachyon*.lock 2>/dev/null || true
+for _p in $(pgrep -f "99-tachyon-wan" 2>/dev/null || true); do kill -9 "$_p" 2>/dev/null || true; done
+
 if [ -x /etc/init.d/tachyon ]; then
     /etc/init.d/tachyon stop >/dev/null 2>&1 || true
 fi
@@ -92,19 +96,26 @@ fi
 if [ -x /etc/init.d/sing-box ]; then
     /etc/init.d/sing-box stop >/dev/null 2>&1 || true
 fi
-if [ -x /etc/init.d/steer ]; then
-    /etc/init.d/steer stop >/dev/null 2>&1 || true
-fi
 if [ -x /usr/bin/tachyon ]; then
     /usr/bin/tachyon stop >/dev/null 2>&1 || true
 fi
-killall -9 tachyon-core sing-box steer 2>/dev/null || true
+killall -9 tachyon-core sing-box nfqws nfqws2 2>/dev/null || true
 
 # Determine package manager
 if command -v apk >/dev/null 2>&1; then
     PKG_MGR="apk"
 else
     PKG_MGR="opkg"
+fi
+
+# OpenWrt 25.12+: release ip-tiny conflict so ip-full can install cleanly
+if [ "$PKG_MGR" = "apk" ]; then
+    if [ -f /etc/apk/world ]; then
+        sed -i -E "/^ip-tiny([ \t<>=~].*)?\$/d" /etc/apk/world 2>/dev/null || true
+    fi
+    apk del --no-network --repositories-file /dev/null --force-broken-world ip-tiny >/dev/null 2>&1 || true
+else
+    opkg remove --force-depends ip-tiny >/dev/null 2>&1 || true
 fi
 ` + zramSection + `
 ENGINE="` + selectedEngine + `"
@@ -114,7 +125,7 @@ VARIANT_MARKER="` + variantMarker + `"
 case "$ENGINE" in
     tachyon-core|sing-box-extended-compressed|sing-box-lx)
         if [ "$PKG_MGR" = "apk" ]; then
-            apk del sing-box-extended sing-box-tiny sing-box >/dev/null 2>&1 || true
+            apk del --no-network --repositories-file /dev/null --force-broken-world sing-box-extended sing-box-tiny sing-box >/dev/null 2>&1 || true
         else
             opkg remove --force-depends sing-box-extended sing-box-tiny sing-box >/dev/null 2>&1 || true
         fi
@@ -122,38 +133,61 @@ case "$ENGINE" in
     sing-box-extended|sing-box-tiny|sing-box)
         rm -f /usr/bin/sing-box /usr/bin/tachyon-core 2>/dev/null || true
         if [ "$ENGINE" != "sing-box-extended" ]; then
-            if [ "$PKG_MGR" = "apk" ]; then apk del sing-box-extended >/dev/null 2>&1 || true; else opkg remove --force-depends sing-box-extended >/dev/null 2>&1 || true; fi
+            if [ "$PKG_MGR" = "apk" ]; then apk del --no-network --repositories-file /dev/null --force-broken-world sing-box-extended >/dev/null 2>&1 || true; else opkg remove --force-depends sing-box-extended >/dev/null 2>&1 || true; fi
         fi
         if [ "$ENGINE" != "sing-box-tiny" ]; then
-            if [ "$PKG_MGR" = "apk" ]; then apk del sing-box-tiny >/dev/null 2>&1 || true; else opkg remove --force-depends sing-box-tiny >/dev/null 2>&1 || true; fi
+            if [ "$PKG_MGR" = "apk" ]; then apk del --no-network --repositories-file /dev/null --force-broken-world sing-box-tiny >/dev/null 2>&1 || true; else opkg remove --force-depends sing-box-tiny >/dev/null 2>&1 || true; fi
         fi
         if [ "$ENGINE" != "sing-box" ]; then
-            if [ "$PKG_MGR" = "apk" ]; then apk del sing-box >/dev/null 2>&1 || true; else opkg remove --force-depends sing-box >/dev/null 2>&1 || true; fi
-        fi
-        ;;
-    steer)
-        if [ "$PKG_MGR" = "apk" ]; then
-            apk del steer-extended >/dev/null 2>&1 || true
-        else
-            opkg remove --force-depends steer-extended >/dev/null 2>&1 || true
+            if [ "$PKG_MGR" = "apk" ]; then apk del --no-network --repositories-file /dev/null --force-broken-world sing-box >/dev/null 2>&1 || true; else opkg remove --force-depends sing-box >/dev/null 2>&1 || true; fi
         fi
         ;;
 esac
 
 echo "==> [2/5] Установка пакетов Tachyon..."
 if [ "$PKG_MGR" = "apk" ]; then
-    # Install local APK packages
+    # Scrub legacy packages and pinned tachyon hash constraints from /etc/apk/world
+    if [ -f /etc/apk/world ]; then
+        for _lp in forkop luci-app-forkop podkop luci-app-podkop forkop_plus luci-app-forkop_plus podkop_plus luci-app-podkop_plus netshift luci-app-netshift; do
+            sed -i -E "/^${_lp}([ \t<>=~].*)?\$/d" /etc/apk/world 2>/dev/null || true
+        done
+        sed -i -E "/^tachyon([ \t<>=~].*)?\$/d; /^luci-app-tachyon([ \t<>=~].*)?\$/d; /^luci-i18n-tachyon-ru([ \t<>=~].*)?\$/d" /etc/apk/world 2>/dev/null || true
+    fi
+    # Ensure runtime dependencies & kmods (skipping built-in kernel modules)
+    for _kmod in kmod-nft-tproxy:nft_tproxy kmod-tun:tun kmod-inet-diag:inet_diag kmod-netlink-diag:netlink_diag kmod-nft-nat:nft_nat; do
+        _pkg="${_kmod%:*}"
+        _mod="${_kmod#*:}"
+        if [ ! -d "/sys/module/$_mod" ] && ! modprobe "$_mod" >/dev/null 2>&1; then
+            apk info -e "$_pkg" >/dev/null 2>&1 || apk add --force-missing-repositories "$_pkg" >/dev/null 2>&1 || true
+        fi
+    done
+    # Try offline local APK install first, fallback to repo-assisted or virtual dep healing
+    apk add --allow-untrusted --force-overwrite --no-network --repositories-file /dev/null /tmp/tachyon-install/*.apk 2>&1 || \
     apk add --allow-untrusted --force-overwrite /tmp/tachyon-install/*.apk 2>&1 || {
-        echo "Внимание: обновление репозиториев для доустановки зависимостей..."
-        apk update >/dev/null 2>&1 || true
-        apk add --allow-untrusted --force-overwrite /tmp/tachyon-install/*.apk
+        echo "Обновление репозиториев apk для доустановки зависимостей..."
+        apk update --force-missing-repositories >/dev/null 2>&1 || true
+        for _dep in ca-bundle curl coreutils-base64 coreutils-timeout bind-dig nftables ip-full luci-base rpcd-mod-luci; do
+            apk info -e "$_dep" >/dev/null 2>&1 || apk add --force-missing-repositories "$_dep" >/dev/null 2>&1 || \
+            apk add --no-network --repositories-file /dev/null --force-non-repository --virtual "$_dep" >/dev/null 2>&1 || true
+        done
+        apk add --allow-untrusted --force-overwrite --no-network --repositories-file /dev/null /tmp/tachyon-install/*.apk 2>&1 || \
+        apk add --allow-untrusted --force-overwrite --force-broken-world /tmp/tachyon-install/*.apk
     }
 else
+    # Ensure runtime kmods if not built-in
+    for _kmod in kmod-nft-tproxy:nft_tproxy kmod-tun:tun kmod-inet-diag:inet_diag kmod-netlink-diag:netlink_diag kmod-nft-nat:nft_nat; do
+        _pkg="${_kmod%:*}"
+        _mod="${_kmod#*:}"
+        if [ ! -d "/sys/module/$_mod" ] && ! modprobe "$_mod" >/dev/null 2>&1; then
+            opkg status "$_pkg" 2>/dev/null | grep -q "installed" || opkg install "$_pkg" >/dev/null 2>&1 || true
+        fi
+    done
     # Install local IPK packages
     opkg install --force-reinstall --force-overwrite /tmp/tachyon-install/*.ipk 2>&1 || {
-        echo "Внимание: обновление opkg для доустановки зависимостей..."
+        echo "Обновление opkg для доустановки зависимостей..."
         opkg update >/dev/null 2>&1 || true
-        opkg install --force-reinstall --force-overwrite /tmp/tachyon-install/*.ipk
+        opkg install --force-reinstall --force-overwrite /tmp/tachyon-install/*.ipk || \
+        opkg install --force-reinstall --force-overwrite --force-depends /tmp/tachyon-install/*.ipk
     }
 fi
 
@@ -231,6 +265,10 @@ fi
 if [ -n "$VARIANT_MARKER" ]; then
     mkdir -p /etc/tachyon /etc/tachyon-core /tmp/tachyon-core /usr/share/tachyon-core /usr/share/sing-box 2>/dev/null || true
     printf '%s\n' "$VARIANT_MARKER" > /etc/tachyon/tachyon-core-variant 2>/dev/null || true
+    if [ "$VARIANT_MARKER" = "tachyon-core" ] && [ -x /usr/bin/tachyon-core ]; then
+        _tc_ver=$(/usr/bin/tachyon-core --version 2>/dev/null | head -n 1 | awk '{print $NF}')
+        [ -n "$_tc_ver" ] && printf '%s\n' "$_tc_ver" > /etc/tachyon/tachyon-core-version 2>/dev/null || true
+    fi
     rm -f /tmp/tachyon-core/cache.db* /usr/share/tachyon-core/cache.db* /usr/share/sing-box/cache.db* /etc/tachyon-core/cache.db* /var/run/sing-box/cache.db* 2>/dev/null || true
     if [ -x /etc/init.d/sing-box ]; then
         /etc/init.d/sing-box stop >/dev/null 2>&1 || true
@@ -241,23 +279,15 @@ if [ -n "$VARIANT_MARKER" ]; then
     fi
 fi
 
-# Ensure /usr/bin/steer symlink exists if steer is in /usr/sbin/steer (Steer 2.0+)
-if [ -x /usr/sbin/steer ] && [ ! -e /usr/bin/steer ]; then
-    ln -sf /usr/sbin/steer /usr/bin/steer 2>/dev/null || true
-fi
-
 if [ -n "$ENGINE" ] && [ "$ENGINE" != "skip" ]; then
     echo "==> [3/5] Настройка активного ядра в UCI ($ENGINE)..."
     case "$ENGINE" in
-        tachyon-core|sing-box*|extended*|tiny|lx)
-            uci -q set tachyon.settings.engine="sing-box"
-            if [ -x /etc/init.d/steer ]; then
-                /etc/init.d/steer stop >/dev/null 2>&1 || true
-                /etc/init.d/steer disable >/dev/null 2>&1 || true
-            fi
+        tachyon-core)
+            uci -q set tachyon.settings.engine="tachyon-core"
+            uci -q set tachyon.settings.subscription_engine="core"
             ;;
-        steer*)
-            uci -q set tachyon.settings.engine="$ENGINE"
+        sing-box*|extended*|tiny|lx)
+            uci -q set tachyon.settings.engine="sing-box"
             ;;
         *)
             uci -q set tachyon.settings.engine="$ENGINE"
@@ -273,7 +303,7 @@ echo "==> [5/5] Активация и запуск службы Tachyon..."
 /etc/init.d/tachyon enable >/dev/null 2>&1 || true
 /etc/init.d/tachyon restart 2>&1 || /usr/bin/tachyon start 2>&1 || true
 
-echo "==> Экспресс-установка на роутере успешно завершена!"
+echo "==> Установка на роутере завершена."
 `
 
 	// Ensure UNIX line endings (LF)
@@ -291,42 +321,99 @@ func (s *StagingArea) WriteRunnerScript(selectedEngine string, isAPK bool, insta
 	return path, nil
 }
 
-// GenerateUninstallScript creates a clean uninstaller shell script.
+// GenerateUninstallScript creates a clean uninstaller shell script synced with Tachyon uninstall.sh v1.3.0.
 func GenerateUninstallScript(isAPK bool) string {
 	script := `#!/bin/sh
-# Tachyon Clean Complete Uninstaller
+# Tachyon Clean Complete Uninstaller (v1.3.0 sync)
 set -e
 
-echo "==> [1/4] Остановка служб Tachyon..."
-if [ -x /etc/init.d/tachyon ]; then
-    /etc/init.d/tachyon stop >/dev/null 2>&1 || true
-    /etc/init.d/tachyon disable >/dev/null 2>&1 || true
-fi
-if [ -x /etc/init.d/tachyon-core ]; then
-    /etc/init.d/tachyon-core stop >/dev/null 2>&1 || true
-    /etc/init.d/tachyon-core disable >/dev/null 2>&1 || true
-fi
-killall -9 tachyon tachyon-core sing-box steer 2>/dev/null || true
+echo "==> [1/4] Остановка служб Tachyon и освобождение блокировок..."
+rm -rf /var/run/tachyon/starting /var/run/tachyon/reloading /var/run/tachyon*.lock 2>/dev/null || true
+for _p in $(pgrep -f "99-tachyon-wan" 2>/dev/null || true); do kill -9 "$_p" 2>/dev/null || true; done
+
+for _svc in tachyon tachyon-core sing-box; do
+    if [ -x "/etc/init.d/$_svc" ]; then
+        "/etc/init.d/$_svc" stop >/dev/null 2>&1 || true
+        "/etc/init.d/$_svc" disable >/dev/null 2>&1 || true
+    fi
+done
+killall -9 tachyon tachyon-core sing-box nfqws nfqws2 2>/dev/null || true
+
+# Clean nftables tables
 nft delete table inet TachyonTable 2>/dev/null || true
 nft delete table inet tachyon 2>/dev/null || true
-nft delete table inet steer 2>/dev/null || true
+nft delete table inet tachyon_tailscale 2>/dev/null || true
+
+# Clean policy routing rules and tables (105 / tachyon, 100, Tailscale 4247/4248)
+for _ipt in "ip" "ip -6"; do
+    while $_ipt rule del fwmark 0x04000000/0x04000000 lookup tachyon 2>/dev/null; do :; done
+    while $_ipt rule del fwmark 0x04000000/0x04000000 lookup 105 2>/dev/null; do :; done
+    while $_ipt rule del fwmark 0x10000000/0x10000000 lookup 100 2>/dev/null; do :; done
+    while $_ipt rule del lookup tachyon 2>/dev/null; do :; done
+    while $_ipt rule del lookup 105 2>/dev/null; do :; done
+    while $_ipt rule del lookup 100 2>/dev/null; do :; done
+    while $_ipt rule del lookup 4247 2>/dev/null; do :; done
+    while $_ipt rule del lookup 4248 2>/dev/null; do :; done
+    for _tbl in tachyon 105 100 4247 4248; do
+        $_ipt route flush table "$_tbl" 2>/dev/null || true
+    done
+done
+if [ -f /etc/iproute2/rt_tables ]; then
+    sed -i '/^[[:space:]]*105[[:space:]]\+tachyon$/d' /etc/iproute2/rt_tables 2>/dev/null || true
+fi
+ip netns del fkpsc 2>/dev/null || true
+ip link del fkpsc0 2>/dev/null || true
+
+# Restore dnsmasq backups created by Tachyon
+if command -v uci >/dev/null 2>&1; then
+    if uci -q get dhcp.@dnsmasq[0].tachyon_server >/dev/null 2>&1; then
+        uci -q delete dhcp.@dnsmasq[0].server 2>/dev/null || true
+        for _srv in $(uci -q get dhcp.@dnsmasq[0].tachyon_server); do
+            uci -q add_list dhcp.@dnsmasq[0].server="$_srv" 2>/dev/null || true
+        done
+        uci -q delete dhcp.@dnsmasq[0].tachyon_server 2>/dev/null || true
+    fi
+    for _opt in noresolv cachesize rebind_protection localuse; do
+        _bak=$(uci -q get "dhcp.@dnsmasq[0].tachyon_${_opt}" 2>/dev/null || true)
+        if [ -n "$_bak" ]; then
+            if [ "$_bak" = "__unset__" ]; then
+                uci -q delete "dhcp.@dnsmasq[0].${_opt}" 2>/dev/null || true
+            else
+                uci -q set "dhcp.@dnsmasq[0].${_opt}=${_bak}" 2>/dev/null || true
+            fi
+            uci -q delete "dhcp.@dnsmasq[0].tachyon_${_opt}" 2>/dev/null || true
+        fi
+    done
+    uci -q del_list dhcp.@dnsmasq[0].addn_hosts='/tmp/tachyon/hosts' 2>/dev/null || true
+    uci -q commit dhcp 2>/dev/null || true
+    /etc/init.d/dnsmasq restart >/dev/null 2>&1 || true
+fi
+
+# Clean crontabs
+if [ -f /etc/crontabs/root ]; then
+    sed -i -E '/tachyon|parental_quota_tick/d' /etc/crontabs/root 2>/dev/null || true
+    /etc/init.d/cron reload >/dev/null 2>&1 || true
+fi
 
 echo "==> [2/4] Удаление пакетов Tachyon..."
 if command -v apk >/dev/null 2>&1; then
-    apk del luci-app-tachyon luci-i18n-tachyon-ru tachyon 2>&1 || true
+    if [ -f /etc/apk/world ]; then
+        sed -i -E "/^(luci-app-tachyon|luci-i18n-tachyon-ru|tachyon)([ \t<>=~].*)?\$/d" /etc/apk/world 2>/dev/null || true
+    fi
+    apk del --no-network --repositories-file /dev/null --force-broken-world luci-app-tachyon luci-i18n-tachyon-ru tachyon 2>&1 || true
 else
-    opkg remove --autoremove luci-app-tachyon luci-i18n-tachyon-ru tachyon 2>&1 || true
+    opkg remove --force-removal-of-dependent-packages luci-app-tachyon luci-i18n-tachyon-ru tachyon 2>&1 || true
 fi
 
 echo "==> [3/4] Очистка конфигурации и временных файлов..."
-rm -rf /etc/config/tachyon /etc/tachyon /etc/tachyon-core /etc/init.d/tachyon-core /usr/bin/tachyon /usr/bin/tachyon-core /usr/sbin/steer /tmp/tachyon-install /tmp/tachyon-core /tmp/luci-modulecache/ /tmp/luci-indexcache* 2>/dev/null || true
+rm -rf /etc/config/tachyon /etc/tachyon /etc/tachyon-core /etc/.tachyon /etc/init.d/tachyon /etc/init.d/tachyon-core /etc/hotplug.d/iface/99-tachyon-wan /usr/bin/tachyon /usr/bin/tachyon-core /usr/lib/tachyon /usr/share/tachyon-core /tmp/tachyon* /var/run/tachyon /tmp/luci-modulecache/ /tmp/luci-indexcache* 2>/dev/null || true
 
 echo "==> [4/4] Сброс сетевых правил и перезапуск firewall..."
 if [ -x /etc/init.d/firewall ]; then
     /etc/init.d/firewall restart >/dev/null 2>&1 || true
 fi
 
-echo "==> Tachyon успешно удален с роутера."
+echo "==> Tachyon удален с роутера."
 `
 	return strings.ReplaceAll(script, "\r\n", "\n")
 }

@@ -31,21 +31,44 @@ type SubscriptionAnalysis struct {
 }
 
 var knownProtocols = map[string]string{
-	"vless":     "VLESS",
-	"vmess":     "VMess",
-	"trojan":    "Trojan",
-	"ss":        "Shadowsocks",
-	"ssr":       "ShadowsocksR",
-	"hy2":       "Hysteria 2",
-	"hysteria2": "Hysteria 2",
-	"hysteria":  "Hysteria",
-	"tuic":      "TUIC",
-	"wireguard": "WireGuard",
-	"wg":        "WireGuard",
+	"vless":       "VLESS",
+	"vmess":       "VMess",
+	"trojan":      "Trojan",
+	"ss":          "Shadowsocks",
+	"shadowsocks": "Shadowsocks",
+	"ssr":         "ShadowsocksR",
+	"hy2":         "Hysteria 2",
+	"hysteria2":   "Hysteria 2",
+	"hysteria":    "Hysteria",
+	"tuic":        "TUIC",
+	"anytls":      "AnyTLS",
+	"wireguard":   "WireGuard",
+	"wg":          "WireGuard",
+	"awg":         "AmneziaWG",
+	"amneziawg":   "AmneziaWG",
+	"socks":       "SOCKS5",
+	"socks5":      "SOCKS5",
+	"http":        "HTTP Proxy",
+	"https":       "HTTPS Proxy",
+	"naive+https": "NaiveProxy",
+	"naive":       "NaiveProxy",
+	"mieru":       "Mieru",
+	"snell":       "Snell",
+	"sudoku":      "Sudoku",
+	"masque":      "MASQUE",
+	"tewfai":      "Tewfai",
+	"trusttunnel": "TrustTunnel",
+	"openconnect": "OpenConnect",
+	"tg":          "MTProto",
+	"mtproto":     "MTProto",
+	"warp":        "WARP",
+	"fptn":        "FPTN",
+	"fptnb":       "FPTN",
+	"happ":        "Happ",
 }
 
 // AnalyzeSubscription inspects a raw string to determine if it is a valid HTTP(S) link,
-// raw proxy URIs (vless://, hysteria2://, etc.), or a base64 encoded bundle.
+// Happ encrypted subscription, raw proxy URIs (vless://, hysteria2://, fptn:, etc.), or a base64 encoded bundle.
 func AnalyzeSubscription(raw string) SubscriptionAnalysis {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -56,8 +79,8 @@ func AnalyzeSubscription(raw string) SubscriptionAnalysis {
 		}
 	}
 
-	// 1. Direct HTTP/HTTPS subscription URL
-	if strings.HasPrefix(raw, "http://") || strings.HasPrefix(raw, "https://") {
+	// 1. Direct HTTP/HTTPS subscription URL or Happ crypt4 subscription
+	if !strings.ContainsAny(raw, " \t\r\n") && (strings.HasPrefix(raw, "http://") || strings.HasPrefix(raw, "https://")) {
 		parsed, err := url.ParseRequestURI(raw)
 		if err != nil || parsed.Host == "" {
 			return SubscriptionAnalysis{
@@ -74,23 +97,50 @@ func AnalyzeSubscription(raw string) SubscriptionAnalysis {
 			Protocols: []string{"Авто-обновление"},
 		}
 	}
+	if !strings.ContainsAny(raw, " \t\r\n") && strings.HasPrefix(strings.ToLower(raw), "happ://crypt4/") {
+		return SubscriptionAnalysis{
+			Valid:     true,
+			Type:      "https",
+			Summary:   "Зашифрованная ссылка подписки Happ (crypt4)",
+			NodeCount: 1,
+			Protocols: []string{"Happ crypt4"},
+		}
+	}
 
-	// Helper to extract nodes and protocol counts
+	// Helper to extract nodes and protocol counts (supports multiple share URIs per line)
 	parseNodes := func(lines []string, srcType string) (SubscriptionAnalysis, bool) {
 		var validNodes []string
 		protoCounts := make(map[string]int)
 
-		for _, line := range lines {
-			line = strings.TrimSpace(line)
-			if line == "" || strings.HasPrefix(line, "#") {
+		for _, rawLine := range lines {
+			rawLine = strings.TrimSpace(rawLine)
+			if rawLine == "" || strings.HasPrefix(rawLine, "#") {
 				continue
 			}
-			parts := strings.SplitN(line, "://", 2)
-			if len(parts) == 2 {
-				scheme := strings.ToLower(parts[0])
-				if name, ok := knownProtocols[scheme]; ok {
-					validNodes = append(validNodes, line)
-					protoCounts[name]++
+			tokens := []string{rawLine}
+			if strings.Count(rawLine, "://") > 1 {
+				tokens = strings.FieldsFunc(rawLine, func(r rune) bool {
+					return r == ' ' || r == '\t' || r == ',' || r == ';'
+				})
+			}
+			for _, token := range tokens {
+				token = strings.TrimSpace(token)
+				if token == "" {
+					continue
+				}
+				lowerToken := strings.ToLower(token)
+				if (strings.HasPrefix(lowerToken, "fptn:") || strings.HasPrefix(lowerToken, "fptnb:")) && !strings.Contains(lowerToken, "://") {
+					validNodes = append(validNodes, token)
+					protoCounts["FPTN"]++
+					continue
+				}
+				parts := strings.SplitN(token, "://", 2)
+				if len(parts) == 2 {
+					scheme := strings.ToLower(parts[0])
+					if name, ok := knownProtocols[scheme]; ok {
+						validNodes = append(validNodes, token)
+						protoCounts[name]++
+					}
 				}
 			}
 		}
@@ -163,7 +213,7 @@ func AnalyzeSubscription(raw string) SubscriptionAnalysis {
 func CheckSubscriptions(client *gossh.Client, execFn sshutil.ExecFunc) SubscriptionStatus {
 	status := SubscriptionStatus{SectionName: "main"}
 
-	pkgOut, _ := execFn(client, "opkg list-installed 2>/dev/null || apk info 2>/dev/null")
+	pkgOut, _ := execFn(client, "(opkg list-installed 2>/dev/null || apk info 2>/dev/null); [ -d /sys/module/nft_tproxy ] && echo kmod-nft-tproxy; [ -d /sys/module/tun ] && echo kmod-tun")
 	if !strings.Contains(pkgOut, "kmod-nft-tproxy") {
 		status.MissingKernelMods = append(status.MissingKernelMods, "kmod-nft-tproxy")
 	}
@@ -177,7 +227,7 @@ func CheckSubscriptions(client *gossh.Client, execFn sshutil.ExecFunc) Subscript
 		return status
 	}
 
-	// Check if any subscription_url or selector_proxy_links is defined
+	// Check if any subscription_url, proxy_links, selector_proxy_links, or standalone desync/awg section is defined
 	hasURL := false
 	hasProxyLink := false
 	for _, line := range strings.Split(uciOut, "\n") {
@@ -192,7 +242,10 @@ func CheckSubscriptions(client *gossh.Client, execFn sshutil.ExecFunc) Subscript
 				}
 			}
 		}
-		if strings.Contains(line, "selector_proxy_links") && !strings.Contains(line, "vless://example") {
+		if (strings.Contains(line, "selector_proxy_links") || strings.Contains(line, ".proxy_links")) && !strings.Contains(line, "vless://example") {
+			hasProxyLink = true
+		}
+		if strings.Contains(line, ".action='desync'") || strings.Contains(line, ".action='awg'") || strings.Contains(line, ".action='zapret'") || strings.Contains(line, ".action='zapret2'") {
 			hasProxyLink = true
 		}
 	}
@@ -240,25 +293,31 @@ uci set tachyon.@subscription_url[-1].subscription_update_interval='1h'
 `, safeURL))
 	} else if len(analysis.Nodes) > 0 {
 		// Direct proxy links or decoded base64 links
-		cmd.WriteString("\n# 2. Configure selector_proxy_links\nuci -q del_list tachyon.main.selector_proxy_links 2>/dev/null || true\n")
+		cmd.WriteString("\n# 2. Configure selector_proxy_links and proxy_links\nuci -q del_list tachyon.main.selector_proxy_links 2>/dev/null || true\nuci -q del_list tachyon.main.proxy_links 2>/dev/null || true\n")
 		for _, node := range analysis.Nodes {
 			safeNode := strings.ReplaceAll(node, "'", "'\\''")
 			cmd.WriteString(fmt.Sprintf("uci add_list tachyon.main.selector_proxy_links='%s'\n", safeNode))
+			cmd.WriteString(fmt.Sprintf("uci add_list tachyon.main.proxy_links='%s'\n", safeNode))
 		}
 	}
 
 	cmd.WriteString(`
-# 3. Ensure sing-box engine is active and enabled
-uci -q set tachyon.settings.engine='sing-box' 2>/dev/null || true
+# 3. Ensure active proxy engine (tachyon-core or sing-box) is enabled
+if [ "$(uci -q get tachyon.settings.engine 2>/dev/null)" = "tachyon-core" ] || [ "$(cat /etc/tachyon/tachyon-core-variant 2>/dev/null)" = "tachyon-core" ]; then
+    uci -q set tachyon.settings.engine='tachyon-core' 2>/dev/null || true
+    uci -q set tachyon.settings.subscription_engine='core' 2>/dev/null || true
+else
+    uci -q set tachyon.settings.engine='sing-box' 2>/dev/null || true
+fi
 uci -q set tachyon.settings.enabled='1' 2>/dev/null || true
 uci commit tachyon 2>/dev/null || true
 
-# 4. Synchronously fetch subscription proxies into cache so sing-box can start
+# 4. Synchronously fetch subscription proxies into cache so core can start
 if [ -x /usr/bin/tachyon ]; then
     /usr/bin/tachyon subscription_update main >/dev/null 2>&1 || /usr/bin/tachyon subscription_update >/dev/null 2>&1 || true
 fi
 
-# 5. Populate community ruleset binary files (.srs)
+# 5. Populate community ruleset binary files (.trs / .srs)
 if [ -x /usr/bin/tachyon ]; then
     /usr/bin/tachyon list_update_async >/dev/null 2>&1 || /usr/bin/tachyon list_update >/dev/null 2>&1 || true
 fi

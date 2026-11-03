@@ -9,15 +9,14 @@ import (
 	"github.com/rivo/tview"
 )
 
-// LogoColors defines the gradient colors for each row of the TACHYON logo
-// matching the authentic Tachyon holographic title gradient (#00F0FF -> #38BDF8 -> #818CF8 -> #A855F7 -> #C084FC).
+// LogoColors defines the monochromatic Sky-to-Slate ramp for each row of the TACHYON logo.
 var logoColors = []tcell.Color{
-	tcell.NewRGBColor(0, 240, 255),   // #00f0ff - Tachyon Neon Cyan
-	tcell.NewRGBColor(56, 189, 248),  // #38bdf8 - Cyber Sky
-	tcell.NewRGBColor(129, 140, 248), // #818cf8 - Tachyon Indigo
-	tcell.NewRGBColor(168, 85, 247),  // #a855f7 - Quantum Violet
-	tcell.NewRGBColor(192, 132, 252), // #c084fc - Holographic Lilac
-	tcell.NewRGBColor(232, 121, 249), // #e879f9 - Holographic Fuchsia
+	tcell.NewRGBColor(56, 189, 248),  // #38bdf8 - Sky 400
+	tcell.NewRGBColor(56, 189, 248),  // #38bdf8 - Sky 400
+	tcell.NewRGBColor(14, 165, 233),  // #0ea5e9 - Sky 500
+	tcell.NewRGBColor(2, 132, 199),   // #0284c7 - Sky 600
+	tcell.NewRGBColor(148, 163, 184), // #94a3b8 - Slate 400
+	tcell.NewRGBColor(113, 113, 122), // #71717a - Zinc 500
 }
 
 // flashColor is the bright white flash when a character is first typed.

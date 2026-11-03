@@ -54,18 +54,13 @@ type FleetNode struct {
 // tailored to the router's architecture and memory limits.
 func (n *FleetNode) ComputeRecommendations(targetVersion string) {
 	// 1. Engine selection based on RAM & Flash
+	n.RecommendedEngine = "tachyon-core"
 	switch {
 	case n.RAMTotalMB < 64 || (n.FlashFreeMB > 0 && n.FlashFreeMB < 8):
-		// Low-memory / low-flash routers: Steer C lightweight engine
-		n.RecommendedEngine = "steer"
 		n.RecommendedZRAM = true
 	case n.RAMTotalMB >= 64 && n.RAMTotalMB < 128:
-		// Mid-range routers: optimized sing-box-lx or steer-extended
-		n.RecommendedEngine = "sing-box-lx"
 		n.RecommendedZRAM = n.RAMFreeMB < 35
 	default:
-		// High-end routers (128MB+ RAM): full sing-box-lx
-		n.RecommendedEngine = "sing-box-lx"
 		n.RecommendedZRAM = false
 	}
 

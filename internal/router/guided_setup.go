@@ -12,9 +12,9 @@ import (
 type GuidedSetupMode string
 
 const (
-	// ModeStandaloneDPI configures packet-level DPI bypass (steer/zapret) without external proxy servers.
+	// ModeStandaloneDPI configures packet-level DPI bypass (Adaptive Desync / zapret) without external proxy servers.
 	ModeStandaloneDPI GuidedSetupMode = "standalone_dpi"
-	// ModeTunnel configures sing-box / VLESS tunnel using the user's subscription.
+	// ModeTunnel configures tachyon-core / sing-box tunnel using the user's subscription.
 	ModeTunnel GuidedSetupMode = "tunnel"
 	// ModeHybrid configures DPI bypass for domestic/heavy traffic + tunnel for blocked sites.
 	ModeHybrid GuidedSetupMode = "hybrid"
@@ -83,11 +83,7 @@ func RunGuidedSetup(client *gossh.Client, execFn sshutil.ExecFunc, plan GuidedSe
 	// 3. Engine selection and DPI Strategy / Subscription
 	engine := plan.SelectedEngine
 	if engine == "" {
-		if plan.Mode == ModeStandaloneDPI {
-			engine = "steer"
-		} else {
-			engine = "sing-box"
-		}
+		engine = "tachyon-core"
 	}
 	res.EngineName = engine
 
@@ -95,10 +91,13 @@ func RunGuidedSetup(client *gossh.Client, execFn sshutil.ExecFunc, plan GuidedSe
 	setEngineCmd := fmt.Sprintf(`
 if command -v uci >/dev/null 2>&1; then
     uci -q set tachyon.settings.engine='%s' 2>/dev/null || true
+    if [ "%s" = "tachyon-core" ]; then
+        uci -q set tachyon.settings.subscription_engine='core' 2>/dev/null || true
+    fi
     uci -q set tachyon.settings.enabled='1' 2>/dev/null || true
     uci commit tachyon 2>/dev/null || true
 fi
-`, engine)
+`, engine, engine)
 	execFn(client, setEngineCmd)
 
 	// Apply DPI Strategy if in Standalone DPI or Hybrid mode
@@ -113,7 +112,9 @@ fi
 	if plan.SubscriptionURL != "" {
 		progress("Сохранение ссылки подписки и запуск обновления узлов...", 0.70)
 		if err := SaveSubscription(client, execFn, plan.SubscriptionURL); err == nil {
-			res.EngineName = "sing-box"
+			if res.EngineName == "" {
+				res.EngineName = "tachyon-core"
+			}
 		}
 	}
 

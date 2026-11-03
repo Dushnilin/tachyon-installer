@@ -26,7 +26,7 @@ func TestShowGuidedSetupModal(t *testing.T) {
 
 func TestCycleSelectorItem_KeysAndCycle(t *testing.T) {
 	options := []string{
-		"1. Steer / Zapret",
+		"1. Adaptive Desync / Zapret",
 		"2. VLESS Tunnel",
 		"3. Hybrid Mode",
 	}
@@ -129,7 +129,7 @@ func TestCycleSelectorItem_Draw(t *testing.T) {
 	defer screen.Fini()
 	screen.SetSize(80, 24)
 
-	options := []string{"Автономный (Steer/Zapret)", "VLESS Туннель"}
+	options := []string{"Автономный (Desync/Zapret)", "VLESS Туннель"}
 	item := newCycleSelectorItem("Режим работы: ", options, 0, nil)
 	item.SetRect(2, 2, 70, 1)
 	item.Draw(screen)
@@ -147,7 +147,7 @@ func TestCycleSelectorItem_Draw(t *testing.T) {
 	if !strings.Contains(output, "Режим работы:") {
 		t.Errorf("rendered row missing label: %s", output)
 	}
-	if !strings.Contains(output, "Автономный (Steer/Zapret)") {
+	if !strings.Contains(output, "Автономный (Desync/Zapret)") {
 		t.Errorf("rendered row missing selected option: %s", output)
 	}
 }
@@ -172,7 +172,7 @@ func TestGuidedSetupForm_AllControlsVisibleWithoutClipping(t *testing.T) {
 
 	modeOptions := []string{
 		"1. VLESS / Sing-box подписка (Туннель)",
-		"2. Автономный обход (Steer/Zapret — без серверов)",
+		"2. Автономный обход (Desync/Zapret — без серверов)",
 		"3. Гибридный режим (Zapret + VLESS Туннель)",
 	}
 	modeItem := newCycleSelectorItem("Режим работы:        ", modeOptions, 0, nil)

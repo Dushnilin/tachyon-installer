@@ -18,12 +18,12 @@ import (
 
 // ShowMonitorModal displays a real-time live performance monitor for the connected router.
 func ShowMonitorModal(ctx *AppContext, returnPage string) {
-	panel := buildStepPanel(" 📊 ЖИВОЙ МОНИТОРИНГ РОУТЕРА ")
+	panel := buildStepPanel("Мониторинг роутера")
 
 	statsView := tview.NewTextView().
 		SetDynamicColors(true)
 	statsView.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
-	statsView.SetText("\n  [#38bdf8]⚡ Сбор метрик с роутера...[-]")
+	statsView.SetText("\n  [#38bdf8]Сбор метрик с роутера...[-]")
 
 	form := tview.NewForm()
 	StyleForm(form)
@@ -42,7 +42,7 @@ func ShowMonitorModal(ctx *AppContext, returnPage string) {
 		}
 	}
 
-	form.AddButton("🚪 Закрыть (Esc)", closeModal)
+	form.AddButton("Закрыть (Esc)", closeModal)
 	form.SetCancelFunc(closeModal)
 	EnableFormArrowNavigation(form)
 
@@ -66,14 +66,14 @@ func ShowMonitorModal(ctx *AppContext, returnPage string) {
 		updateStats := func() {
 			if ctx.SSHClient == nil {
 				ctx.App.QueueUpdateDraw(func() {
-					statsView.SetText("\n  [#ef5350]❌ Нет активного SSH-подключения к роутеру.[-]")
+					statsView.SetText("\n  [#e5484d]✗ Нет активного SSH-подключения к роутеру.[-]")
 				})
 				return
 			}
 			stats, err := routerpkg.CollectLiveStats(ctx.SSHClient, execFn)
 			if err != nil {
 				ctx.App.QueueUpdateDraw(func() {
-					statsView.SetText(fmt.Sprintf("\n  [#ef5350]⚠️ Ошибка опроса роутера: %v[-]", err))
+					statsView.SetText(fmt.Sprintf("\n  [#e5484d]! Ошибка опроса роутера: %v[-]", err))
 				})
 				return
 			}
@@ -82,26 +82,26 @@ func ShowMonitorModal(ctx *AppContext, returnPage string) {
 			if stats.RAMTotalMB > 0 {
 				ramPct = (stats.RAMUsedMB / stats.RAMTotalMB) * 100.0
 			}
-			ramColor := "#22c55e"
+			ramColor := "#4cc38a"
 			if ramPct > 75.0 {
 				ramColor = "#eab308"
 			}
 			if ramPct > 90.0 {
-				ramColor = "#ef5350"
+				ramColor = "#e5484d"
 			}
 
-			engStatus := "[#64748b]не запущен[-]"
+			engStatus := "[#71717a]не запущен[-]"
 			if stats.EngineName != "" {
-				engStatus = fmt.Sprintf("[#22c55e:b]%s[-] [#94a3b8](PID: %s, Память: %s)[-]", stats.EngineName, stats.EnginePID, stats.EngineVSZ)
+				engStatus = fmt.Sprintf("[#4cc38a:b]%s[-] [#a1a1a6](PID: %s, Память: %s)[-]", stats.EngineName, stats.EnginePID, stats.EngineVSZ)
 			}
 
 			text := fmt.Sprintf("\n"+
-				"  [#38bdf8]CPU Loadavg:[-]      [#f1f5f9:b]%.2f[-] (1м)  ·  [#cbd5e1]%.2f[-] (5м)  ·  [#94a3b8]%.2f[-] (15м)\n"+
-				"  [#38bdf8]Оперативная память:[-] [%s]%s[-] [#f1f5f9]%.1f / %.1f МБ[-] ([%s]%.0f%%[-])\n"+
-				"  [#38bdf8]Время работы:[-]     [#f1f5f9]%s[-]\n"+
+				"  [#38bdf8]CPU Loadavg:[-]        [#ededed:b]%.2f[-] (1м)  ·  [#a1a1a6]%.2f[-] (5м)  ·  [#71717a]%.2f[-] (15м)\n"+
+				"  [#38bdf8]Оперативная память:[-] [%s]%s[-] [#ededed]%.1f / %.1f МБ[-] ([%s]%.0f%%[-])\n"+
+				"  [#38bdf8]Время работы:[-]       [#ededed]%s[-]\n"+
 				"  [#38bdf8]Служба ядра прокси:[-] %s\n"+
-				"  [#38bdf8]Сетевой трафик LAN:[-] [#38bdf8]↓ %s[-]  ·  [#a855f7]↑ %s[-]\n"+
-				"  [#38bdf8]Активных сессий:[-]  [#f1f5f9]%d conntrack[-]\n",
+				"  [#38bdf8]Сетевой трафик LAN:[-] [#38bdf8]↓ %s[-]  ·  [#a1a1a6]↑ %s[-]\n"+
+				"  [#38bdf8]Активных сессий:[-]    [#ededed]%d conntrack[-]\n",
 				stats.Load1, stats.Load5, stats.Load15,
 				ramColor, renderBar(ramPct, 16), stats.RAMUsedMB, stats.RAMTotalMB, ramColor, ramPct,
 				stats.UptimeString(),
@@ -131,26 +131,26 @@ func ShowMonitorModal(ctx *AppContext, returnPage string) {
 	panel.AddItem(nil, 1, 0, false)
 	panel.AddItem(formLayout(form), 4, 1, true)
 
-	modal := CreateWizardModalCustom(panel, 80, 18)
+	modal := CreateWizardModalCustom(panel, 88, 20)
 	ctx.Pages.AddPage("monitor_modal", modal, true, true)
 	ctx.App.SetFocus(form)
 }
 
 // ShowRescueModal displays a confirmation dialog and executes Emergency Rescue.
 func ShowRescueModal(ctx *AppContext, returnPage string) {
-	panel := buildStepPanel(" 🚑 АВАРИЙНЫЙ СБРОС И ВОССТАНОВЛЕНИЕ СЕТИ ")
+	panel := buildStepPanel("Аварийное восстановление сети")
 
 	infoView := tview.NewTextView().
 		SetDynamicColors(true)
 	infoView.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
 
 	initialText := "\n" +
-		"  [#ef5350:b]Внимание! Экстренное восстановление прямого интернета:[-]\n\n" +
-		"  [#cbd5e1]1. Принудительно остановит службы Tachyon, sing-box и steer[-]\n" +
-		"  [#cbd5e1]2. Очистит и удалит таблицы правил nftables и iptables[-]\n" +
-		"  [#cbd5e1]3. Сбросит маршруты TProxy (fwmark / table 100)[-]\n" +
-		"  [#cbd5e1]4. Перезапустит стандартные службы dnsmasq и firewall[-]\n" +
-		"  [#cbd5e1]5. Проверит пинг до шлюза провайдера и в интернет (8.8.8.8)[-]\n"
+		"  [#e5484d:b]Экстренное восстановление прямого интернета:[-]\n\n" +
+		"  [#a1a1a6]1. Остановит службы Tachyon, tachyon-core и sing-box[-]\n" +
+		"  [#a1a1a6]2. Очистит таблицы nftables (inet tachyon, tachyon_tailscale) и iptables[-]\n" +
+		"  [#a1a1a6]3. Сбросит маршруты TProxy (таблицы tachyon/105, 100, 4247/4248)[-]\n" +
+		"  [#a1a1a6]4. Восстановит настройки dnsmasq и перезапустит firewall[-]\n" +
+		"  [#a1a1a6]5. Проверит доступность шлюза провайдера и интернета (8.8.8.8)[-]\n"
 
 	infoView.SetText(initialText)
 
@@ -180,9 +180,9 @@ func ShowRescueModal(ctx *AppContext, returnPage string) {
 	}
 
 	runRescue := func() {
-		infoView.SetText("\n  [#38bdf8]⚡ Выполняется экстренный сброс сетевых правил... Подождите[-]\n")
+		infoView.SetText("\n  [#38bdf8]Выполняется сброс сетевых правил...[-]\n")
 		form.Clear(true)
-		form.AddButton("⏳ Выполняется...", nil)
+		form.AddButton("Выполняется...", nil)
 
 		go func() {
 			rep := routerpkg.EmergencyRescue(ctx.SSHClient, execFn)
@@ -191,35 +191,35 @@ func ShowRescueModal(ctx *AppContext, returnPage string) {
 				var sb strings.Builder
 				sb.WriteString("\n")
 				if rep.Success {
-					sb.WriteString("  [#22c55e:b]✓ Аварийный сброс успешно выполнен![-]\n\n")
+					sb.WriteString("  [#4cc38a:b]✓ Сброс сетевых правил выполнен[-]\n\n")
 					for _, a := range rep.ActionsTaken {
-						sb.WriteString(fmt.Sprintf("  [#94a3b8]•[-] [#cbd5e1]%s[-]\n", a))
+						sb.WriteString(fmt.Sprintf("  [#71717a]•[-] [#a1a1a6]%s[-]\n", a))
 					}
 					sb.WriteString("\n")
 					if rep.GatewayPing {
-						sb.WriteString("  [#22c55e]✓ Пинг до шлюза провайдера: УСПЕШНО[-]\n")
+						sb.WriteString("  [#4cc38a]✓ Пинг до шлюза провайдера: доступен[-]\n")
 					} else {
-						sb.WriteString("  [#ef5350]✗ Пинг до шлюза: НЕТ ОТВЕТА[-]\n")
+						sb.WriteString("  [#e5484d]✗ Пинг до шлюза: нет ответа[-]\n")
 					}
 					if rep.InternetPing {
-						sb.WriteString("  [#22c55e]✓ Прямой интернет (8.8.8.8): РАБОТАЕТ[-]\n")
+						sb.WriteString("  [#4cc38a]✓ Прямой интернет (8.8.8.8): доступен[-]\n")
 					} else {
-						sb.WriteString("  [#eab308]⚠️ Прямой интернет (8.8.8.8): НЕ ОТВЕЧАЕТ (проверьте WAN/кабель)[-]\n")
+						sb.WriteString("  [#eab308]! Прямой интернет (8.8.8.8): не отвечает (проверьте WAN)[-]\n")
 					}
 				} else {
-					sb.WriteString(fmt.Sprintf("  [#ef5350:b]❌ Сбой выполнения:[-] %s\n", rep.Detail))
+					sb.WriteString(fmt.Sprintf("  [#e5484d:b]✗ Сбой выполнения:[-] %s\n", rep.Detail))
 				}
 
 				infoView.SetText(sb.String())
 
 				form.Clear(true)
-				form.AddButton("✅ Закрыть", closeModal)
+				form.AddButton("Закрыть", closeModal)
 				ctx.App.SetFocus(form)
 			})
 		}()
 	}
 
-	form.AddButton("🚑 Выполнить сброс", runRescue)
+	form.AddButton("Выполнить сброс", runRescue)
 	form.AddButton("Отмена", closeModal)
 	form.SetCancelFunc(closeModal)
 	EnableFormArrowNavigation(form)
@@ -228,24 +228,24 @@ func ShowRescueModal(ctx *AppContext, returnPage string) {
 	panel.AddItem(nil, 1, 0, false)
 	panel.AddItem(formLayout(form), 4, 1, true)
 
-	modal := CreateWizardModalCustom(panel, 82, 19)
+	modal := CreateWizardModalCustom(panel, 88, 22)
 	ctx.Pages.AddPage("rescue_modal", modal, true, true)
 	ctx.App.SetFocus(form)
 }
 
 // ShowConflictFixModal scans and disables conflicting proxy services.
 func ShowConflictFixModal(ctx *AppContext, returnPage string) {
-	panel := buildStepPanel(" 🛡️ УСТРАНЕНИЕ СЕТЕВЫХ КОНФЛИКТОВ ")
+	panel := buildStepPanel("Устранение сетевых конфликтов")
 
 	infoView := tview.NewTextView().
 		SetDynamicColors(true)
 	infoView.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
 
 	initialText := "\n" +
-		"  [#eab308:b]Отключение конфликтующих служб обхода блокировок:[-]\n\n" +
-		"  [#cbd5e1]Службы вроде Passwall, OpenClash, ShadowsocksR, Zapret и Xray[-]\n" +
-		"  [#cbd5e1]перехватывают DNS (порт 53) и правила TProxy, вызывая сбои в работе Tachyon.[-]\n\n" +
-		"  [#94a3b8]Нажмите кнопку ниже для безопасной остановки и отключения автозапуска.[-]\n"
+		"  [#eab308:b]Отключение конфликтующих прокси-служб:[-]\n\n" +
+		"  [#a1a1a6]Службы Passwall, OpenClash, ShadowsocksR, Zapret и Xray[-]\n" +
+		"  [#a1a1a6]перехватывают DNS (порт 53) и правила TProxy, мешая работе Tachyon.[-]\n\n" +
+		"  [#71717a]Нажмите кнопку ниже для остановки конфликтующих служб и отключения их автозапуска.[-]\n"
 
 	infoView.SetText(initialText)
 
@@ -275,9 +275,9 @@ func ShowConflictFixModal(ctx *AppContext, returnPage string) {
 	}
 
 	runFix := func() {
-		infoView.SetText("\n  [#38bdf8]⚡ Поиск и отключение конфликтующих служб...[-]\n")
+		infoView.SetText("\n  [#38bdf8]Поиск и отключение конфликтующих служб...[-]\n")
 		form.Clear(true)
-		form.AddButton("⏳ Выполняется...", nil)
+		form.AddButton("Выполняется...", nil)
 
 		go func() {
 			rep := routerpkg.DisableConflicts(ctx.SSHClient, execFn, nil)
@@ -287,27 +287,27 @@ func ShowConflictFixModal(ctx *AppContext, returnPage string) {
 				sb.WriteString("\n")
 				if rep.Success {
 					if rep.DisabledCount > 0 {
-						sb.WriteString("  [#22c55e:b]✓ Конфликтующие службы успешно остановлены и отключены:[-]\n\n")
+						sb.WriteString("  [#4cc38a:b]✓ Конфликтующие службы остановлены и отключены:[-]\n\n")
 						for _, s := range rep.DisabledList {
-							sb.WriteString(fmt.Sprintf("    [#ef5350]✗[-] [#f1f5f9]%s[-] (служба остановлена, автозапуск выключен)\n", s))
+							sb.WriteString(fmt.Sprintf("    [#e5484d]✗[-] [#ededed]%s[-] (остановлена, автозапуск отключен)\n", s))
 						}
 					} else {
-						sb.WriteString("  [#22c55e:b]✓ Конфликтов не обнаружено:[-] сторонние прокси-пакеты не активны.\n")
+						sb.WriteString("  [#4cc38a:b]✓ Конфликтов не обнаружено:[-] сторонние прокси-пакеты не активны.\n")
 					}
 				} else {
-					sb.WriteString(fmt.Sprintf("  [#ef5350:b]❌ Ошибка:[-] %s\n", rep.Details))
+					sb.WriteString(fmt.Sprintf("  [#e5484d:b]✗ Ошибка:[-] %s\n", rep.Details))
 				}
 
 				infoView.SetText(sb.String())
 
 				form.Clear(true)
-				form.AddButton("✅ Закрыть", closeModal)
+				form.AddButton("Закрыть", closeModal)
 				ctx.App.SetFocus(form)
 			})
 		}()
 	}
 
-	form.AddButton("🛡️ Отключить конфликты", runFix)
+	form.AddButton("Отключить конфликты", runFix)
 	form.AddButton("Отмена", closeModal)
 	form.SetCancelFunc(closeModal)
 	EnableFormArrowNavigation(form)
@@ -316,24 +316,24 @@ func ShowConflictFixModal(ctx *AppContext, returnPage string) {
 	panel.AddItem(nil, 1, 0, false)
 	panel.AddItem(formLayout(form), 4, 1, true)
 
-	modal := CreateWizardModalCustom(panel, 82, 18)
+	modal := CreateWizardModalCustom(panel, 88, 20)
 	ctx.Pages.AddPage("conflicts_modal", modal, true, true)
 	ctx.App.SetFocus(form)
 }
 
 // ShowSnapshotModal creates a full configuration archive (network, dhcp, firewall, tachyon).
 func ShowSnapshotModal(ctx *AppContext, returnPage string) {
-	panel := buildStepPanel(" 💾 ПОЛНЫЙ СНИМОК СИСТЕМЫ (SNAPSHOT) ")
+	panel := buildStepPanel("Снимок конфигурации (Snapshot)")
 
 	infoView := tview.NewTextView().
 		SetDynamicColors(true)
 	infoView.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
 
 	initialText := "\n" +
-		"  [#38bdf8:b]Создание полного снимка настроек OpenWrt на ваш ПК:[-]\n\n" +
-		"  [#cbd5e1]В архив войдут:[-] /etc/config/network, /etc/config/dhcp,\n" +
-		"  /etc/config/firewall, /etc/nftables.d/ и /etc/config/tachyon.\n\n" +
-		"  [#94a3b8]Архив сохраняется в папку backups/ на вашем компьютере.[-]\n"
+		"  [#38bdf8:b]Создание архива настроек OpenWrt и Tachyon на компьютере:[-]\n\n" +
+		"  [#a1a1a6]В архив войдут:[-] /etc/config/tachyon, /etc/tachyon, /etc/tachyon-core,\n" +
+		"  /etc/config/network, /etc/config/dhcp, /etc/config/firewall, /etc/nftables.d/.\n\n" +
+		"  [#71717a]Архив сохраняется в каталог backups/ в рабочей папке.[-]\n"
 
 	infoView.SetText(initialText)
 
@@ -352,9 +352,9 @@ func ShowSnapshotModal(ctx *AppContext, returnPage string) {
 	}
 
 	runSnapshot := func() {
-		infoView.SetText("\n  [#38bdf8]⚡ Создание архива и загрузка с роутера на ПК...[-]\n")
+		infoView.SetText("\n  [#38bdf8]Создание архива и загрузка с роутера...[-]\n")
 		form.Clear(true)
-		form.AddButton("⏳ Выполняется...", nil)
+		form.AddButton("Выполняется...", nil)
 
 		go func() {
 			routerIP := "router"
@@ -367,23 +367,23 @@ func ShowSnapshotModal(ctx *AppContext, returnPage string) {
 				var sb strings.Builder
 				sb.WriteString("\n")
 				if err == nil {
-					sb.WriteString("  [#22c55e:b]✓ Полный снимок успешно создан![-]\n\n")
-					sb.WriteString(fmt.Sprintf("  [#f1f5f9]%s[-]\n\n", msg))
-					sb.WriteString("  [#94a3b8]Вы всегда можете восстановить конфигурацию через -restore или меню.[-]\n")
+					sb.WriteString("  [#4cc38a:b]✓ Снимок конфигурации создан[-]\n\n")
+					sb.WriteString(fmt.Sprintf("  [#ededed]%s[-]\n\n", msg))
+					sb.WriteString("  [#71717a]Восстановить конфигурацию можно ключом -restore или через меню.[-]\n")
 				} else {
-					sb.WriteString(fmt.Sprintf("  [#ef5350:b]❌ Ошибка создания снимка:[-] %v\n", err))
+					sb.WriteString(fmt.Sprintf("  [#e5484d:b]✗ Ошибка создания снимка:[-] %v\n", err))
 				}
 
 				infoView.SetText(sb.String())
 
 				form.Clear(true)
-				form.AddButton("✅ Закрыть", closeModal)
+				form.AddButton("Закрыть", closeModal)
 				ctx.App.SetFocus(form)
 			})
 		}()
 	}
 
-	form.AddButton("💾 Создать снимок", runSnapshot)
+	form.AddButton("Создать снимок", runSnapshot)
 	form.AddButton("Отмена", closeModal)
 	form.SetCancelFunc(closeModal)
 	EnableFormArrowNavigation(form)
@@ -392,27 +392,27 @@ func ShowSnapshotModal(ctx *AppContext, returnPage string) {
 	panel.AddItem(nil, 1, 0, false)
 	panel.AddItem(formLayout(form), 4, 1, true)
 
-	modal := CreateWizardModalCustom(panel, 82, 18)
+	modal := CreateWizardModalCustom(panel, 88, 20)
 	ctx.Pages.AddPage("snapshot_modal", modal, true, true)
 	ctx.App.SetFocus(form)
 }
 
 // ShowNetworkTuneModal optimizes router TCP parameters, buffer sizes, and flow offloading.
 func ShowNetworkTuneModal(ctx *AppContext, returnPage string) {
-	panel := buildStepPanel(" 🚀 ОПТИМИЗАЦИЯ СЕТЕВОГО СТЕКА (SYSCTL & BBR) ")
+	panel := buildStepPanel("Оптимизация сетевого стека (sysctl и BBR)")
 
 	infoView := tview.NewTextView().
 		SetDynamicColors(true)
 	infoView.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
 
 	initialText := "\n" +
-		"  [#38bdf8:b]Тонкая настройка сетевого стека ядра OpenWrt:[-]\n\n" +
-		"  [#cbd5e1]• Контроль перегрузки:[-] TCP BBR + fq_codel (борьба с bufferbloat)\n" +
-		"  [#cbd5e1]• Буферы сокетов:[-] rmem/wmem адаптивно под объем памяти роутера\n" +
-		"  [#cbd5e1]• TCP Fast Open (TFO):[-] ускорение повторных рукопожатий\n" +
-		"  [#cbd5e1]• Таблица conntrack:[-] увеличение лимита сессий и быстрая очистка\n" +
-		"  [#cbd5e1]• Flow Offloading:[-] программное/аппаратное ускорение в firewall\n\n" +
-		"  [#94a3b8]Настройки сохраняются в /etc/sysctl.d/99-tachyon-tune.conf[-]\n"
+		"  [#38bdf8:b]Настройка сетевого стека ядра OpenWrt:[-]\n\n" +
+		"  [#a1a1a6]• Контроль перегрузки:[-] TCP BBR + fq_codel (снижение bufferbloat)\n" +
+		"  [#a1a1a6]• Буферы сокетов:[-] rmem/wmem пропорционально объёму ОЗУ роутера\n" +
+		"  [#a1a1a6]• TCP Fast Open (TFO):[-] ускорение повторных рукопожатий\n" +
+		"  [#a1a1a6]• Таблица conntrack:[-] увеличение лимита сессий и сокращение таймаутов\n" +
+		"  [#a1a1a6]• Flow Offloading:[-] отключение ускорения в fw4 для корректной работы TProxy/nftables\n\n" +
+		"  [#71717a]Настройки сохраняются в /etc/sysctl.d/99-tachyon-tune.conf[-]\n"
 
 	infoView.SetText(initialText)
 
@@ -442,9 +442,9 @@ func ShowNetworkTuneModal(ctx *AppContext, returnPage string) {
 	}
 
 	runTune := func() {
-		infoView.SetText("\n  [#38bdf8]⚡ Применение параметров ядра и оптимизация сети...[-]\n")
+		infoView.SetText("\n  [#38bdf8]Применение параметров ядра и оптимизация сети...[-]\n")
 		form.Clear(true)
-		form.AddButton("⏳ Выполняется...", nil)
+		form.AddButton("Выполняется...", nil)
 
 		go func() {
 			rep := routerpkg.TuneNetwork(ctx.SSHClient, execFn)
@@ -453,25 +453,25 @@ func ShowNetworkTuneModal(ctx *AppContext, returnPage string) {
 				var sb strings.Builder
 				sb.WriteString("\n")
 				if rep.Success {
-					sb.WriteString("  [#22c55e:b]✓ Оптимизация сети успешно применена![-]\n\n")
+					sb.WriteString("  [#4cc38a:b]✓ Оптимизация сети применена[-]\n\n")
 					for _, r := range rep.AppliedRules {
-						sb.WriteString(fmt.Sprintf("    [#22c55e]✓[-] [#f1f5f9]%s[-]\n", r))
+						sb.WriteString(fmt.Sprintf("    [#4cc38a]✓[-] [#ededed]%s[-]\n", r))
 					}
-					sb.WriteString(fmt.Sprintf("\n  [#94a3b8]Конфигурация сохранена в:[-] [#38bdf8]%s[-]\n", rep.PersistPath))
+					sb.WriteString(fmt.Sprintf("\n  [#71717a]Конфигурация сохранена в:[-] [#38bdf8]%s[-]\n", rep.PersistPath))
 				} else {
-					sb.WriteString(fmt.Sprintf("  [#ef5350:b]❌ Ошибка оптимизации:[-] %s\n", rep.Details))
+					sb.WriteString(fmt.Sprintf("  [#e5484d:b]✗ Ошибка оптимизации:[-] %s\n", rep.Details))
 				}
 
 				infoView.SetText(sb.String())
 
 				form.Clear(true)
-				form.AddButton("✅ Закрыть", closeModal)
+				form.AddButton("Закрыть", closeModal)
 				ctx.App.SetFocus(form)
 			})
 		}()
 	}
 
-	form.AddButton("🚀 Применить оптимизацию", runTune)
+	form.AddButton("Применить оптимизацию", runTune)
 	form.AddButton("Отмена", closeModal)
 	form.SetCancelFunc(closeModal)
 	EnableFormArrowNavigation(form)
@@ -480,7 +480,7 @@ func ShowNetworkTuneModal(ctx *AppContext, returnPage string) {
 	panel.AddItem(nil, 1, 0, false)
 	panel.AddItem(formLayout(form), 4, 1, true)
 
-	modal := CreateWizardModalCustom(panel, 82, 19)
+	modal := CreateWizardModalCustom(panel, 88, 22)
 	ctx.Pages.AddPage("tune_modal", modal, true, true)
 	ctx.App.SetFocus(form)
 }
@@ -488,12 +488,12 @@ func ShowNetworkTuneModal(ctx *AppContext, returnPage string) {
 // ShowSelfUpdateModal checks GitHub for a newer installer release and shows
 // a notification with a link. Binaries are never replaced in-place.
 func ShowSelfUpdateModal(ctx *AppContext, returnPage, currentVersion string) {
-	panel := buildStepPanel(" 🆙 ОБНОВЛЕНИЕ TACHYON INSTALLER ")
+	panel := buildStepPanel("Обновление установщика")
 
 	infoView := tview.NewTextView().
 		SetDynamicColors(true)
 	infoView.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
-	infoView.SetText(fmt.Sprintf("\n  [#38bdf8]⚡ Проверка наличия новых версий на GitHub...[-]\n\n  [#cbd5e1]Текущая версия:[-] [#f1f5f9]%s[-]\n", currentVersion))
+	infoView.SetText(fmt.Sprintf("\n  [#38bdf8]Проверка наличия новых версий на GitHub...[-]\n\n  [#a1a1a6]Текущая версия:[-] [#ededed]%s[-]\n", currentVersion))
 
 	form := tview.NewForm()
 	StyleForm(form)
@@ -529,13 +529,13 @@ func ShowSelfUpdateModal(ctx *AppContext, returnPage, currentVersion string) {
 			sb.WriteString("\n")
 			switch {
 			case err != nil:
-				sb.WriteString(fmt.Sprintf("  [#ef5350]❌ Не удалось проверить обновления: %v[-]\n", err))
+				sb.WriteString(fmt.Sprintf("  [#e5484d]✗ Не удалось проверить обновления: %v[-]\n", err))
 			case hasUpdate:
-				sb.WriteString(fmt.Sprintf("  [#eab308:b]💡 Доступна новая версия: %s (текущая: %s)[-]\n", latestVer, currentVersion))
-				sb.WriteString(fmt.Sprintf("  [#cbd5e1]Страница релиза:[-] [#38bdf8]%s[-]\n", relURL))
-				sb.WriteString("\n  [#cbd5e1]Обновление: повторно запустите скрипт установки (install.sh / install.ps1)[-]\n")
+				sb.WriteString(fmt.Sprintf("  [#eab308:b]! Доступна новая версия: %s (текущая: %s)[-]\n", latestVer, currentVersion))
+				sb.WriteString(fmt.Sprintf("  [#a1a1a6]Страница релиза:[-] [#38bdf8]%s[-]\n", relURL))
+				sb.WriteString("\n  [#a1a1a6]Обновление: повторно запустите скрипт установки (install.sh / install.ps1)[-]\n")
 			default:
-				sb.WriteString(fmt.Sprintf("  [#22c55e:b]✓ У вас уже установлена актуальная версия (%s)[-]\n", currentVersion))
+				sb.WriteString(fmt.Sprintf("  [#4cc38a:b]✓ Установлена актуальная версия (%s)[-]\n", currentVersion))
 			}
 			infoView.SetText(sb.String())
 			ctx.App.SetFocus(form)
@@ -546,7 +546,7 @@ func ShowSelfUpdateModal(ctx *AppContext, returnPage, currentVersion string) {
 	panel.AddItem(nil, 1, 0, false)
 	panel.AddItem(formLayout(form), 4, 1, true)
 
-	modal := CreateWizardModalCustom(panel, 80, 18)
+	modal := CreateWizardModalCustom(panel, 88, 20)
 	ctx.Pages.AddPage("self_update_modal", modal, true, true)
 	ctx.App.SetFocus(form)
 }

@@ -12,7 +12,7 @@ func TestRunGuidedSetup_Success(t *testing.T) {
 		if strings.Contains(cmd, "uci add_list dhcp.@dnsmasq[0].server") {
 			return "", nil
 		}
-		if strings.Contains(cmd, "tachyon.settings.steer_tcp_args") {
+		if strings.Contains(cmd, "tachyon.settings.dpi_profile") {
 			return "", nil
 		}
 		if strings.Contains(cmd, "99-tachyon-tune.conf") {
@@ -37,7 +37,7 @@ func TestRunGuidedSetup_Success(t *testing.T) {
 			Name:    "FakeSplit + Disorder",
 			TCPArgs: "--filter-tcp=443 --lua-desync=fakedsplit",
 		},
-		SelectedEngine: "steer",
+		SelectedEngine: "tachyon-core",
 		EnableTune:     true,
 	}
 

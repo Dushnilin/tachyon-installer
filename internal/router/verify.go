@@ -160,9 +160,9 @@ func autoFixMissingPackages(client *gossh.Client, execFn sshutil.ExecFunc) bool 
 
 	var cmd string
 	if pkgManager == "apk" {
-		cmd = "apk update && apk add kmod-nft-tproxy kmod-tun"
+		cmd = "apk del --no-network --repositories-file /dev/null --force-broken-world ip-tiny >/dev/null 2>&1 || true; apk update --force-missing-repositories && apk add --force-missing-repositories kmod-nft-tproxy kmod-tun kmod-inet-diag kmod-netlink-diag kmod-nft-nat ip-full"
 	} else {
-		cmd = "opkg update && opkg install kmod-nft-tproxy kmod-tun"
+		cmd = "opkg remove --force-depends ip-tiny >/dev/null 2>&1 || true; opkg update && opkg install kmod-nft-tproxy kmod-tun kmod-inet-diag kmod-netlink-diag kmod-nft-nat ip-full"
 	}
 
 	_, installErr := execFn(client, cmd)
@@ -178,18 +178,24 @@ func autoFixMissingPackages(client *gossh.Client, execFn sshutil.ExecFunc) bool 
 // TriggerFallback stops Tachyon and restores clean direct networking.
 func TriggerFallback(client *gossh.Client, execFn sshutil.ExecFunc) {
 	fallbackCmds := []string{
+		"rm -rf /var/run/tachyon/starting /var/run/tachyon/reloading /var/run/tachyon*.lock 2>/dev/null || true",
 		"/usr/bin/tachyon stop >/dev/null 2>&1 || true",
 		"/etc/init.d/tachyon stop >/dev/null 2>&1 || true",
 		"/etc/init.d/tachyon-core stop >/dev/null 2>&1 || true",
 		"/etc/init.d/sing-box stop >/dev/null 2>&1 || true",
-		"/etc/init.d/steer stop >/dev/null 2>&1 || true",
-		"killall -9 tachyon-core sing-box steer 2>/dev/null || true",
+		"killall -9 tachyon-core sing-box nfqws nfqws2 2>/dev/null || true",
 		"uci -q set tachyon.settings.enabled='0'",
 		"uci commit tachyon",
 		"nft delete table inet TachyonTable >/dev/null 2>&1 || true",
 		"nft delete table inet tachyon_table >/dev/null 2>&1 || true",
 		"nft delete table inet tachyon >/dev/null 2>&1 || true",
-		"nft delete table inet steer >/dev/null 2>&1 || true",
+		"nft delete table inet tachyon_tailscale >/dev/null 2>&1 || true",
+		"while ip rule del fwmark 0x04000000/0x04000000 lookup tachyon 2>/dev/null; do :; done",
+		"while ip rule del fwmark 0x04000000/0x04000000 lookup 105 2>/dev/null; do :; done",
+		"while ip rule del fwmark 0x10000000/0x10000000 lookup 100 2>/dev/null; do :; done",
+		"ip route flush table tachyon 2>/dev/null || true",
+		"ip route flush table 105 2>/dev/null || true",
+		"ip route flush table 100 2>/dev/null || true",
 		"/usr/bin/tachyon restore_dnsmasq >/dev/null 2>&1 || /usr/bin/tachyon dnsmasq_restore >/dev/null 2>&1 || { uci -q delete dhcp.@dnsmasq[0].server ; uci -q add_list dhcp.@dnsmasq[0].server=1.1.1.1 ; uci -q add_list dhcp.@dnsmasq[0].server=8.8.8.8 ; uci -q set dhcp.@dnsmasq[0].noresolv=0 ; uci commit dhcp ; }",
 		"/etc/init.d/dnsmasq restart >/dev/null 2>&1 || true",
 	}
@@ -204,6 +210,9 @@ func detectActiveEngine(client *gossh.Client, execFn sshutil.ExecFunc) string {
 		if v != "" && v != "none" {
 			return v
 		}
+	}
+	if tcOut, errTC := execFn(client, "[ -x /usr/bin/tachyon-core ] && echo tachyon-core || echo ''"); errTC == nil && strings.TrimSpace(tcOut) == "tachyon-core" {
+		return "tachyon-core"
 	}
 	return "sing-box"
 }

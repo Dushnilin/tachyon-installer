@@ -12,13 +12,13 @@ import (
 
 // ShowFleetModal displays the interactive Multi-Router Fleet Manager.
 func ShowFleetModal(ctx *AppContext, returnPage string) {
-	panel := buildStepPanel(" 🌐 МАССОВОЕ УПРАВЛЕНИЕ РОУТЕРАМИ (FLEET MANAGER) ")
+	panel := buildStepPanel("Управление роутерами в сети (Fleet)")
 
 	statusView := tview.NewTextView().
 		SetDynamicColors(true).
 		SetScrollable(false)
 	statusView.SetBackgroundColor(ColorBgSpace)
-	statusView.SetText(fmt.Sprintf("  %s⚡ Поиск поддерживаемых OpenWrt роутеров в локальной сети... Пожалуйста, подождите%s", TagCyanBold, TagReset))
+	statusView.SetText(fmt.Sprintf("  %sПоиск поддерживаемых OpenWrt роутеров в локальной сети...%s", TagCyanBold, TagReset))
 
 	hintView := tview.NewTextView().
 		SetDynamicColors(true).
@@ -51,7 +51,7 @@ func ShowFleetModal(ctx *AppContext, returnPage string) {
 		}
 	}
 
-	form.AddButton("🚪 Назад (Esc)", closeModal)
+	form.AddButton("Назад (Esc)", closeModal)
 	form.SetCancelFunc(closeModal)
 	EnableFormArrowNavigation(form)
 
@@ -62,7 +62,7 @@ func ShowFleetModal(ctx *AppContext, returnPage string) {
 	panel.AddItem(nil, 1, 0, false)
 	panel.AddItem(formLayout(form), 5, 0, false)
 
-	modal := CreateWizardModalCustom(panel, 96, 28)
+	modal := CreateWizardModalCustom(panel, 94, 28)
 	ctx.Pages.AddPage("fleet_modal", modal, true, true)
 	ctx.App.SetFocus(table)
 
@@ -182,18 +182,18 @@ func ShowFleetModal(ctx *AppContext, returnPage string) {
 			}
 		}
 		if selectedCount == 0 {
-			statusView.SetText("  [#ef5350:b]❌ Не выбрано ни одного роутера для установки! Нажмите [Space] или [A].[-]")
+			statusView.SetText("  [#e5484d:b]✗ Не выбрано ни одного роутера для установки. Нажмите [Space] или [A].[-]")
 			return
 		}
 
 		isDeploying = true
-		statusView.SetText(fmt.Sprintf("  [#38bdf8:b]⚡ Запуск параллельной установки на %d выбранных роутеров...[-]", selectedCount))
-		hintView.SetText("  [#eab308]Идёт процесс развертывания, пожалуйста, подождите завершения...[-]")
+		statusView.SetText(fmt.Sprintf("  [#38bdf8:b]Параллельная установка на выбранные роутеры (%d)...[-]", selectedCount))
+		hintView.SetText("  [#eab308]Выполняется развертывание...[-]")
 
 		form.Clear(true)
 		StyleForm(form)
 		form.SetBorderPadding(0, 0, 0, 0)
-		form.AddButton("⏳ Выполняется развертывание...", nil)
+		form.AddButton("Выполняется развертывание...", nil)
 
 		go func() {
 			mirror := "auto"
@@ -232,16 +232,16 @@ func ShowFleetModal(ctx *AppContext, returnPage string) {
 				}
 
 				statusView.SetText(fmt.Sprintf(
-					"  [#22c55e:b]🎉 МАССОВОЕ РАЗВЕРТЫВАНИЕ ЗАВЕРШЕНО:[-] Успешно: [#22c55e]%d[-], С ошибками: [#ef5350]%d[-]",
+					"  [#4cc38a:b]✓ Развертывание завершено:[-] успешно: [#4cc38a]%d[-], ошибок: [#e5484d]%d[-]",
 					successCnt, errCnt,
 				))
-				hintView.SetText("  [#cbd5e1]Все выбранные роутеры обновлены и защищены правилами Tachyon.[-]")
+				hintView.SetText("  [#a1a1a6]Выбранные роутеры обновлены.[-]")
 
 				form.Clear(true)
 				StyleForm(form)
 				form.SetBorderPadding(0, 0, 0, 0)
-				form.AddButton("🎉 Завершить (Enter)", closeModal)
-				form.AddButton("🔄 Сканировать снова", runScan)
+				form.AddButton("Завершить (Enter)", closeModal)
+				form.AddButton("Сканировать снова", runScan)
 				form.SetCancelFunc(closeModal)
 				EnableFormArrowNavigation(form)
 				ctx.App.SetFocus(form)
@@ -250,8 +250,8 @@ func ShowFleetModal(ctx *AppContext, returnPage string) {
 	}
 
 	runScan = func() {
-		statusView.SetText("  [#38bdf8:b]⚡ Поиск и опрос роутеров в локальной сети...[-]")
-		hintView.SetText("  [#94a3b8]Сканирование портов SSH и авторизация...[-]")
+		statusView.SetText("  [#38bdf8:b]Поиск и опрос роутеров в локальной сети...[-]")
+		hintView.SetText("  [#71717a]Сканирование портов SSH и авторизация...[-]")
 		table.Clear()
 		updateHeaders()
 
@@ -269,7 +269,7 @@ func ShowFleetModal(ctx *AppContext, returnPage string) {
 			nodes, err := fleet.ScanFleet(context.Background(), scanCfg, func(done, total int, curIP string) {
 				ctx.App.QueueUpdateDraw(func() {
 					statusView.SetText(fmt.Sprintf(
-						"  [#38bdf8:b]⚡ Сканирование сети:[-] [%d/%d] Проверка хоста [#38bdf8]%s[-]...",
+						"  [#38bdf8:b]Сканирование сети:[-] [%d/%d] Проверка хоста [#38bdf8]%s[-]...",
 						done, total, curIP,
 					))
 				})
@@ -277,7 +277,7 @@ func ShowFleetModal(ctx *AppContext, returnPage string) {
 
 			ctx.App.QueueUpdateDraw(func() {
 				if err != nil {
-					statusView.SetText(fmt.Sprintf("  [#ef5350:b]❌ Ошибка сканирования:[-] %v", err))
+					statusView.SetText(fmt.Sprintf("  [#e5484d:b]✗ Ошибка сканирования:[-] %v", err))
 					return
 				}
 				discoveredNodes = nodes
@@ -286,9 +286,9 @@ func ShowFleetModal(ctx *AppContext, returnPage string) {
 				form.Clear(true)
 				StyleForm(form)
 				form.SetBorderPadding(0, 0, 0, 0)
-				form.AddButton("🚀 Установить / Обновить на выбранные (Enter)", runDeploy)
-				form.AddButton("🔄 Повторить сканирование (S)", runScan)
-				form.AddButton("✕ Закрыть (Esc)", closeModal)
+				form.AddButton("Установить / обновить на выбранные (Enter)", runDeploy)
+				form.AddButton("Повторить сканирование (S)", runScan)
+				form.AddButton("Закрыть (Esc)", closeModal)
 				form.SetCancelFunc(closeModal)
 				EnableFormArrowNavigation(form)
 				ctx.App.SetFocus(table)

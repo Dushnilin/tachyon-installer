@@ -13,7 +13,7 @@ import (
 
 // ShowAWGModal displays an interactive AmneziaWG management, generator, and diagnostics modal.
 func ShowAWGModal(ctx *AppContext, returnPage string) {
-	panel := buildStepPanel(" 🛡️ УПРАВЛЕНИЕ И ГЕНЕРАТОР AMNEZIA WG ")
+	panel := buildStepPanel("Управление AmneziaWG")
 
 	infoView := tview.NewTextView().
 		SetDynamicColors(true).
@@ -21,12 +21,12 @@ func ShowAWGModal(ctx *AppContext, returnPage string) {
 	infoView.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
 
 	initialText := "\n" +
-		"  [#38bdf8:b]Генератор и интеграция AmneziaWG (AWG) в Tachyon:[-]\n\n" +
-		"  [#cbd5e1]• Создает секцию с защитой от блокировок протокола WireGuard (DPI Junk/Magic)[-]\n" +
-		"  [#cbd5e1]• Авто-генератор Cloudflare WARP с обфускацией заголовков (Jc, S1, S2, H1-H4)[-]\n" +
-		"  [#cbd5e1]• Подключение списков обхода (YouTube, Discord, RKN) под ключ[-]\n" +
-		"  [#cbd5e1]• Встроенная сквозная проверка подключения и доступности сервисов[-]\n\n" +
-		"  [#94a3b8]Выберите действие в меню ниже: сгенерируйте профиль или укажите свой .conf[-]\n"
+		"  [#38bdf8:b]Генератор и настройка AmneziaWG 2.0 в Tachyon:[-]\n\n" +
+		"  [#a1a1a6]• Создает секцию с обфускацией протокола WireGuard (Jc, S1–S4, H1–H4, CPS I1–I5, J1–J3)[-]\n" +
+		"  [#a1a1a6]• Встроенный генератор профиля Cloudflare WARP с обфускацией заголовков[-]\n" +
+		"  [#a1a1a6]• Автоматическое подключение списков маршрутизации (YouTube, Discord, РКН)[-]\n" +
+		"  [#a1a1a6]• Проверка туннеля и доступности сервисов[-]\n\n" +
+		"  [#71717a]Выберите действие ниже: сгенерируйте профиль WARP или вставьте свой .conf / vpn://[-]\n"
 
 	infoView.SetText(initialText)
 
@@ -67,41 +67,41 @@ func ShowAWGModal(ctx *AppContext, returnPage string) {
 		if extraMsg != "" {
 			sb.WriteString("  " + extraMsg + "\n\n")
 		}
-		sb.WriteString("  [#38bdf8:b]Параметры сгенерированной конфигурации AmneziaWG:[-]\n\n")
-		sb.WriteString(fmt.Sprintf("  [#94a3b8]• Версия AWG:[-]       [#f1f5f9]%s[-]\n", cfg.Version))
-		sb.WriteString(fmt.Sprintf("  [#94a3b8]• Сервер (Endpoint):[-] [#22c55e:b]%s:%d[-]\n", cfg.ServerAddress, cfg.ServerPort))
-		sb.WriteString(fmt.Sprintf("  [#94a3b8]• Внутренний IP:[-]    [#f1f5f9]%s[-]\n", cfg.Address))
+		sb.WriteString("  [#38bdf8:b]Параметры конфигурации AmneziaWG:[-]\n\n")
+		sb.WriteString(fmt.Sprintf("  [#71717a]• Версия AWG:[-]       [#ededed]%s[-]\n", cfg.Version))
+		sb.WriteString(fmt.Sprintf("  [#71717a]• Сервер (Endpoint):[-] [#4cc38a:b]%s:%d[-]\n", cfg.ServerAddress, cfg.ServerPort))
+		sb.WriteString(fmt.Sprintf("  [#71717a]• Внутренний IP:[-]    [#ededed]%s[-]\n", cfg.Address))
 
 		pubDisplay := cfg.PeerPublicKey
 		if len(pubDisplay) > 30 {
 			pubDisplay = pubDisplay[:28] + "..."
 		}
-		sb.WriteString(fmt.Sprintf("  [#94a3b8]• Публичный ключ:[-]   [#cbd5e1]%s[-]\n", pubDisplay))
+		sb.WriteString(fmt.Sprintf("  [#71717a]• Публичный ключ:[-]   [#a1a1a6]%s[-]\n", pubDisplay))
 
-		sb.WriteString(fmt.Sprintf("  [#94a3b8]• Мусорные пакеты:[-]  [#eab308]Jc=%d[-], [#eab308]Jmin=%d[-], [#eab308]Jmax=%d[-]\n",
+		sb.WriteString(fmt.Sprintf("  [#71717a]• Мусорные пакеты:[-]  [#eab308]Jc=%d[-], [#eab308]Jmin=%d[-], [#eab308]Jmax=%d[-]\n",
 			cfg.Jc, cfg.Jmin, cfg.Jmax))
-		sb.WriteString(fmt.Sprintf("  [#94a3b8]• Сдвиги пакетов:[-]   [#eab308]S1=%d[-], [#eab308]S2=%d[-]\n",
+		sb.WriteString(fmt.Sprintf("  [#71717a]• Сдвиги пакетов:[-]   [#eab308]S1=%d[-], [#eab308]S2=%d[-]\n",
 			cfg.S1, cfg.S2))
-		sb.WriteString(fmt.Sprintf("  [#94a3b8]• Магические хэши:[-]  [#a855f7]H1=%s[-], [#a855f7]H2=%s[-], [#a855f7]H3=%s[-], [#a855f7]H4=%s[-]\n",
+		sb.WriteString(fmt.Sprintf("  [#71717a]• Заголовки H1–H4:[-]  [#38bdf8]H1=%s[-], [#38bdf8]H2=%s[-], [#38bdf8]H3=%s[-], [#38bdf8]H4=%s[-]\n",
 			cfg.H1, cfg.H2, cfg.H3, cfg.H4))
 
-		sb.WriteString("\n  [#94a3b8]Готово к применению! Нажмите «🚀 Применить секцию» для записи в Tachyon.[-]\n")
+		sb.WriteString("\n  [#71717a]Готово к применению. Нажмите «Применить секцию» для записи в Tachyon.[-]\n")
 		infoView.SetText(sb.String())
 	}
 
 	// 1. Action: Generate WARP Config
 	runGenerateWarp := func() {
-		infoView.SetText("\n  [#38bdf8]⚡ Генерация учетной записи Cloudflare WARP и вычисление параметров AWG...[-]\n")
+		infoView.SetText("\n  [#38bdf8]Генерация профиля Cloudflare WARP и параметров AmneziaWG...[-]\n")
 
 		go func() {
 			cfg, err := routerpkg.GenerateWarpAWG(ctx.SSHClient, execFn)
 			ctx.App.QueueUpdateDraw(func() {
 				if err != nil {
-					infoView.SetText(fmt.Sprintf("\n  [#ef5350:b]❌ Ошибка генерации:[-] %v\n\n  [#94a3b8]Проверьте интернет-соединение или используйте ручной ввод .conf[-]\n", err))
+					infoView.SetText(fmt.Sprintf("\n  [#e5484d:b]✗ Ошибка генерации:[-] %v\n\n  [#71717a]Проверьте подключение к интернету или вставьте готовый .conf[-]\n", err))
 					return
 				}
 				currentCfg = cfg
-				renderConfigPreview(cfg, "[#22c55e:b]✓ Конфигурация Cloudflare WARP (AmneziaWG 2.0) успешно создана![-]")
+				renderConfigPreview(cfg, "[#4cc38a:b]✓ Конфигурация Cloudflare WARP (AmneziaWG 2.0) создана[-]")
 			})
 		}()
 	}
@@ -109,24 +109,24 @@ func ShowAWGModal(ctx *AppContext, returnPage string) {
 	// 2. Action: Apply Config to Router
 	runApply := func() {
 		if currentCfg == nil {
-			infoView.SetText("\n  [#ef5350:b]⚠️ Сначала создайте или введите конфигурацию![-]\n\n  [#cbd5e1]Нажмите «⚡ Сгенерировать WARP» или «📋 Вставить .conf»[-]\n")
+			infoView.SetText("\n  [#eab308:b]! Сначала создайте или введите конфигурацию[-]\n\n  [#a1a1a6]Нажмите «Сгенерировать WARP» или «Вставить .conf»[-]\n")
 			return
 		}
 
-		infoView.SetText("\n  [#38bdf8]⚡ Сохранение конфигурации в UCI, скачивание списков и перезапуск Tachyon...[-]\n")
+		infoView.SetText("\n  [#38bdf8]Сохранение конфигурации в UCI, обновление списков и перезапуск Tachyon...[-]\n")
 
 		go func() {
 			err := routerpkg.ApplyAWGSection(ctx.SSHClient, execFn, currentCfg, "awg", true)
 			ctx.App.QueueUpdateDraw(func() {
 				if err != nil {
-					infoView.SetText(fmt.Sprintf("\n  [#ef5350:b]❌ Ошибка применения секции:[-] %v\n", err))
+					infoView.SetText(fmt.Sprintf("\n  [#e5484d:b]✗ Ошибка применения секции:[-] %v\n", err))
 					return
 				}
 
-				msg := "\n  [#22c55e:b]✓ Секция AmneziaWG успешно применена и активирована![-]\n\n" +
-					"  [#cbd5e1]• Служба Tachyon перезапущена с ядром sing-box[-]\n" +
-					"  [#cbd5e1]• Списки YouTube, Discord и РКН подключены[-]\n\n" +
-					"  [#38bdf8]Нажмите «🔍 Проверить работу» для верификации обхода блокировок.[-]\n"
+				msg := "\n  [#4cc38a:b]✓ Секция AmneziaWG применена и активирована[-]\n\n" +
+					"  [#a1a1a6]• Служба Tachyon перезапущена[-]\n" +
+					"  [#a1a1a6]• Списки YouTube, Discord и РКН подключены[-]\n\n" +
+					"  [#38bdf8]Нажмите «Проверить работу» для тестирования обхода.[-]\n"
 				infoView.SetText(msg)
 			})
 		}()
@@ -134,7 +134,7 @@ func ShowAWGModal(ctx *AppContext, returnPage string) {
 
 	// 3. Action: Test Connectivity & Bypass
 	runTest := func() {
-		infoView.SetText("\n  [#38bdf8]⚡ Выполняется тестирование обхода блокировок через AmneziaWG...[-]\n  [#94a3b8]Проверка sing-box, Fake-IP DNS, YouTube, Discord и egress IP...[-]\n")
+		infoView.SetText("\n  [#38bdf8]Тестирование обхода через AmneziaWG...[-]\n  [#71717a]Проверка ядра прокси, DNS, YouTube, Discord и внешнего IP...[-]\n")
 
 		go func() {
 			rep, err := routerpkg.TestAWGSection(ctx.SSHClient, execFn, "awg")
@@ -142,19 +142,19 @@ func ShowAWGModal(ctx *AppContext, returnPage string) {
 				var sb strings.Builder
 				sb.WriteString("\n")
 				if err != nil && rep == nil {
-					sb.WriteString(fmt.Sprintf("  [#ef5350:b]❌ Ошибка тестирования:[-] %v\n", err))
+					sb.WriteString(fmt.Sprintf("  [#e5484d:b]✗ Ошибка тестирования:[-] %v\n", err))
 				} else if rep != nil {
 					if rep.Success {
-						sb.WriteString("  [#22c55e:b]✓ ТЕСТИРОВАНИЕ AMNEZIA WG ПРОШЛО УСПЕШНО![-]\n\n")
+						sb.WriteString("  [#4cc38a:b]✓ Проверка AmneziaWG завершена успешно[-]\n\n")
 					} else {
-						sb.WriteString("  [#eab308:b]⚠️ РЕЗУЛЬТАТЫ ПРОВЕРКИ AMNEZIA WG:[-]\n\n")
+						sb.WriteString("  [#eab308:b]! Результаты проверки AmneziaWG:[-]\n\n")
 					}
 					sb.WriteString(rep.FormatSummary())
 					sb.WriteString("\n")
 					if rep.Success {
-						sb.WriteString(fmt.Sprintf("  [#22c55e:b]Статус:[-] %s\n", rep.Details))
+						sb.WriteString(fmt.Sprintf("  [#4cc38a:b]Статус:[-] %s\n", rep.Details))
 					} else {
-						sb.WriteString(fmt.Sprintf("  [#eab308:b]Замечание:[-] %s\n", rep.Details))
+						sb.WriteString(fmt.Sprintf("  [#eab308:b]Примечание:[-] %s\n", rep.Details))
 					}
 				}
 				infoView.SetText(sb.String())
@@ -164,7 +164,7 @@ func ShowAWGModal(ctx *AppContext, returnPage string) {
 
 	// 4. Action: Manual input dialog
 	showManualModal := func() {
-		inputPanel := buildStepPanel(" 📋 ВВОД КОНФИГУРАЦИИ AMNEZIA WG ")
+		inputPanel := buildStepPanel("Ввод конфигурации AmneziaWG")
 		inputForm := tview.NewForm()
 		StyleForm(inputForm)
 
@@ -184,16 +184,16 @@ func ShowAWGModal(ctx *AppContext, returnPage string) {
 			inputStr = inputArea.GetText()
 			cfg, err := routerpkg.ParseAWGConfig(inputStr)
 			if err != nil {
-				infoView.SetText(fmt.Sprintf("\n  [#ef5350:b]❌ Некорректный конфиг:[-] %v\n", err))
+				infoView.SetText(fmt.Sprintf("\n  [#e5484d:b]✗ Некорректный конфиг:[-] %v\n", err))
 				closeManual()
 				return
 			}
 			currentCfg = cfg
-			renderConfigPreview(cfg, "[#22c55e:b]✓ Конфигурация успешно распознана и загружена![-]")
+			renderConfigPreview(cfg, "[#4cc38a:b]✓ Конфигурация распознана и загружена[-]")
 			closeManual()
 		}
 
-		inputForm.AddButton("✅ Использовать", saveManual)
+		inputForm.AddButton("Использовать", saveManual)
 		inputForm.AddButton("Отмена", closeManual)
 		inputForm.SetCancelFunc(closeManual)
 		EnableFormArrowNavigation(inputForm)
@@ -201,16 +201,16 @@ func ShowAWGModal(ctx *AppContext, returnPage string) {
 		inputPanel.AddItem(inputArea, 12, 1, true)
 		inputPanel.AddItem(formLayout(inputForm), 4, 1, false)
 
-		subModal := CreateWizardModalCustom(inputPanel, 84, 20)
+		subModal := CreateWizardModalCustom(inputPanel, 88, 22)
 		ctx.Pages.AddPage("awg_manual_modal", subModal, true, true)
 		ctx.App.SetFocus(inputArea)
 	}
 
-	form.AddButton("⚡ Сгенерировать WARP", runGenerateWarp)
-	form.AddButton("📋 Вставить .conf", showManualModal)
-	form.AddButton("🚀 Применить секцию", runApply)
-	form.AddButton("🔍 Проверить работу", runTest)
-	form.AddButton("🚪 Закрыть", closeModal)
+	form.AddButton("Сгенерировать WARP", runGenerateWarp)
+	form.AddButton("Вставить .conf", showManualModal)
+	form.AddButton("Применить секцию", runApply)
+	form.AddButton("Проверить работу", runTest)
+	form.AddButton("Закрыть", closeModal)
 	form.SetCancelFunc(closeModal)
 	EnableFormArrowNavigation(form)
 
@@ -218,7 +218,7 @@ func ShowAWGModal(ctx *AppContext, returnPage string) {
 	panel.AddItem(nil, 1, 0, false)
 	panel.AddItem(formLayout(form), 4, 1, true)
 
-	modal := CreateWizardModalCustom(panel, 88, 21)
+	modal := CreateWizardModalCustom(panel, 88, 22)
 	ctx.Pages.AddPage("awg_modal", modal, true, true)
 	ctx.App.SetFocus(form)
 }

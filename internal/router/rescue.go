@@ -26,27 +26,22 @@ func EmergencyRescue(client *gossh.Client, execFn sshutil.ExecFunc) RescueReport
 	}
 
 	rescueScript := `
-# 1. Stop proxy services
-if [ -x /etc/init.d/tachyon ]; then
-    /etc/init.d/tachyon stop >/dev/null 2>&1 || true
-fi
-if [ -x /etc/init.d/tachyon-core ]; then
-    /etc/init.d/tachyon-core stop >/dev/null 2>&1 || true
-fi
-if [ -x /etc/init.d/sing-box ]; then
-    /etc/init.d/sing-box stop >/dev/null 2>&1 || true
-fi
-if [ -x /etc/init.d/steer ]; then
-    /etc/init.d/steer stop >/dev/null 2>&1 || true
-fi
-killall -9 tachyon-core sing-box steer 2>/dev/null || true
+# 1. Release stale locks and stop proxy services
+rm -rf /var/run/tachyon/starting /var/run/tachyon/reloading /var/run/tachyon*.lock 2>/dev/null || true
+for _p in $(pgrep -f "99-tachyon-wan" 2>/dev/null || true); do kill -9 "$_p" 2>/dev/null || true; done
+for _svc in tachyon tachyon-core sing-box; do
+    if [ -x "/etc/init.d/$_svc" ]; then
+        "/etc/init.d/$_svc" stop >/dev/null 2>&1 || true
+    fi
+done
+killall -9 tachyon-core sing-box nfqws nfqws2 2>/dev/null || true
 
 # 2. Flush and delete nftables rules (fw4)
 if command -v nft >/dev/null 2>&1; then
     nft delete table inet TachyonTable >/dev/null 2>&1 || true
     nft delete table inet tachyon_table >/dev/null 2>&1 || true
     nft delete table inet tachyon >/dev/null 2>&1 || true
-    nft delete table inet steer >/dev/null 2>&1 || true
+    nft delete table inet tachyon_tailscale >/dev/null 2>&1 || true
     nft delete table ip tachyon >/dev/null 2>&1 || true
     nft delete table ip6 tachyon >/dev/null 2>&1 || true
 fi
@@ -59,13 +54,47 @@ if command -v iptables >/dev/null 2>&1; then
     iptables -t mangle -D PREROUTING -j TACHYON >/dev/null 2>&1 || true
 fi
 
-# 4. Clean TProxy policy routing
-ip rule del fwmark 0x1/0x1 table 100 >/dev/null 2>&1 || true
-ip route flush table 100 >/dev/null 2>&1 || true
-ip -6 rule del fwmark 0x1/0x1 table 100 >/dev/null 2>&1 || true
-ip -6 route flush table 100 >/dev/null 2>&1 || true
+# 4. Clean TProxy and policy routing (tables tachyon/105, 100, Tailscale 4247/4248)
+for _ipt in "ip" "ip -6"; do
+    while $_ipt rule del fwmark 0x04000000/0x04000000 lookup tachyon 2>/dev/null; do :; done
+    while $_ipt rule del fwmark 0x04000000/0x04000000 lookup 105 2>/dev/null; do :; done
+    while $_ipt rule del fwmark 0x10000000/0x10000000 lookup 100 2>/dev/null; do :; done
+    while $_ipt rule del fwmark 0x1/0x1 table 100 2>/dev/null; do :; done
+    while $_ipt rule del lookup tachyon 2>/dev/null; do :; done
+    while $_ipt rule del lookup 105 2>/dev/null; do :; done
+    while $_ipt rule del lookup 100 2>/dev/null; do :; done
+    while $_ipt rule del lookup 4247 2>/dev/null; do :; done
+    while $_ipt rule del lookup 4248 2>/dev/null; do :; done
+    for _tbl in tachyon 105 100 4247 4248; do
+        $_ipt route flush table "$_tbl" 2>/dev/null || true
+    done
+done
+ip netns del fkpsc 2>/dev/null || true
+ip link del fkpsc0 2>/dev/null || true
 
-# 5. Restart standard firewall & dnsmasq
+# 5. Restore dnsmasq backups if present & restart standard firewall + dnsmasq
+if command -v uci >/dev/null 2>&1; then
+    if uci -q get dhcp.@dnsmasq[0].tachyon_server >/dev/null 2>&1; then
+        uci -q delete dhcp.@dnsmasq[0].server 2>/dev/null || true
+        for _srv in $(uci -q get dhcp.@dnsmasq[0].tachyon_server); do
+            uci -q add_list dhcp.@dnsmasq[0].server="$_srv" 2>/dev/null || true
+        done
+        uci -q delete dhcp.@dnsmasq[0].tachyon_server 2>/dev/null || true
+    fi
+    for _opt in noresolv cachesize rebind_protection localuse; do
+        _bak=$(uci -q get "dhcp.@dnsmasq[0].tachyon_${_opt}" 2>/dev/null || true)
+        if [ -n "$_bak" ]; then
+            if [ "$_bak" = "__unset__" ]; then
+                uci -q delete "dhcp.@dnsmasq[0].${_opt}" 2>/dev/null || true
+            else
+                uci -q set "dhcp.@dnsmasq[0].${_opt}=${_bak}" 2>/dev/null || true
+            fi
+            uci -q delete "dhcp.@dnsmasq[0].tachyon_${_opt}" 2>/dev/null || true
+        fi
+    done
+    uci -q del_list dhcp.@dnsmasq[0].addn_hosts='/tmp/tachyon/hosts' 2>/dev/null || true
+    uci -q commit dhcp 2>/dev/null || true
+fi
 /etc/init.d/dnsmasq restart >/dev/null 2>&1 || true
 /etc/init.d/firewall restart >/dev/null 2>&1 || true
 
@@ -88,11 +117,11 @@ echo "RESCUE_DONE:$GW_OK:$NET_OK"
 	}
 
 	report.ActionsTaken = append(report.ActionsTaken,
-		"Остановлена служба Tachyon и процессы sing-box/steer",
-		"Сброшены таблицы nftables (inet tachyon)",
-		"Очищены правила iptables TACHYON",
-		"Удалены маршруты TProxy (table 100)",
-		"Перезапущены стандартные dnsmasq и firewall",
+		"Остановлены службы Tachyon, tachyon-core и sing-box",
+		"Сброшены таблицы nftables (inet tachyon / tachyon_tailscale)",
+		"Очищены маршруты TProxy (таблицы tachyon/105, 100, 4247/4248)",
+		"Восстановлены настройки dnsmasq и перезапущен DNS-резолвер",
+		"Перезапущен системный межсетевой экран (firewall)",
 	)
 
 	report.Success = true

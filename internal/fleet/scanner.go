@@ -96,7 +96,7 @@ func ScanFleet(ctx context.Context, cfg ScanConfig, progressCb func(done, total 
 			})
 		}
 		// Also add common router addresses
-		for _, ip := range []string{"192.168.1.1", "192.168.0.1", "192.168.31.1", "192.168.1.205", "192.168.2.1"} {
+		for _, ip := range []string{"192.168.1.1", "192.168.0.1", "192.168.31.1", "192.168.8.1", "192.168.2.1"} {
 			addIP(ip)
 		}
 		for _, c := range cidrs {

@@ -105,7 +105,7 @@ func RunSpeedDoctor(client *gossh.Client, execFn sshutil.ExecFunc, opts SpeedDoc
 	report.Direct = directRun
 
 	// 2. Check if Tachyon Proxy Tunnel is active
-	checkTunnelCmd := `ps 2>/dev/null | grep -E 'sing-box|steer' | grep -v grep | head -n 1`
+	checkTunnelCmd := `ps 2>/dev/null | grep -E 'tachyon-core|sing-box' | grep -v grep | head -n 1`
 	tunnelProc, _ := execFn(client, checkTunnelCmd)
 	tunnelProc = strings.TrimSpace(tunnelProc)
 
@@ -466,7 +466,7 @@ func buildRecommendations(report *SpeedDoctorReport) {
 		}
 		if report.Direct.CPU.Throttled {
 			report.Recommendations = append(report.Recommendations,
-				fmt.Sprintf("CPU роутера загружен на %.0f%% (softirq: %.0f%%). Включите Packet Steering или Software Flow Offloading.",
+				fmt.Sprintf("CPU роутера загружен на %.0f%% (softirq: %.0f%%). Рекомендуется включить Packet Steering для распределения прерываний по ядрам.",
 					report.Direct.CPU.TotalPct, report.Direct.CPU.SoftIRQPct))
 		}
 	}
@@ -474,7 +474,7 @@ func buildRecommendations(report *SpeedDoctorReport) {
 	if report.Tunnel != nil {
 		if report.Tunnel.CPU.Throttled {
 			report.Recommendations = append(report.Recommendations,
-				fmt.Sprintf("Туннель Tachyon упирается в процессор роутера (CPU: %.0f%%, softirq: %.0f%%). Для роутеров с MIPS/Atheros рекомендуется ядро 'steer' вместо тяжёлого Go.",
+				fmt.Sprintf("Туннель Tachyon упирается в процессор роутера (CPU: %.0f%%, softirq: %.0f%%). Рекомендуется ядро 'tachyon-core' (Rust) вместо Go.",
 					report.Tunnel.CPU.TotalPct, report.Tunnel.CPU.SoftIRQPct))
 		}
 		if report.Direct != nil && report.Direct.SpeedMbps > 0 {

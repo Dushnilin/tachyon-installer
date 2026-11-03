@@ -14,13 +14,13 @@ import (
 
 // ShowSpeedDoctorModal displays the interactive Bufferbloat & Speed Doctor diagnostic modal.
 func ShowSpeedDoctorModal(ctx *AppContext, returnPage string) {
-	panel := buildStepPanel(" 🚀 BUFFERBLOAT & SPEED DOCTOR ")
+	panel := buildStepPanel("Диагностика скорости и Bufferbloat")
 
 	statusView := tview.NewTextView().
 		SetDynamicColors(true).
 		SetScrollable(false)
 	statusView.SetBackgroundColor(ColorBgSpace)
-	statusView.SetText(fmt.Sprintf("  %s⚡ Измерение сетевых задержек, джиттера и нагрузки на CPU... Пожалуйста, подождите (5-10 сек)%s", TagCyanBold, TagReset))
+	statusView.SetText(fmt.Sprintf("  %sИзмерение сетевых задержек, джиттера и нагрузки на CPU (5–10 сек)...%s", TagCyanBold, TagReset))
 
 	resultsView := tview.NewTextView().
 		SetDynamicColors(true).
@@ -43,7 +43,7 @@ func ShowSpeedDoctorModal(ctx *AppContext, returnPage string) {
 		}
 	}
 
-	form.AddButton("🚪 Назад (Esc)", closeModal)
+	form.AddButton("Назад (Esc)", closeModal)
 	form.SetCancelFunc(closeModal)
 	EnableFormArrowNavigation(form)
 
@@ -82,29 +82,29 @@ func ShowSpeedDoctorModal(ctx *AppContext, returnPage string) {
 			sb.WriteString(fmt.Sprintf("  %s  %s%s%s\n\n",
 				gradeBadge, TagTextBold, d.Verdict, TagReset))
 
-			sb.WriteString(fmt.Sprintf("  %s⚡ Скорость скачивания (WAN):%s   %s%.1f Мбит/с%s\n",
+			sb.WriteString(fmt.Sprintf("  %sСкорость скачивания (WAN):%s     %s%.1f Мбит/с%s\n",
 				TagCyanBold, TagReset, TagTextBold, d.SpeedMbps, TagReset))
-			sb.WriteString(fmt.Sprintf("  %s⏱️  Задержка в покое (Idle):%s     %s%.1f мс%s  %s(мин: %.1f, макс: %.1f, джиттер: %.1f мс)%s\n",
+			sb.WriteString(fmt.Sprintf("  %sЗадержка в покое (Idle):%s       %s%.1f мс%s  %s(мин: %.1f, макс: %.1f, джиттер: %.1f мс)%s\n",
 				TagSubText, TagReset, TagGreenBold, d.IdlePingAvg, TagReset, TagMuted, d.IdlePingMin, d.IdlePingMax, d.IdleJitter, TagReset))
-			sb.WriteString(fmt.Sprintf("  %s🌊 Задержка под нагрузкой:%s       %s%.1f мс%s\n",
+			sb.WriteString(fmt.Sprintf("  %sЗадержка под нагрузкой:%s        %s%.1f мс%s\n",
 				TagSubText, TagReset, getLoadedLatencyColor(d.Grade), d.LoadedPingAvg, TagReset))
-			sb.WriteString(fmt.Sprintf("  %s📊 Bufferbloat Оверхед:%s         %s+%.1f мс%s %s(%s)%s\n\n",
+			sb.WriteString(fmt.Sprintf("  %sBufferbloat оверхед:%s           %s+%.1f мс%s %s(%s)%s\n\n",
 				TagSubText, TagReset, getLoadedLatencyColor(d.Grade), d.BufferbloatDelta, TagReset, TagMuted, d.Grade, TagReset))
 
 			// CPU meter
 			cpuBar := formatCPULoadBar(d.CPU.TotalPct)
 			cpuWarning := ""
 			if d.CPU.Throttled {
-				cpuWarning = fmt.Sprintf(" %s⚠️ CPU Throttling!%s", TagRedBold, TagReset)
+				cpuWarning = fmt.Sprintf(" %s! CPU Throttling%s", TagRedBold, TagReset)
 			}
-			sb.WriteString(fmt.Sprintf("  %s⚙️  Загрузка CPU роутера:%s        %s %s%.0f%%%s (sys: %.0f%%, softirq: %.0f%%)%s\n",
+			sb.WriteString(fmt.Sprintf("  %sЗагрузка CPU роутера:%s          %s %s%.0f%%%s (sys: %.0f%%, softirq: %.0f%%)%s\n",
 				TagSubText, TagReset, cpuBar, TagTextBold, d.CPU.TotalPct, TagReset, d.CPU.SystemPct, d.CPU.SoftIRQPct, cpuWarning))
 		}
 
 		if report.Tunnel != nil {
 			t := report.Tunnel
-			sb.WriteString(fmt.Sprintf("\n  %s🟣 ТУННЕЛЬ TACHYON (PROXY):%s\n", TagVioletBold, TagReset))
-			sb.WriteString(fmt.Sprintf("     Скорость: %s%.1f Мбит/с%s  •  Пинг: %s%.1f мс%s (Bufferbloat: +%.1f мс)  •  CPU: %s%.0f%%%s\n",
+			sb.WriteString(fmt.Sprintf("\n  %sТуннель Tachyon (прокси):%s\n", TagCyanBold, TagReset))
+			sb.WriteString(fmt.Sprintf("     Скорость: %s%.1f Мбит/с%s  ·  Пинг: %s%.1f мс%s (Bufferbloat: +%.1f мс)  ·  CPU: %s%.0f%%%s\n",
 				TagTextBold, t.SpeedMbps, TagReset, TagSubText, t.IdlePingAvg, TagReset, t.BufferbloatDelta, TagText, t.CPU.TotalPct, TagReset))
 		}
 
@@ -114,14 +114,14 @@ func ShowSpeedDoctorModal(ctx *AppContext, returnPage string) {
 			currDelta := report.Direct.BufferbloatDelta
 			if initDelta > currDelta && currDelta > 0 {
 				ratio := initDelta / currDelta
-				sb.WriteString(fmt.Sprintf("\n  %s🎉 РЕЗУЛЬТАТ ОПТИМИЗАЦИИ:%s Bufferbloat снижен с %s+%.0f мс%s до %s+%.0f мс%s (%sв %.1f раз быстрее!%s)\n",
+				sb.WriteString(fmt.Sprintf("\n  %sРезультат оптимизации:%s Bufferbloat снижен с %s+%.0f мс%s до %s+%.0f мс%s (%sв %.1f раз ниже%s)\n",
 					TagGreenBold, TagReset, TagRedBold, initDelta, TagReset, TagGreenBold, currDelta, TagReset, TagCyanBold, ratio, TagReset))
 			}
 		}
 
 		// Recommendations
 		if len(report.Recommendations) > 0 {
-			sb.WriteString(fmt.Sprintf("\n  %s💡 Рекомендации сетевого доктора:%s\n", TagAmberBold, TagReset))
+			sb.WriteString(fmt.Sprintf("\n  %sРекомендации:%s\n", TagAmberBold, TagReset))
 			for _, rec := range report.Recommendations {
 				sb.WriteString(fmt.Sprintf("   • %s%s%s\n", TagSubText, rec, TagReset))
 			}
@@ -138,8 +138,8 @@ func ShowSpeedDoctorModal(ctx *AppContext, returnPage string) {
 		}
 		isBenchmarking = true
 
-		statusView.SetText(fmt.Sprintf("  %s⚡ Измерение сетевых задержек, джиттера и нагрузки на CPU... Пожалуйста, подождите (5-10 сек)%s", TagCyanBold, TagReset))
-		resultsView.SetText(fmt.Sprintf("\n  %sЗапуск сетевого тестирования... Потоковая загрузка тестовых пакетов без записи на диск...%s\n", TagSubText, TagReset))
+		statusView.SetText(fmt.Sprintf("  %sИзмерение сетевых задержек, джиттера и нагрузки на CPU (5–10 сек)...%s", TagCyanBold, TagReset))
+		resultsView.SetText(fmt.Sprintf("\n  %sЗапуск сетевого тестирования без записи на Flash...%s\n", TagSubText, TagReset))
 
 		go func() {
 			client := ctx.SSHClient
@@ -149,7 +149,7 @@ func ShowSpeedDoctorModal(ctx *AppContext, returnPage string) {
 				if err != nil {
 					ctx.App.QueueUpdateDraw(func() {
 						isBenchmarking = false
-						statusView.SetText(fmt.Sprintf("  %s❌ Ошибка SSH подключения:%s %v", TagRedBold, TagReset, err))
+						statusView.SetText(fmt.Sprintf("  %s✗ Ошибка SSH-подключения:%s %v", TagRedBold, TagReset, err))
 					})
 					return
 				}
@@ -162,7 +162,7 @@ func ShowSpeedDoctorModal(ctx *AppContext, returnPage string) {
 			ctx.App.QueueUpdateDraw(func() {
 				isBenchmarking = false
 				if err != nil {
-					statusView.SetText(fmt.Sprintf("  %s❌ Ошибка бенчмарка:%s %v", TagRedBold, TagReset, err))
+					statusView.SetText(fmt.Sprintf("  %s✗ Ошибка измерения:%s %v", TagRedBold, TagReset, err))
 					return
 				}
 
@@ -173,7 +173,7 @@ func ShowSpeedDoctorModal(ctx *AppContext, returnPage string) {
 					report.TuningApplied = true
 				}
 
-				statusView.SetText(fmt.Sprintf("  %s✅ Анализ завершен!%s  [Enter] Повторить  [T] Оптимизировать сетевой стек", TagGreenBold, TagReset))
+				statusView.SetText(fmt.Sprintf("  %s✓ Анализ завершен%s  [Enter] Повторить  [T] Оптимизировать сетевой стек", TagGreenBold, TagReset))
 				renderReport(report)
 			})
 		}()
@@ -181,16 +181,16 @@ func ShowSpeedDoctorModal(ctx *AppContext, returnPage string) {
 
 	// Button: Run Benchmark
 	form.Clear(true)
-	form.AddButton("🚀 Повторить тест", func() {
+	form.AddButton("Повторить тест", func() {
 		runBenchmark(false)
 	})
 
 	// Button: Apply Tuning
-	form.AddButton("⚡ Оптимизировать (T)", func() {
+	form.AddButton("Оптимизировать (T)", func() {
 		if isBenchmarking {
 			return
 		}
-		statusView.SetText(fmt.Sprintf("  %s⚡ Применение сетевого тюнинга fq_codel, BBR и оптимизации сокетов...%s", TagCyanBold, TagReset))
+		statusView.SetText(fmt.Sprintf("  %sПрименение сетевого тюнинга fq_codel, BBR и сокетов...%s", TagCyanBold, TagReset))
 		go func() {
 			client := ctx.SSHClient
 			if client == nil {
@@ -198,7 +198,7 @@ func ShowSpeedDoctorModal(ctx *AppContext, returnPage string) {
 				client, err = reconnectFn()
 				if err != nil {
 					ctx.App.QueueUpdateDraw(func() {
-						statusView.SetText(fmt.Sprintf("  %s❌ Ошибка SSH подключения:%s %v", TagRedBold, TagReset, err))
+						statusView.SetText(fmt.Sprintf("  %s✗ Ошибка SSH-подключения:%s %v", TagRedBold, TagReset, err))
 					})
 					return
 				}
@@ -207,16 +207,16 @@ func ShowSpeedDoctorModal(ctx *AppContext, returnPage string) {
 			tuneRep := routerpkg.TuneNetwork(client, execFn)
 			ctx.App.QueueUpdateDraw(func() {
 				if tuneRep.Success {
-					statusView.SetText(fmt.Sprintf("  %s✅ Тюнинг применен!%s Запуск контрольного теста задержки...", TagGreenBold, TagReset))
+					statusView.SetText(fmt.Sprintf("  %s✓ Тюнинг применен.%s Запуск контрольного измерения задержки...", TagGreenBold, TagReset))
 					runBenchmark(true)
 				} else {
-					statusView.SetText(fmt.Sprintf("  %s❌ Ошибка применения тюнинга:%s %s", TagRedBold, TagReset, tuneRep.Details))
+					statusView.SetText(fmt.Sprintf("  %s✗ Ошибка применения тюнинга:%s %s", TagRedBold, TagReset, tuneRep.Details))
 				}
 			})
 		}()
 	})
 
-	form.AddButton("🚪 Назад (Esc)", closeModal)
+	form.AddButton("Назад (Esc)", closeModal)
 
 	// Hotkey Handler for modal
 	form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {

@@ -150,27 +150,25 @@ func showCancelModal(ctx *AppContext) {
 
 	modal := tview.NewFlex().SetDirection(tview.FlexRow)
 	modal.SetBorder(true).
-		SetTitle(" ⚠️  ПРЕДУПРЕЖДЕНИЕ ").
+		SetTitle(" Предупреждение ").
 		SetTitleAlign(tview.AlignCenter).
-		SetTitleColor(tcell.NewRGBColor(234, 179, 8)).
-		SetBorderColor(tcell.NewRGBColor(234, 179, 8))
+		SetTitleColor(ColorStatusWarning).
+		SetBorderColor(ColorStatusWarning)
 	modal.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
 
 	textView := tview.NewTextView().
 		SetDynamicColors(true).
 		SetTextAlign(tview.AlignCenter).
-		SetText("\n[#eab308]Установка ещё не завершена![-]\n[#cbd5e1]Вы уверены, что хотите прервать процесс?[-]\n")
+		SetText("\n[#eab308]Установка ещё не завершена[-]\n[#a1a1a6]Прервать текущий процесс?[-]\n")
 	textView.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
 
 	form := tview.NewForm()
-	form.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
-	form.SetLabelColor(tview.Styles.SecondaryTextColor)
-	form.SetFieldTextColor(tview.Styles.PrimaryTextColor)
-	form.AddButton("❌ Отменить установку", func() {
+	StyleForm(form)
+	form.AddButton("Отменить установку", func() {
 		ctx.Installing = false
 		ctx.App.Stop()
 	})
-	form.AddButton("✅ Продолжить установку", func() {
+	form.AddButton("Продолжить установку", func() {
 		ctx.CancelModalShown = false
 		ctx.Pages.RemovePage("cancel_modal")
 	})
@@ -193,33 +191,33 @@ func showCancelModal(ctx *AppContext) {
 }
 
 func PrintFinalResultsToConsole(ctx *AppContext, success bool, archiveVer string) {
-	ctx.ConsoleWrite("\n[#38bdf8]======================================================[-]\n")
+	ctx.ConsoleWrite("\n[#2e2e32]──────────────────────────────────────────────────────[-]\n")
 	if success {
-		ctx.ConsoleWrite("[#22c55e] 🎉 УСТАНОВКА TACHYON УСПЕШНО ЗАВЕРШЕНА[-]\n")
+		ctx.ConsoleWrite("[#4cc38a:b] ✓ Установка Tachyon завершена[-]\n")
 	} else {
-		ctx.ConsoleWrite("[#eab308] ⚠️ УСТАНОВКА ЗАВЕРШЕНА С ЗАМЕЧАНИЯМИ[-]\n")
+		ctx.ConsoleWrite("[#eab308:b] ! Установка завершена с замечаниями[-]\n")
 	}
-	ctx.ConsoleWrite("[#38bdf8]======================================================[-]\n\n")
+	ctx.ConsoleWrite("[#2e2e32]──────────────────────────────────────────────────────[-]\n\n")
 
 	ip := ""
 	if ctx.Config != nil {
 		ip = ctx.Config.RouterIP
 	}
 	luciURL := fmt.Sprintf("http://%s/cgi-bin/luci/admin/services/tachyon", ip)
-	ctx.ConsoleWrite(fmt.Sprintf("  [#22c55e]✅[-] Tachyon Core: [#f8fafc]v%s[-]\n", archiveVer))
-	ctx.ConsoleWrite(fmt.Sprintf("  [#22c55e]✅[-] LuCI Web: [#f8fafc]%s[-]\n", luciURL))
-	ctx.ConsoleWrite(fmt.Sprintf("  [#22c55e]✅[-] SSH: [#f8fafc]ssh root@%s[-]\n\n", ip))
+	ctx.ConsoleWrite(fmt.Sprintf("  [#4cc38a]✓[-] Tachyon:   [#ededed]v%s[-]\n", archiveVer))
+	ctx.ConsoleWrite(fmt.Sprintf("  [#4cc38a]✓[-] LuCI Web:  [#ededed]%s[-]\n", luciURL))
+	ctx.ConsoleWrite(fmt.Sprintf("  [#4cc38a]✓[-] SSH:       [#ededed]ssh root@%s[-]\n\n", ip))
 	if ctx.FirewallNotReady {
-		ctx.ConsoleWrite("  [#eab308]⚠ Правила firewall fw4 не применились: таблица ещё не была загружена.[-]\n")
-		ctx.ConsoleWrite("  [#cbd5e1]Это не ломает установку. Если прокси не заработает, выполните на роутере:[-]\n")
+		ctx.ConsoleWrite("  [#eab308]! Правила firewall fw4 не применились: таблица ещё не была загружена.[-]\n")
+		ctx.ConsoleWrite("  [#a1a1a6]Если прокси не запустился автоматически, выполните на роутере:[-]\n")
 		ctx.ConsoleWrite("  [#38bdf8]/etc/init.d/firewall restart && /etc/init.d/tachyon restart[-]\n\n")
 	}
 	if ctx.ReportPath != "" {
-		ctx.ConsoleWrite(fmt.Sprintf("  [#94a3b8]Отчёт диагностики: %s[-]\n", ctx.ReportPath))
+		ctx.ConsoleWrite(fmt.Sprintf("  [#71717a]Отчёт диагностики: %s[-]\n", ctx.ReportPath))
 	}
 	if ctx.LogPath != "" {
-		ctx.ConsoleWrite(fmt.Sprintf("  [#94a3b8]Полный лог установки: %s[-]\n\n", ctx.LogPath))
+		ctx.ConsoleWrite(fmt.Sprintf("  [#71717a]Полный лог установки: %s[-]\n\n", ctx.LogPath))
 	}
-	ctx.ConsoleWrite("  [#38bdf8:b]🚀 Нажмите [O] (или выберите в окне), чтобы открыть LuCI в браузере![-]\n")
-	ctx.ConsoleWrite("  [#64748b]Клавиши: [O] открыть браузер · [Enter / Esc / Q] закрыть программу[-]\n\n")
+	ctx.ConsoleWrite("  [#38bdf8]Нажмите [O], чтобы открыть панель LuCI в браузере[-]\n")
+	ctx.ConsoleWrite("  [#71717a]Клавиши: [O] открыть браузер · [Enter / Esc / Q] закрыть программу[-]\n\n")
 }

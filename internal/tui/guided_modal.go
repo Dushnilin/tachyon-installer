@@ -195,7 +195,7 @@ func (c *cycleSelectorItem) MouseHandler() func(action tview.MouseAction, event 
 
 // ShowGuidedSetupModal displays the hand-in-hand autopilot setup wizard.
 func ShowGuidedSetupModal(ctx *AppContext, returnPage string) {
-	panel := buildStepPanel(" ✨ МАСТЕР БЫСТРОЙ НАСТРОЙКИ (АВТОПИЛОТ) ")
+	panel := buildStepPanel("Мастер быстрой настройки")
 
 	infoView := tview.NewTextView().
 		SetDynamicColors(true).
@@ -203,13 +203,13 @@ func ShowGuidedSetupModal(ctx *AppContext, returnPage string) {
 	infoView.SetBackgroundColor(ColorBgSpace)
 
 	infoView.SetText("\n" +
-		fmt.Sprintf("  %s🚀 Запуск интеллектуального автопилота настройки роутера...%s\n\n", TagCyanBold, TagReset) +
-		fmt.Sprintf("  %s1. Подключение по SSH и сканирование оборудования%s\n", TagSubText, TagReset) +
-		fmt.Sprintf("  %s2. DNS-тестирование: проверка отравления UDP 53 и подбор быстрого резолвера%s\n", TagSubText, TagReset) +
-		fmt.Sprintf("  %s3. DPI Fuzzer: подбор лучшей стратегии обхода для YouTube и Discord%s\n", TagSubText, TagReset) +
-		fmt.Sprintf("  %s4. Автоматическая оптимизация сетевого стека (BBR, conntrack, сокеты)%s\n", TagSubText, TagReset) +
-		fmt.Sprintf("  %s5. Сквозная валидация результата%s\n\n", TagSubText, TagReset) +
-		fmt.Sprintf("  %s⚡ Выполняется экспресс-диагностика роутера и провайдера, подождите...%s\n", TagAmberBold, TagReset))
+		fmt.Sprintf("  %sЗапуск анализа роутера и провайдера...%s\n\n", TagCyanBold, TagReset) +
+		fmt.Sprintf("  %s1. Подключение по SSH и сбор параметров оборудования%s\n", TagSubText, TagReset) +
+		fmt.Sprintf("  %s2. Тестирование DNS: проверка подмены UDP 53 и выбор быстрого резолвера%s\n", TagSubText, TagReset) +
+		fmt.Sprintf("  %s3. DPI Fuzzer: подбор стратегии обхода для YouTube и Discord%s\n", TagSubText, TagReset) +
+		fmt.Sprintf("  %s4. Оптимизация сетевого стека (TCP BBR, conntrack, сокеты)%s\n", TagSubText, TagReset) +
+		fmt.Sprintf("  %s5. Сквозная проверка результата%s\n\n", TagSubText, TagReset) +
+		fmt.Sprintf("  %sВыполняется диагностика роутера и провайдера...%s\n", TagAmberBold, TagReset))
 
 	form := tview.NewForm()
 	StyleForm(form)
@@ -227,14 +227,14 @@ func ShowGuidedSetupModal(ctx *AppContext, returnPage string) {
 		}
 	}
 
-	form.AddButton("🚪 Назад (Esc)", closeModal)
+	form.AddButton("Назад (Esc)", closeModal)
 	form.SetCancelFunc(closeModal)
 	EnableFormArrowNavigation(form)
 
 	panel.AddItem(infoView, 0, 1, false)
 	panel.AddItem(formLayout(form), 9, 0, true)
 
-	modal := CreateWizardModalCustom(panel, 92, 27)
+	modal := CreateWizardModalCustom(panel, 94, 28)
 	ctx.Pages.AddPage("guided_modal", modal, true, true)
 	ctx.App.SetFocus(form)
 
@@ -257,7 +257,7 @@ func ShowGuidedSetupModal(ctx *AppContext, returnPage string) {
 			client, err = reconnectFn()
 			if err != nil {
 				ctx.App.QueueUpdateDraw(func() {
-					infoView.SetText(fmt.Sprintf("\n  [#ef5350:b]❌ Ошибка SSH подключения:[-] %v\n\n  [#cbd5e1]Проверьте IP-адрес роутера и пароль.[-]\n", err))
+					infoView.SetText(fmt.Sprintf("\n  [#e5484d:b]✗ Ошибка SSH-подключения:[-] %v\n\n  [#a1a1a6]Проверьте IP-адрес роутера и пароль.[-]\n", err))
 					form.Clear(true)
 					StyleForm(form)
 					form.SetBorderPadding(0, 0, 0, 0)
@@ -285,17 +285,17 @@ func ShowGuidedSetupModal(ctx *AppContext, returnPage string) {
 		// Render diagnostic findings & ready-to-apply action
 		ctx.App.QueueUpdateDraw(func() {
 			var sb strings.Builder
-			sb.WriteString("\n  [#38bdf8:b]📊 РЕЗУЛЬТАТЫ АНАЛИЗА РОУТЕРА И ПРОВАЙДЕРА:[-]\n\n")
+			sb.WriteString("\n  [#38bdf8:b]Результаты анализа роутера и провайдера:[-]\n\n")
 
 			if profile != nil {
-				sb.WriteString(fmt.Sprintf("  • Роутер:       [#f1f5f9:b]%s[-] ([#94a3b8]%s, RAM: %.0f МБ[-])\n",
+				sb.WriteString(fmt.Sprintf("  • Роутер:        [#ededed:b]%s[-] ([#71717a]%s, RAM: %.0f МБ[-])\n",
 					profile.Model, profile.Arch, profile.RAMTotal))
 			}
 
 			// DNS
-			dnsStatus := "[#22c55e]чистый (без подмены)[-]"
+			dnsStatus := "[#4cc38a]без подмены[-]"
 			if dnsReport.UDPPoisoned {
-				dnsStatus = "[#ef5350:b]подменяется провайдером (спуфинг)[-]"
+				dnsStatus = "[#e5484d:b]подменяется провайдером (спуфинг)[-]"
 			}
 			bestDNSName := "Cloudflare DNS"
 			bestDNSLat := int64(15)
@@ -303,21 +303,21 @@ func ShowGuidedSetupModal(ctx *AppContext, returnPage string) {
 				bestDNSName = dnsReport.Fastest.Name
 				bestDNSLat = dnsReport.Fastest.LatencyMs
 			}
-			sb.WriteString(fmt.Sprintf("  • DNS-провайдер: %s · Рекомендован: [#22c55e:b]%s (%d мс)[-]\n",
+			sb.WriteString(fmt.Sprintf("  • DNS-провайдер: %s · выбран: [#4cc38a:b]%s (%d мс)[-]\n",
 				dnsStatus, bestDNSName, bestDNSLat))
 
 			// DPI Strategy
-			bestStratName := "FakeSplit + Disorder"
+			bestStratName := "Adaptive Desync 2.0 (FakeSplit + Disorder)"
 			bestStratRate := 100
 			if fuzzReport.WinningStrategy != nil {
 				bestStratName = fuzzReport.WinningStrategy.Name
 				bestStratRate = fuzzReport.WinningStrategy.SuccessRate
 			}
-			sb.WriteString(fmt.Sprintf("  • DPI-стратегия: [#22c55e:b]%s[-] (Эффективность: [#38bdf8]%d%%[-])\n",
+			sb.WriteString(fmt.Sprintf("  • DPI-стратегия: [#4cc38a:b]%s[-] (успех: [#38bdf8]%d%%[-])\n",
 				bestStratName, bestStratRate))
 
-			sb.WriteString(fmt.Sprintf("  • Стек роутера:  [#f1f5f9]Доступна авто-настройка TCP BBR + защита Netfilter[-]\n\n"))
-			sb.WriteString("  [#22c55e]Готово к автоматической настройке под ключ в 1 клик![-]\n")
+			sb.WriteString("  • Сетевой стек:  [#ededed]TCP BBR + защита Netfilter[-]\n\n")
+			sb.WriteString("  [#4cc38a]Проверьте параметры ниже и нажмите Enter для применения.[-]\n")
 
 			infoView.SetText(sb.String())
 
@@ -328,9 +328,9 @@ func ShowGuidedSetupModal(ctx *AppContext, returnPage string) {
 			form.SetItemPadding(1)
 
 			modeOptions := []string{
-				"1. VLESS / Sing-box подписка (Туннель)",
-				"2. Автономный обход (Steer/Zapret — без серверов)",
-				"3. Гибридный режим (Zapret + VLESS Туннель)",
+				"1. Подписка прокси / VLESS (tachyon-core / sing-box)",
+				"2. Автономный обход DPI (Adaptive Desync / Zapret)",
+				"3. Гибридный режим (Desync/Zapret + Туннель)",
 				"4. AmneziaWG (Генератор WARP / свой .conf)",
 			}
 			selectedModeIdx := 0
@@ -358,7 +358,7 @@ func ShowGuidedSetupModal(ctx *AppContext, returnPage string) {
 			form.AddFormItem(cb)
 
 			// Apply Button
-			form.AddButton("🚀 Настроить всё автоматически (Enter)", func() {
+			form.AddButton("Применить настройки (Enter)", func() {
 				if selectedModeIdx == 3 {
 					ctx.Pages.RemovePage("guided_modal")
 					ShowAWGModal(ctx, returnPage)
@@ -367,17 +367,17 @@ func ShowGuidedSetupModal(ctx *AppContext, returnPage string) {
 
 				subVal := strings.TrimSpace(subInput.GetText())
 				if (selectedModeIdx == 0 || selectedModeIdx == 2) && subVal == "" {
-					infoView.SetText(sb.String() + "\n  [#ef5350:b]⚠️ Внимание:[-] укажите ссылку на подписку VLESS для режима туннеля!\n")
+					infoView.SetText(sb.String() + "\n  [#e5484d:b]! Укажите ссылку на подписку или узел для режима туннеля[-]\n")
 					ctx.App.SetFocus(subInput)
 					return
 				}
 
 				// Switch to execution view
-				infoView.SetText("\n  [#38bdf8:b]⚡ Применение параметров автопилота... Пожалуйста, подождите[-]\n\n")
+				infoView.SetText("\n  [#38bdf8:b]Применение параметров настройки...[-]\n\n")
 				form.Clear(true)
 				StyleForm(form)
 				form.SetBorderPadding(0, 0, 0, 0)
-				form.AddButton("⏳ Выполняется...", nil)
+				form.AddButton("Выполняется...", nil)
 
 				go func() {
 					var chosenDNS routerpkg.DNSResolver
@@ -394,14 +394,13 @@ func ShowGuidedSetupModal(ctx *AppContext, returnPage string) {
 						chosenStrat = routerpkg.DefaultDPIStrategies()[0]
 					}
 
+					defaultEngine := "tachyon-core"
 					mode := routerpkg.ModeTunnel
-					engine := "sing-box"
+					engine := defaultEngine
 					if selectedModeIdx == 1 {
 						mode = routerpkg.ModeStandaloneDPI
-						engine = "steer"
 					} else if selectedModeIdx == 2 {
 						mode = routerpkg.ModeHybrid
-						engine = "sing-box"
 					}
 
 					plan := routerpkg.GuidedSetupPlan{
@@ -416,8 +415,8 @@ func ShowGuidedSetupModal(ctx *AppContext, returnPage string) {
 					var logLines []string
 					progressCallback := func(stepTitle string, fraction float64) {
 						ctx.App.QueueUpdateDraw(func() {
-							logLines = append(logLines, fmt.Sprintf("  • [#cbd5e1]%s[-] [#22c55e]✓[-]", stepTitle))
-							infoView.SetText("\n  [#38bdf8:b]⚡ Применение параметров автопилота:[-]\n\n" + strings.Join(logLines, "\n"))
+							logLines = append(logLines, fmt.Sprintf("  • [#a1a1a6]%s[-] [#4cc38a]✓[-]", stepTitle))
+							infoView.SetText("\n  [#38bdf8:b]Применение параметров настройки:[-]\n\n" + strings.Join(logLines, "\n"))
 						})
 					}
 
@@ -427,32 +426,32 @@ func ShowGuidedSetupModal(ctx *AppContext, returnPage string) {
 						var resSB strings.Builder
 						resSB.WriteString("\n")
 						if err != nil {
-							resSB.WriteString(fmt.Sprintf("  [#ef5350:b]❌ Ошибка при настройке:[-] %v\n", err))
+							resSB.WriteString(fmt.Sprintf("  [#e5484d:b]✗ Ошибка при настройке:[-] %v\n", err))
 						} else {
-							resSB.WriteString("  [#22c55e:b]🎉 НАСТРОЙКА ПОД КЛЮЧ УСПЕШНО ЗАВЕРШЕНА![-]\n\n")
-							resSB.WriteString(fmt.Sprintf("  • [#38bdf8]Защищенный DNS:[-]     [#22c55e]%s[-] ([#f1f5f9]%d мс[-], защита от подмены активирована)\n",
+							resSB.WriteString("  [#4cc38a:b]✓ Настройка завершена[-]\n\n")
+							resSB.WriteString(fmt.Sprintf("  • [#38bdf8]Защищенный DNS:[-]     [#4cc38a]%s[-] ([#ededed]%d мс[-], защита от подмены включена)\n",
 								res.DNSName, res.DNSLatencyMs))
 							if res.StrategyApplied {
-								resSB.WriteString(fmt.Sprintf("  • [#38bdf8]DPI-стратегия:[-]      [#22c55e]%s[-] (YouTube и Discord разблокированы)\n",
+								resSB.WriteString(fmt.Sprintf("  • [#38bdf8]DPI-стратегия:[-]      [#4cc38a]%s[-]\n",
 									res.StrategyName))
 							}
 							if res.NetworkTuned {
-								resSB.WriteString(fmt.Sprintf("  • [#38bdf8]Сетевой стек:[-]       [#22c55e]TCP BBR + сокеты %s + conntrack %s[-]\n",
+								resSB.WriteString(fmt.Sprintf("  • [#38bdf8]Сетевой стек:[-]       [#4cc38a]TCP BBR + сокеты %s + conntrack %s[-]\n",
 									res.TuneReport.Buffers, res.TuneReport.Conntrack))
 							}
 
 							// Bypass probes
 							for _, p := range res.VerifyResult.Probes {
 								if p.Success {
-									resSB.WriteString(fmt.Sprintf("  • [#38bdf8]%-18s[-] [#22c55e]HTTP %d (%d мс) ✓[-]\n",
+									resSB.WriteString(fmt.Sprintf("  • [#38bdf8]%-18s[-] [#4cc38a]HTTP %d (%d мс) ✓[-]\n",
 										p.Name+":", p.HTTPStatus, p.LatencyMs))
 								} else {
-									resSB.WriteString(fmt.Sprintf("  • [#38bdf8]%-18s[-] [#eab308]HTTP %d (проверка в браузере)[-]\n",
+									resSB.WriteString(fmt.Sprintf("  • [#38bdf8]%-18s[-] [#eab308]HTTP %d (проверьте в браузере)[-]\n",
 										p.Name+":", p.HTTPStatus))
 								}
 							}
 
-							resSB.WriteString("\n  [#f1f5f9]Роутер полностью готов к работе, все устройства в сети защищены.[-]\n")
+							resSB.WriteString("\n  [#ededed]Роутер готов к работе.[-]\n")
 						}
 
 						infoView.SetText(resSB.String())
@@ -460,7 +459,7 @@ func ShowGuidedSetupModal(ctx *AppContext, returnPage string) {
 						form.Clear(true)
 						StyleForm(form)
 						form.SetBorderPadding(0, 0, 0, 0)
-						form.AddButton("🌐 Открыть LuCI", func() {
+						form.AddButton("Открыть LuCI", func() {
 							ip := "192.168.1.1"
 							if ctx.Config != nil && ctx.Config.RouterIP != "" {
 								ip = ctx.Config.RouterIP
@@ -468,7 +467,7 @@ func ShowGuidedSetupModal(ctx *AppContext, returnPage string) {
 							_ = browser.OpenURL(fmt.Sprintf("http://%s", ip))
 							closeModal()
 						})
-						form.AddButton("✅ Закрыть (Enter)", closeModal)
+						form.AddButton("Закрыть (Enter)", closeModal)
 						form.SetCancelFunc(closeModal)
 						EnableFormArrowNavigation(form)
 						ctx.App.SetFocus(form)

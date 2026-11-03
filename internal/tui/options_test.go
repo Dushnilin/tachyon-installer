@@ -184,7 +184,7 @@ func TestVersionNavigation2D(t *testing.T) {
 	}
 }
 
-func TestEngineOptionsConfigurationAndSteerC(t *testing.T) {
+func TestEngineOptionsConfiguration(t *testing.T) {
 	opt := NewOptionsSelector(ProfileData{RAMTotal: 512, RAMFree: 300})
 
 	foundTiny := false
@@ -195,16 +195,6 @@ func TestEngineOptionsConfigurationAndSteerC(t *testing.T) {
 		// 1. User requirement: "никакой не рекомендуется" (no engine should have "Рекомендуется")
 		if strings.Contains(eng.Badge, "Рекомендуется") || strings.Contains(eng.Desc, "Рекомендуется") {
 			t.Errorf("engine %s should NOT have 'Рекомендуется': badge=%q desc=%q", eng.Key, eng.Badge, eng.Desc)
-		}
-
-		// 2. User requirement: Steer is in C, NOT Go
-		if eng.Key == "steer" || eng.Key == "steer-extended" {
-			if strings.Contains(strings.ToLower(eng.Desc), "go") || strings.Contains(strings.ToLower(eng.Badge), "go") {
-				t.Errorf("engine %s incorrectly mentions Go: badge=%q desc=%q", eng.Key, eng.Badge, eng.Desc)
-			}
-			if !strings.Contains(eng.Badge, "C-движок") && !strings.Contains(eng.Desc, "C") {
-				t.Errorf("engine %s should state C-engine: badge=%q desc=%q", eng.Key, eng.Badge, eng.Desc)
-			}
 		}
 
 		if eng.Key == "tachyon-core" {
@@ -231,7 +221,7 @@ func TestEngineOptionsConfigurationAndSteerC(t *testing.T) {
 		t.Errorf("expected sing-box-extended-compressed in engine options")
 	}
 
-	// 3. Test numeric shortcuts 1..8 for engines
+	// 2. Test numeric shortcuts 1..6 for engines
 	handler := opt.InputHandler()
 	opt.activeSection = SectionEngine
 	handler(tcell.NewEventKey(tcell.KeyRune, '1', tcell.ModNone), nil) // tachyon-core
@@ -246,9 +236,9 @@ func TestEngineOptionsConfigurationAndSteerC(t *testing.T) {
 			opt.selectedEngine, opt.engines[opt.selectedEngine].Key)
 	}
 
-	handler(tcell.NewEventKey(tcell.KeyRune, '6', tcell.ModNone), nil) // steer
-	if opt.selectedEngine != 5 || opt.engines[opt.selectedEngine].Key != "steer" {
-		t.Errorf("expected '6' to select steer (index 5), got index=%d key=%s",
+	handler(tcell.NewEventKey(tcell.KeyRune, '6', tcell.ModNone), nil) // skip
+	if opt.selectedEngine != 5 || opt.engines[opt.selectedEngine].Key != "skip" {
+		t.Errorf("expected '6' to select skip (index 5), got index=%d key=%s",
 			opt.selectedEngine, opt.engines[opt.selectedEngine].Key)
 	}
 }
@@ -307,8 +297,8 @@ func TestZRAMOptionAndHardwareAdvice(t *testing.T) {
 	if !optsLow.InstallZRAM {
 		t.Errorf("expected InstallZRAM to be true by default for 64MB RAM router")
 	}
-	if optsLow.SelectedEngine != "steer" {
-		t.Errorf("expected steer engine to be preselected for 64MB router, got %s", optsLow.SelectedEngine)
+	if optsLow.SelectedEngine != "tachyon-core" {
+		t.Errorf("expected tachyon-core engine to be preselected for 64MB router, got %s", optsLow.SelectedEngine)
 	}
 
 	// High-end router (>512MB RAM)

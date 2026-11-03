@@ -45,7 +45,7 @@ var _ = tview.Styles
 func TestOptionsAdaptToTerminalSize(t *testing.T) {
 	for _, sz := range [][2]int{{120, 40}, {92, 28}, {80, 24}, {60, 18}, {40, 12}} {
 		out := renderOptions(t, sz[0], sz[1])
-		if !strings.Contains(out, "ЯДРО") {
+		if !strings.Contains(out, "Ядро") && !strings.Contains(out, "ЯДРО") {
 			t.Errorf("%dx%d: engine section missing", sz[0], sz[1])
 		}
 		for _, line := range strings.Split(out, "\n") {

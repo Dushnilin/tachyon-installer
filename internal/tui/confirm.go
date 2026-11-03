@@ -14,8 +14,6 @@ var engineLabels = map[string]string{
 	"sing-box-extended-compressed": "sing-box-extended (сжатый бинарник)",
 	"sing-box-tiny":                "sing-box-tiny (минимум RAM)",
 	"sing-box-lx":                  "sing-box-lx (Leadaxe)",
-	"steer":                        "steer (C-движок, минимум RAM)",
-	"steer-extended":               "steer-extended (C-движок, xHTTP)",
 	"skip":                         "без ядра (поставить позже)",
 }
 
@@ -63,7 +61,7 @@ func confirmText(routerIP string, profile ProfileData, opts InstallOptions) stri
 
 // showConfirmModal asks the user to confirm the chosen options before the install starts.
 func showConfirmModal(ctx *AppContext, profile ProfileData, opts InstallOptions, onConfirm, onCancel func()) {
-	panel := buildStepPanel(" ПОДТВЕРЖДЕНИЕ ")
+	panel := buildStepPanel("Подтверждение параметров")
 
 	routerIP := ""
 	if ctx.Config != nil {
@@ -75,7 +73,7 @@ func showConfirmModal(ctx *AppContext, profile ProfileData, opts InstallOptions,
 	form := tview.NewForm()
 	StyleForm(form)
 	form.SetButtonsAlign(tview.AlignCenter)
-	form.AddButton("🚀 Установить", onConfirm)
+	form.AddButton("Установить", onConfirm)
 	form.AddButton("← Изменить", onCancel)
 	form.SetInputCapture(func(ev *tcell.EventKey) *tcell.EventKey {
 		switch ev.Key() {
@@ -93,7 +91,7 @@ func showConfirmModal(ctx *AppContext, profile ProfileData, opts InstallOptions,
 	panel.AddItem(tv, 0, 1, false)
 	panel.AddItem(formLayout(form), 3, 0, true)
 
-	ctx.Pages.AddPage("confirm_wizard", CreateWizardModalCustom(panel, 84, 22), true, true)
+	ctx.Pages.AddPage("confirm_wizard", CreateWizardModalCustom(panel, 88, 22), true, true)
 	ctx.Pages.SwitchToPage("confirm_wizard")
 	ctx.App.SetFocus(form)
 }

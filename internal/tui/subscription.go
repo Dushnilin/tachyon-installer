@@ -11,18 +11,11 @@ import (
 
 // ShowSubscriptionSetupForm displays a modal for entering a subscription URL or direct proxy link(s).
 func ShowSubscriptionSetupForm(ctx *AppContext) {
-	panel := NewSolidFlex()
-	panel.SetDirection(tview.FlexRow)
-	panel.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
-	panel.SetBorder(true).
-		SetTitle(" 🚀 ДОБАВЛЕНИЕ ССЫЛКИ НА ПОДПИСКУ ").
-		SetTitleAlign(tview.AlignCenter).
-		SetTitleColor(tcell.NewRGBColor(56, 189, 248)).
-		SetBorderColor(tcell.NewRGBColor(56, 189, 248))
+	panel := buildStepPanel("Добавление подписки")
 
-	text := "\n  [#38bdf8]🛰️  Tachyon успешно установлен![-]\n\n" +
-		"  [#cbd5e1]Для обхода блокировок вставьте вашу ссылку на подписку[-]\n" +
-		"  [#cbd5e1](VLESS / Shadowsocks / Trojan / VMess / Hysteria2) от вашего VPN-провайдера:[-]"
+	text := "\n  [#38bdf8]Tachyon установлен на роутер[-]\n\n" +
+		"  [#a1a1a6]Вставьте ссылку на подписку (HTTPS / Happ crypt4), конфигурационную ссылку[-]\n" +
+		"  [#a1a1a6](VLESS, Trojan, Shadowsocks, VMess, Hysteria2, TUIC, AnyTLS, FPTN) или base64:[-]"
 
 	textView := tview.NewTextView().
 		SetDynamicColors(true).
@@ -31,7 +24,7 @@ func ShowSubscriptionSetupForm(ctx *AppContext) {
 
 	statusView := tview.NewTextView().
 		SetDynamicColors(true).
-		SetText("  [#64748b]Поддерживаются HTTPS ссылки, прямые конфиги (vless://...) и base64 бандлы[-] ")
+		SetText("  [#71717a]Поддерживаются HTTPS/Happ ссылки, прямые URI (vless://, hy2://, fptn:...) и base64[-] ")
 	statusView.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
 
 	subInput := tview.NewInputField().
@@ -42,21 +35,19 @@ func ShowSubscriptionSetupForm(ctx *AppContext) {
 	subInput.SetChangedFunc(func(text string) {
 		trimmed := strings.TrimSpace(text)
 		if trimmed == "" {
-			statusView.SetText("  [#64748b]Поддерживаются HTTPS ссылки, прямые конфиги (vless://...) и base64 бандлы[-] ")
+			statusView.SetText("  [#71717a]Поддерживаются HTTPS/Happ ссылки, прямые URI (vless://, hy2://, fptn:...) и base64[-] ")
 			return
 		}
 		analysis := routerpkg.AnalyzeSubscription(trimmed)
 		if analysis.Valid {
-			statusView.SetText("  [#22c55e]✓ " + analysis.Summary + "[-] ")
+			statusView.SetText("  [#4cc38a]✓ " + analysis.Summary + "[-] ")
 		} else {
-			statusView.SetText("  [#ef5350]⚠️ " + analysis.ErrorMsg + "[-] ")
+			statusView.SetText("  [#e5484d]! " + analysis.ErrorMsg + "[-] ")
 		}
 	})
 
 	form := tview.NewForm()
-	form.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
-	form.SetLabelColor(tview.Styles.SecondaryTextColor)
-	form.SetFieldTextColor(tview.Styles.PrimaryTextColor)
+	StyleForm(form)
 	form.AddFormItem(subInput)
 
 	saveAndRun := func() {
@@ -69,14 +60,14 @@ func ShowSubscriptionSetupForm(ctx *AppContext) {
 		}
 
 		ctx.Pages.SwitchToPage("progress")
-		ctx.ConsoleWrite("\n[#cbd5e1]⚡ Сохранение подписки в Tachyon...[-]\n")
+		ctx.ConsoleWrite("\n[#a1a1a6]Сохранение подписки в Tachyon...[-]\n")
 
 		if ctx.OnSaveSub != nil {
 			ctx.OnSaveSub(url)
 		}
 	}
 
-	form.AddButton("🚀 Сохранить и запустить", saveAndRun)
+	form.AddButton("Сохранить и запустить", saveAndRun)
 	form.AddButton("Пропустить (настроить в LuCI)", func() {
 		if ctx.OnSkipSub != nil {
 			ctx.OnSkipSub()
@@ -95,14 +86,7 @@ func ShowSubscriptionSetupForm(ctx *AppContext) {
 	panel.AddItem(statusView, 1, 0, false)
 	panel.AddItem(formLayout(form), 6, 1, true)
 
-	modalForm := NewSolidFlex()
-	modalForm.AddItem(nil, 0, 1, false)
-	modalForm.AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
-		AddItem(nil, 0, 1, false).
-		AddItem(panel, 16, 1, true).
-		AddItem(nil, 0, 1, false), 76, 1, true)
-	modalForm.AddItem(nil, 0, 1, false)
-	modalForm.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
+	modalForm := CreateWizardModalCustom(panel, 88, 18)
 
 	ctx.Pages.AddPage("sub_setup", modalForm, true, true)
 	ctx.Pages.SwitchToPage("sub_setup")
