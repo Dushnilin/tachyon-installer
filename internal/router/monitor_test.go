@@ -20,7 +20,7 @@ Inter-|   Receive                                                |  Transmit
     lo: 1000       10    0    0    0     0          0         0     1000       10    0    0    0     0       0          0
 br-lan: 10485760   5000    0    0    0     0          0         0  5242880    4000    0    0    0     0       0          0
 --- PROC ---
- 1420 root      35420 S    /usr/bin/sing-box run -c /etc/tachyon/config.json
+ 1420 root      35420 S    /usr/bin/tachyon-core run -c /etc/tachyon-core/config.json
 --- CONN ---
 145
 `
@@ -42,7 +42,7 @@ br-lan: 10485760   5000    0    0    0     0          0         0  5242880    40
 	if !strings.Contains(uptimeStr, "2д") && !strings.Contains(uptimeStr, "2d") {
 		t.Errorf("unexpected UptimeString: %s", uptimeStr)
 	}
-	if stats.EngineName != "sing-box" || stats.EnginePID != "1420" {
+	if stats.EngineName != "tachyon-core" || stats.EnginePID != "1420" {
 		t.Errorf("unexpected engine stats: name=%s pid=%s", stats.EngineName, stats.EnginePID)
 	}
 	if stats.RXBytes != 10485760 || stats.TXBytes != 5242880 {

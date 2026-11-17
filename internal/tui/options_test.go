@@ -187,9 +187,8 @@ func TestVersionNavigation2D(t *testing.T) {
 func TestEngineOptionsConfiguration(t *testing.T) {
 	opt := NewOptionsSelector(ProfileData{RAMTotal: 512, RAMFree: 300})
 
-	foundTiny := false
-	foundExtCompressed := false
 	foundTachyonCore := false
+	foundSkip := false
 
 	for _, eng := range opt.engines {
 		// 1. User requirement: "никакой не рекомендуется" (no engine should have "Рекомендуется")
@@ -203,25 +202,22 @@ func TestEngineOptionsConfiguration(t *testing.T) {
 				t.Errorf("expected tachyon-core badge to contain Rust, got %s", eng.Badge)
 			}
 		}
-		if eng.Key == "sing-box-tiny" {
-			foundTiny = true
-		}
-		if eng.Key == "sing-box-extended-compressed" {
-			foundExtCompressed = true
+		if eng.Key == "skip" {
+			foundSkip = true
 		}
 	}
 
 	if !foundTachyonCore {
 		t.Errorf("expected tachyon-core in engine options")
 	}
-	if !foundTiny {
-		t.Errorf("expected sing-box-tiny in engine options")
+	if !foundSkip {
+		t.Errorf("expected skip in engine options")
 	}
-	if !foundExtCompressed {
-		t.Errorf("expected sing-box-extended-compressed in engine options")
+	if len(opt.engines) != 2 {
+		t.Errorf("expected 2 engine options (tachyon-core, skip), got %d", len(opt.engines))
 	}
 
-	// 2. Test numeric shortcuts 1..6 for engines
+	// 2. Test numeric shortcuts 1..2 for engines
 	handler := opt.InputHandler()
 	opt.activeSection = SectionEngine
 	handler(tcell.NewEventKey(tcell.KeyRune, '1', tcell.ModNone), nil) // tachyon-core
@@ -230,15 +226,9 @@ func TestEngineOptionsConfiguration(t *testing.T) {
 			opt.selectedEngine, opt.engines[opt.selectedEngine].Key)
 	}
 
-	handler(tcell.NewEventKey(tcell.KeyRune, '4', tcell.ModNone), nil) // sing-box-tiny
-	if opt.selectedEngine != 3 || opt.engines[opt.selectedEngine].Key != "sing-box-tiny" {
-		t.Errorf("expected '4' to select sing-box-tiny (index 3), got index=%d key=%s",
-			opt.selectedEngine, opt.engines[opt.selectedEngine].Key)
-	}
-
-	handler(tcell.NewEventKey(tcell.KeyRune, '6', tcell.ModNone), nil) // skip
-	if opt.selectedEngine != 5 || opt.engines[opt.selectedEngine].Key != "skip" {
-		t.Errorf("expected '6' to select skip (index 5), got index=%d key=%s",
+	handler(tcell.NewEventKey(tcell.KeyRune, '2', tcell.ModNone), nil) // skip
+	if opt.selectedEngine != 1 || opt.engines[opt.selectedEngine].Key != "skip" {
+		t.Errorf("expected '2' to select skip (index 1), got index=%d key=%s",
 			opt.selectedEngine, opt.engines[opt.selectedEngine].Key)
 	}
 }

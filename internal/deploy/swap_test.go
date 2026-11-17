@@ -6,7 +6,7 @@ import (
 )
 
 func TestHotSwapScriptIntegrity(t *testing.T) {
-	// Verify hot swap commands for tachyon-core and sing-box
+	// Verify hot swap command for tachyon-core
 	engine := "tachyon-core"
 	script := `uci -q set tachyon.settings.engine="` + engine + `"`
 	if !strings.Contains(script, "tachyon-core") {

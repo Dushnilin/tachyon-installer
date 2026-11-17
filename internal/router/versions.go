@@ -61,21 +61,7 @@ func GetInstalledVersions(client *gossh.Client, isAPK bool, packages []string) m
 		}
 	}
 
-	// Also check binary version for sing-box
-	sessionSB, err := client.NewSession()
-	if err == nil {
-		outBytesSB, errSB := sessionSB.CombinedOutput("GOMEMLIMIT=15MiB /usr/bin/sing-box version 2>/dev/null | head -1 | awk '{print $3}'")
-		if errSB == nil {
-			sbVer := strings.TrimSpace(string(outBytesSB))
-			if sbVer != "" {
-				versions["sing-box-extended"] = sbVer
-				versions["sing-box"] = sbVer
-			}
-		}
-		sessionSB.Close()
-	}
-
-	// Also check tachyon-core version file or binary
+	// Check tachyon-core version file or binary
 	sessionTC, errTC := client.NewSession()
 	if errTC == nil {
 		outBytesTC, errTCB := sessionTC.CombinedOutput("cat /etc/tachyon/tachyon-core-version 2>/dev/null | head -1 || /usr/bin/tachyon-core --version 2>/dev/null | head -1 | awk '{print $NF}' || /usr/bin/tachyon-core version 2>/dev/null | head -1 | awk '{print $3}'")

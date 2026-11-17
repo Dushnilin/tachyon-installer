@@ -107,8 +107,18 @@ func TestSaveSubscription_HTTPS(t *testing.T) {
 	if !strings.Contains(executedCmd, "list_update_async") {
 		t.Errorf("expected list_update_async in executed command")
 	}
-	if !strings.Contains(executedCmd, "engine='sing-box'") {
-		t.Errorf("expected engine='sing-box' in executed command")
+	if !strings.Contains(executedCmd, "engine='tachyon-core'") {
+		t.Errorf("expected engine='tachyon-core' in executed command")
+	}
+	if !strings.Contains(executedCmd, "subscription_engine='core'") {
+		t.Errorf("expected subscription_engine='core' in executed command")
+	}
+}
+
+func TestAnalyzeSubscription_NewProtocols(t *testing.T) {
+	a := AnalyzeSubscription("csqtt://user@1.2.3.4:443#CS\nwdtt://user@1.2.3.4:443#WD\nmierus://user@1.2.3.4:8443#Mieru")
+	if !a.Valid || a.NodeCount != 3 {
+		t.Fatalf("expected 3 valid nodes, got Valid=%v count=%d err=%s", a.Valid, a.NodeCount, a.ErrorMsg)
 	}
 }
 

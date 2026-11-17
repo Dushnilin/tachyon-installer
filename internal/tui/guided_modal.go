@@ -206,7 +206,7 @@ func ShowGuidedSetupModal(ctx *AppContext, returnPage string) {
 		fmt.Sprintf("  %sЗапуск анализа роутера и провайдера...%s\n\n", TagCyanBold, TagReset) +
 		fmt.Sprintf("  %s1. Подключение по SSH и сбор параметров оборудования%s\n", TagSubText, TagReset) +
 		fmt.Sprintf("  %s2. Тестирование DNS: проверка подмены UDP 53 и выбор быстрого резолвера%s\n", TagSubText, TagReset) +
-		fmt.Sprintf("  %s3. DPI Fuzzer: подбор стратегии обхода для YouTube и Discord%s\n", TagSubText, TagReset) +
+		fmt.Sprintf("  %s3. Packet Fuzzer: подбор стратегии десинхронизации для YouTube и Discord%s\n", TagSubText, TagReset) +
 		fmt.Sprintf("  %s4. Оптимизация сетевого стека (TCP BBR, conntrack, сокеты)%s\n", TagSubText, TagReset) +
 		fmt.Sprintf("  %s5. Сквозная проверка результата%s\n\n", TagSubText, TagReset) +
 		fmt.Sprintf("  %sВыполняется диагностика роутера и провайдера...%s\n", TagAmberBold, TagReset))
@@ -328,10 +328,10 @@ func ShowGuidedSetupModal(ctx *AppContext, returnPage string) {
 			form.SetItemPadding(1)
 
 			modeOptions := []string{
-				"1. Подписка прокси / VLESS (tachyon-core / sing-box)",
-				"2. Автономный обход DPI (Adaptive Desync / Zapret)",
+				"1. Подписка прокси / VLESS (tachyon-core)",
+				"2. Автономная десинхронизация пакетов (Adaptive Desync / Zapret)",
 				"3. Гибридный режим (Desync/Zapret + Туннель)",
-				"4. AmneziaWG (Генератор WARP / свой .conf)",
+				"4. AmneziaWG 2.0 (Генератор WARP / свой .conf)",
 			}
 			selectedModeIdx := 0
 			modeItem := newCycleSelectorItem("Режим работы:        ", modeOptions, 0, func(index int) {

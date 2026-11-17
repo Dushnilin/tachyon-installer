@@ -41,22 +41,35 @@ func TestResolveEngineAssets_Skip(t *testing.T) {
 	}
 }
 
-func TestResolveEngineAssets_TinyAndStable(t *testing.T) {
-	mgr := downloader.NewMirrorManager("direct")
-	customClient := downloader.NewClient(mgr)
-	tinyAssets, err := downloader.ResolveEngineAssets(context.Background(), customClient, downloader.EngineSingBoxTiny, "aarch64_generic", "arm64", false)
-	if err != nil || len(tinyAssets) != 1 || tinyAssets[0].EngineType != downloader.EngineSingBoxTiny {
-		t.Fatalf("expected EngineSingBoxTiny handling, got %v, err %v", tinyAssets, err)
+func TestNormalizeEngine(t *testing.T) {
+	cases := []struct {
+		input    string
+		expected downloader.EngineType
+	}{
+		{"", downloader.EngineTachyonCore},
+		{"tachyon-core", downloader.EngineTachyonCore},
+		{"core", downloader.EngineTachyonCore},
+		{"sing-box", downloader.EngineTachyonCore},
+		{"sing-box-extended", downloader.EngineTachyonCore},
+		{"sing-box-extended-compressed", downloader.EngineTachyonCore},
+		{"sing-box-tiny", downloader.EngineTachyonCore},
+		{"sing-box-lx", downloader.EngineTachyonCore},
+		{"skip", downloader.EngineSkip},
 	}
 
-	stableAssets, err := downloader.ResolveEngineAssets(context.Background(), customClient, downloader.EngineSingBoxStable, "aarch64_generic", "arm64", false)
-	if err != nil || len(stableAssets) != 1 || stableAssets[0].EngineType != downloader.EngineSingBoxStable {
-		t.Fatalf("expected EngineSingBoxStable handling, got %v, err %v", stableAssets, err)
+	for _, c := range cases {
+		if got := downloader.NormalizeEngine(c.input); got != c.expected {
+			t.Errorf("NormalizeEngine(%q) = %q; want %q", c.input, got, c.expected)
+		}
 	}
 }
 
 func TestFilterTachyonCoreAssets(t *testing.T) {
 	assets := []downloader.ReleaseAsset{
+		{Name: "tachyon-core-aarch64-linux-android-v0.5.8.tar.gz", BrowserDownloadURL: "https://example.com/android-arm64"},
+		{Name: "tachyon-core-armv7-linux-androideabi-v0.5.8.tar.gz", BrowserDownloadURL: "https://example.com/android-armv7"},
+		{Name: "tachyon-core-x86_64-linux-android-v0.5.8.tar.gz", BrowserDownloadURL: "https://example.com/android-amd64"},
+		{Name: "tachyon-core-ios-arm64-v0.5.8.tar.gz", BrowserDownloadURL: "https://example.com/ios-arm64"},
 		{Name: "tachyon-core-linux-amd64-v0.0.2.tar.gz", BrowserDownloadURL: "https://example.com/amd64"},
 		{Name: "tachyon-core-aarch64-v0.0.2.tar.gz", BrowserDownloadURL: "https://example.com/aarch64"},
 		{Name: "tachyon-core-armv7-v0.0.2.tar.gz", BrowserDownloadURL: "https://example.com/armv7"},
@@ -104,6 +117,43 @@ func TestFilterTachyonCoreAssets(t *testing.T) {
 		}
 		if res[0].IsPackage {
 			t.Errorf("expected IsPackage=false for tar.gz, got true")
+		}
+	}
+}
+
+func TestFilterTachyonCoreAssets_V058Packages(t *testing.T) {
+	assets := []downloader.ReleaseAsset{
+		{Name: "tachyon-core-aarch64-linux-android-v0.5.8.tar.gz", BrowserDownloadURL: "https://example.com/android"},
+		{Name: "tachyon-core-ios-arm64-v0.5.8.tar.gz", BrowserDownloadURL: "https://example.com/ios"},
+		{Name: "tachyon-core-aarch64-v0.5.8.apk", BrowserDownloadURL: "https://example.com/apk-arm64"},
+		{Name: "tachyon-core-x86_64-v0.5.8.apk", BrowserDownloadURL: "https://example.com/apk-amd64"},
+		{Name: "tachyon-core-mips-v0.5.8.apk", BrowserDownloadURL: "https://example.com/apk-mips"},
+		{Name: "tachyon-core-mipsel-v0.5.8.apk", BrowserDownloadURL: "https://example.com/apk-mipsel"},
+		{Name: "tachyon-core-i386_pentium4-v0.5.8.apk", BrowserDownloadURL: "https://example.com/apk-386"},
+		{Name: "tachyon-core-riscv64-v0.5.8.ipk", BrowserDownloadURL: "https://example.com/ipk-riscv64"},
+	}
+
+	cases := []struct {
+		distribArch string
+		rawArch     string
+		ext         string
+		wantURL     string
+	}{
+		{"aarch64_generic", "arm64", "apk", "https://example.com/apk-arm64"},
+		{"x86_64", "amd64", "apk", "https://example.com/apk-amd64"},
+		{"mips_24kc", "mips", "apk", "https://example.com/apk-mips"},
+		{"mipsel_24kc", "mipsle", "apk", "https://example.com/apk-mipsel"},
+		{"i386_pentium4", "386", "apk", "https://example.com/apk-386"},
+		{"riscv64_generic", "riscv64", "ipk", "https://example.com/ipk-riscv64"},
+	}
+
+	for _, tc := range cases {
+		res, err := downloader.FilterTachyonCoreAssets(assets, tc.distribArch, tc.rawArch, tc.ext, "v0.5.8")
+		if err != nil {
+			t.Fatalf("FilterTachyonCoreAssets(%s, %s) failed: %v", tc.distribArch, tc.ext, err)
+		}
+		if len(res) != 1 || !res[0].IsPackage || res[0].URL != tc.wantURL {
+			t.Errorf("for %s/%s got %+v; want IsPackage=true, URL=%s", tc.distribArch, tc.ext, res, tc.wantURL)
 		}
 	}
 }

@@ -171,8 +171,8 @@ func TestGuidedSetupForm_AllControlsVisibleWithoutClipping(t *testing.T) {
 	form.SetItemPadding(1)
 
 	modeOptions := []string{
-		"1. VLESS / Sing-box подписка (Туннель)",
-		"2. Автономный обход (Desync/Zapret — без серверов)",
+		"1. VLESS / tachyon-core подписка (Туннель)",
+		"2. Автономная десинхронизация (Desync/Zapret — без серверов)",
 		"3. Гибридный режим (Zapret + VLESS Туннель)",
 	}
 	modeItem := newCycleSelectorItem("Режим работы:        ", modeOptions, 0, nil)

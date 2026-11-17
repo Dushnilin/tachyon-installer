@@ -53,6 +53,12 @@ var knownProtocols = map[string]string{
 	"naive+https": "NaiveProxy",
 	"naive":       "NaiveProxy",
 	"mieru":       "Mieru",
+	"mierus":      "Mieru",
+	"csqtt":       "CSQTT",
+	"wdtt":        "WDTT",
+	"qwdtt":       "QWDTT",
+	"openvpn":     "OpenVPN",
+	"tailscale":   "Tailscale",
 	"snell":       "Snell",
 	"sudoku":      "Sudoku",
 	"masque":      "MASQUE",
@@ -302,13 +308,9 @@ uci set tachyon.@subscription_url[-1].subscription_update_interval='1h'
 	}
 
 	cmd.WriteString(`
-# 3. Ensure active proxy engine (tachyon-core or sing-box) is enabled
-if [ "$(uci -q get tachyon.settings.engine 2>/dev/null)" = "tachyon-core" ] || [ "$(cat /etc/tachyon/tachyon-core-variant 2>/dev/null)" = "tachyon-core" ]; then
-    uci -q set tachyon.settings.engine='tachyon-core' 2>/dev/null || true
-    uci -q set tachyon.settings.subscription_engine='core' 2>/dev/null || true
-else
-    uci -q set tachyon.settings.engine='sing-box' 2>/dev/null || true
-fi
+# 3. Ensure active proxy engine (tachyon-core) is enabled
+uci -q set tachyon.settings.engine='tachyon-core' 2>/dev/null || true
+uci -q set tachyon.settings.subscription_engine='core' 2>/dev/null || true
 uci -q set tachyon.settings.enabled='1' 2>/dev/null || true
 uci commit tachyon 2>/dev/null || true
 

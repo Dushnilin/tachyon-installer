@@ -113,4 +113,18 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.Username != "root" {
 		t.Errorf("expected default user root, got %s", cfg.Username)
 	}
+	if cfg.SelectedEngine != "tachyon-core" {
+		t.Errorf("expected default engine tachyon-core, got %q", cfg.SelectedEngine)
+	}
+}
+
+func TestLoad_LegacySingBoxNormalized(t *testing.T) {
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "config.json")
+	os.WriteFile(path, []byte(`{"router_ip":"192.168.1.1","selected_engine":"sing-box-extended"}`), 0644)
+
+	cfg := config.Load(path)
+	if cfg.SelectedEngine != "tachyon-core" {
+		t.Errorf("expected normalized engine tachyon-core, got %q", cfg.SelectedEngine)
+	}
 }

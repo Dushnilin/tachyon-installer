@@ -48,7 +48,7 @@ func healthy() *fake {
 		on("github.com", "OK").
 		on("[ -x /usr/bin/tachyon ] && /usr/bin/tachyon get_status", "RUNNING").
 		on("[ -x /usr/bin/tachyon ] && echo BIN", "BIN").
-		on("command -v $b", "sing-box=/usr/bin/sing-box").
+		on("command -v tachyon-core", "tachyon-core=/usr/bin/tachyon-core (0.5.8)").
 		on("logread", "tachyon: started")
 }
 
@@ -123,7 +123,7 @@ func TestNotInstalledSkipsServiceChecks(t *testing.T) {
 
 func TestLogErrorsEscalateToWarn(t *testing.T) {
 	f := healthy()
-	f.rules[len(f.rules)-1].out = "sing-box: FATAL start service: bad config"
+	f.rules[len(f.rules)-1].out = "tachyon-core: FATAL start service: bad config"
 	if r := find(t, RunRouter(f.run, nil), "logs"); r.Status != Warn {
 		t.Errorf("got %+v", r)
 	}

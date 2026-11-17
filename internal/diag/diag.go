@@ -81,7 +81,7 @@ func RunRouter(run Exec, progress ProgressFn) []Result {
 	loadPkgs := func() string {
 		if !pkgsLoaded {
 			pkgsLoaded = true
-			out, _ := run(`(if command -v apk >/dev/null 2>&1; then apk info 2>/dev/null; else opkg list-installed 2>/dev/null; fi); [ -d /sys/module/nft_tproxy ] && echo kmod-nft-tproxy; [ -d /sys/module/tun ] && echo kmod-tun; [ -d /sys/module/inet_diag ] && echo kmod-inet-diag`)
+			out, _ := run(`(if command -v apk >/dev/null 2>&1; then apk info 2>/dev/null; else opkg list-installed 2>/dev/null; fi); [ -d /sys/module/nft_tproxy ] && echo kmod-nft-tproxy; ([ -d /sys/module/nft_fib_inet ] || [ -d /sys/module/nft_fib ]) && echo kmod-nft-fib; [ -d /sys/module/tun ] && echo kmod-tun; [ -d /sys/module/inet_diag ] && echo kmod-inet-diag; [ -d /sys/module/tcp_bbr ] && echo kmod-tcp-bbr`)
 			pkgs = out
 		}
 		return pkgs
@@ -196,7 +196,7 @@ func checkMemory(run Exec) Result {
 		r.Hint = "Критически мало ОЗУ: ядро прокси может падать. Выберите tachyon-core + zRAM или освободите память."
 	case availMB < minFreeRAMWarn:
 		r.Status = Warn
-		r.Hint = "Мало свободной ОЗУ. Рекомендуется tachyon-core вместо sing-box."
+		r.Hint = "Мало свободной ОЗУ. Рекомендуется zRAM для стабильной работы tachyon-core."
 	default:
 		r.Status = OK
 	}
@@ -275,7 +275,13 @@ func checkModules(pkgs string) Result {
 		}
 	}
 	if len(missing) == 0 {
-		r.Status, r.Detail = OK, "kmod-nft-tproxy, kmod-tun установлены"
+		extra := []string{"kmod-nft-tproxy", "kmod-tun"}
+		for _, opt := range []string{"kmod-nft-fib", "kmod-tcp-bbr"} {
+			if hasPackage(pkgs, opt) {
+				extra = append(extra, opt)
+			}
+		}
+		r.Status, r.Detail = OK, strings.Join(extra, ", ")+" установлены"
 		return r
 	}
 	r.Status = Warn
@@ -339,7 +345,7 @@ func checkGitHub(run Exec) Result {
 	} else {
 		r.Status = Info
 		r.Detail = "github.com напрямую недоступен"
-		r.Hint = "Это ожидаемо при блокировках. Именно поэтому установщик скачивает файлы на ПК."
+		r.Hint = "Это ожидаемо при сетевых ограничениях на маршруте. Установщик скачивает файлы на ПК."
 	}
 	return r
 }
@@ -382,13 +388,13 @@ func checkService(run Exec) Result {
 }
 
 func checkEngines(run Exec) Result {
-	r := Result{ID: "engines", Title: "Ядра прокси"}
-	out, _ := run(`for b in tachyon-core sing-box; do p=$(command -v $b 2>/dev/null) && echo "$b=$p"; done`)
+	r := Result{ID: "engines", Title: "Ядро прокси"}
+	out, _ := run(`p=$(command -v tachyon-core 2>/dev/null); if [ -n "$p" ]; then v=$(cat /etc/tachyon/tachyon-core-version 2>/dev/null | head -n1); [ -z "$v" ] && v=$(tachyon-core --version 2>/dev/null | head -n1 | awk '{print $NF}'); echo "tachyon-core=$p${v:+ ($v)}"; fi`)
 	out = strings.TrimSpace(out)
 	if out == "" {
 		r.Status = Warn
-		r.Detail = "tachyon-core и sing-box не найдены"
-		r.Hint = "Установите ядро через мастер или в веб-интерфейсе Tachyon."
+		r.Detail = "tachyon-core не найдено"
+		r.Hint = "Установите tachyon-core через мастер или в веб-интерфейсе Tachyon."
 		return r
 	}
 	r.Status = OK
@@ -415,7 +421,7 @@ func checkQuarantine(run Exec) Result {
 
 func checkLogs(run Exec) Result {
 	r := Result{ID: "logs", Title: "Последние записи в системном логе"}
-	out, _ := run(`logread 2>/dev/null | grep -iE 'tachyon|sing-box' | tail -n 8`)
+	out, _ := run(`logread 2>/dev/null | grep -iE 'tachyon|tachyon-core' | tail -n 8`)
 	out = strings.TrimSpace(out)
 	if out == "" {
 		r.Status, r.Detail = Info, "записей нет"

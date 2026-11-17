@@ -44,7 +44,7 @@ func TestVerifyAndFallback_EmptySubscriptionSkipsWaiting(t *testing.T) {
 	mockExec := func(_ *gossh.Client, cmd string) (string, error) {
 		// Mock engine
 		if strings.Contains(cmd, "engine") {
-			return "sing-box-extended\n", nil
+			return "tachyon-core\n", nil
 		}
 		// Subscription is empty
 		return "", nil

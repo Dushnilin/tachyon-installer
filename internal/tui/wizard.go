@@ -121,13 +121,13 @@ func ShowWelcomeWizard(ctx *AppContext) {
 		ctx.App.SetFocus(step2Form)
 	}
 
-	menuList.AddItem("[1] Установка Tachyon", "Выбор ядра (tachyon-core / sing-box), версии, зеркал и параметров", '1', func() {
+	menuList.AddItem("[1] Установка Tachyon", "Установка ядра tachyon-core, выбор версии, зеркал и параметров", '1', func() {
 		startAction(ActionInstall)
 	})
-	menuList.AddItem("[2] Авто-мастер (настройка под ключ)", "Аудит роутера, подбор DNS и стратегии обхода, настройка подписки", '2', func() {
+	menuList.AddItem("[2] Авто-мастер (настройка под ключ)", "Аудит роутера, подбор DNS и стратегии десинхронизации, настройка подписки", '2', func() {
 		startAction(ActionGuided)
 	})
-	menuList.AddItem("[W] AmneziaWG (WARP и конфиги)", "Генератор AmneziaWG 2.0 / WARP, импорт .conf / vpn:// и проверка обхода", 'w', func() {
+	menuList.AddItem("[W] AmneziaWG (WARP и конфиги)", "Генератор AmneziaWG 2.0 / WARP, импорт .conf / vpn:// и проверка туннеля", 'w', func() {
 		startAction(ActionAWG)
 	})
 	menuList.AddItem("[3] Управление роутерами (Fleet)", "Поиск роутеров в локальной сети, аудит версий и параллельная установка", '3', func() {

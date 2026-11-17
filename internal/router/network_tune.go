@@ -89,7 +89,7 @@ fi
 # 5. Apply sysctl
 sysctl -p /etc/sysctl.d/99-tachyon-tune.conf >/dev/null 2>&1 || true
 
-# 6. Disable firewall flow offloading (prevents bypassing Netfilter/TProxy for Sing-box)
+# 6. Disable firewall flow offloading (prevents skipping Netfilter/TProxy for tachyon-core)
 FLOW_OK="0"
 if command -v uci >/dev/null 2>&1; then
     uci -q set firewall.@defaults[0].flow_offloading='0' 2>/dev/null || true
@@ -157,8 +157,8 @@ echo "TUNE_DONE:$BBR_AVAIL:$RAM_TOTAL_MB:$CONN_MAX:$FLOW_OK"
 	)
 
 	if flowOK {
-		report.Offloading = "Flow Offloading безопасно отключен (защита TProxy/sing-box от обхода правил Netfilter)"
-		report.AppliedRules = append(report.AppliedRules, "Отключен Flow Offloading (защита TProxy и прозрачного проксирования)")
+		report.Offloading = "Flow Offloading безопасно отключен (корректная работа TProxy и Netfilter для tachyon-core)"
+		report.AppliedRules = append(report.AppliedRules, "Отключен Flow Offloading (корректная работа TProxy и прозрачного проксирования)")
 	} else {
 		report.Offloading = "Flow Offloading пропущен (UCI недоступен)"
 	}

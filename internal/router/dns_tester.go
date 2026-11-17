@@ -101,7 +101,7 @@ echo "$out"
 		report.PoisonDetail = "Провайдер блокирует прямой UDP 53 к внешним серверам (таймаут)"
 	} else if strings.Contains(poisonOut, "127.0.0.1") || strings.Contains(poisonOut, "0.0.0.0") || strings.Contains(poisonOut, "warning.rt.ru") {
 		report.UDPPoisoned = true
-		report.PoisonDetail = "Провайдер подменяет DNS-ответы (обнаружен спуфинг/заглушка РКН)"
+		report.PoisonDetail = "Провайдер подменяет DNS-ответы (обнаружен спуфинг/подмена на маршруте)"
 	} else {
 		report.UDPPoisoned = false
 		report.PoisonDetail = "Прямой UDP 53 не перехватывается провайдером"

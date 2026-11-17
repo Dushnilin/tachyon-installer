@@ -206,7 +206,7 @@ func main() {
 			}
 
 			if ctx.ProgressView != nil {
-				ctx.ProgressView.SetStep(3, "3/3: Проверка службы и сквозного обхода")
+				ctx.ProgressView.SetStep(3, "3/3: Проверка службы и сквозной маршрутизации")
 			}
 
 			execFn := func(_ *gossh.Client, cmd string) (string, error) {
@@ -227,7 +227,7 @@ func main() {
 				ctx.ConsoleWrite("[#4cc38a][✓] Служба активирована и запущена[-]\n")
 			}
 
-			ctx.ConsoleWrite("[#a1a1a6]→ Сквозная проверка обхода блокировок и Fake-IP с роутера...[-]\n")
+			ctx.ConsoleWrite("[#a1a1a6]→ Сквозная проверка маршрутизации и Fake-IP с роутера...[-]\n")
 			bpReport := routerpkg.TestBypass(client, execFn)
 			if bpReport.Success {
 				ctx.ConsoleWritef("[#4cc38a][✓] %s[-]\n", bpReport.Details)

@@ -26,7 +26,7 @@ type RouterProfile struct {
 	Conflicts           []string
 	IsAPK               bool
 	Firewall            string // fw4, fw3
-	ActiveEngine        string // tachyon-core, sing-box, none
+	ActiveEngine        string // tachyon-core, none
 	InstalledTachyonVer string
 	InstalledAppVer     string
 	InstalledEngineVer  string
@@ -330,7 +330,7 @@ func HardwareRecommendation(ramTotal, ramFree, flashFree float64) (recEngine str
 		return "tachyon-core", fmt.Sprintf("ОЗУ %.0f МБ (<128 МБ): рекомендуется tachyon-core (4.2 МБ RAM)", ramTotal)
 	}
 	if flashFree > 0 && flashFree < 15.0 {
-		return "tachyon-core", fmt.Sprintf("Свободно Flash %.0f МБ (<15 МБ): рекомендуется tachyon-core или сжатый бинарник", flashFree)
+		return "tachyon-core", fmt.Sprintf("Свободно Flash %.0f МБ (<15 МБ): рекомендуется tachyon-core", flashFree)
 	}
 	return "tachyon-core", ""
 }

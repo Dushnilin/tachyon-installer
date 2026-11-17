@@ -76,7 +76,7 @@ func DefaultDPIStrategies() []DPIStrategy {
 		{
 			ID:           "mss_syndata",
 			Name:         "MSS 1200 + Multi-Split",
-			Badge:        "Анти-ТСПУ",
+			Badge:        "Устойчивая",
 			Description:  "Занижение MSS до 1200 и мульти-сплит первого TCP-сегмента",
 			TCPArgs:      "--filter-tcp=443 --filter-l7=tls --payload=tls_client_hello --lua-desync=fakesplit:pos=2:mss=1200",
 			UDPArgs:      "--filter-udp=443,50000-50099 --lua-desync=fake",

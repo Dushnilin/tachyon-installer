@@ -17,11 +17,11 @@
 
 ## О проекте
 
-**Tachyon Installer** — автономная кроссплатформенная утилита (TUI и CLI) для установки, диагностики и обслуживания экосистемы **[Tachyon](https://github.com/Dushnilin/tachyon)** (v1.7.9+) на маршрутизаторах под управлением **OpenWrt** (23.05, 24.10, 25.12 и SNAPSHOT с пакетными менеджерами `opkg` и `apk`).
+**Tachyon Installer** — автономная кроссплатформенная утилита (TUI и CLI) для установки, диагностики и обслуживания экосистемы **[Tachyon](https://github.com/Dushnilin/tachyon)** (v1.8.0+) на маршрутизаторах под управлением **OpenWrt** (23.05, 24.10, 25.12 и SNAPSHOT с пакетными менеджерами `opkg` и `apk`).
 
 ### Зачем нужен отдельный установщик
 
-При сетевых блокировках или на чистой прошивке маршрутизатор часто не имеет стабильного доступа к GitHub, из-за чего запуск `curl | sh` на самом роутере обрывается. **Tachyon Installer** переносит сетевую и подготовительную нагрузку на рабочую станцию администратора (Windows, Linux, macOS):
+При сетевых ограничениях или на чистой прошивке маршрутизатор часто не имеет стабильного доступа к GitHub, из-за чего запуск `curl | sh` на самом роутере обрывается. **Tachyon Installer** переносит сетевую и подготовительную нагрузку на рабочую станцию администратора (Windows, Linux, macOS):
 
 1. Рабочая станция параллельно измеряет отклик зеркал GitHub и скачивает пакеты `tachyon`, `luci-app-tachyon`, локализацию и выбранное ядро.
 2. Локально проверяет контрольные суммы **SHA-256** и структуру пакетов (`.apk` / `.ipk`).
@@ -31,29 +31,29 @@
 
 ## Ключевые возможности
 
-- **Нативная поддержка `tachyon-core` (Rust) и альтернативных ядер**:
-  - `tachyon-core` — основное ядро на Rust (~4.2 МБ ОЗУ, без пауз GC, встроенные Adaptive Desync 2.0, AmneziaWG 2.0, xHTTP, Reality, Hysteria2, TUIC, ShadowTLS, AnyTLS, Tailscale, Торрент-детектор и бинарные списки `.trs`). Рекомендуется для всех роутеров с ОЗУ от 64 МБ.
-  - `sing-box-extended` / `sing-box-tiny` / `sing-box-lx` — альтернативные сборки ядра `sing-box` (включая компактные и сжатые варианты).
-  - Горячая смена ядра (`-switch-engine` или клавиша `S`) за несколько секунд без переустановки LuCI и без потери подписок.
-- **Полная совместимость с OpenWrt 25.12 (APK) и 23.05–24.10 (OPKG)**:
-  - Офлайн-установка локальных `.apk` пакетов (`apk add --allow-untrusted --no-network --repositories-file /dev/null`) с fallback на виртуальный пакет при жестких hash-привязках `apk`.
-  - Автоматическая очистка `/etc/apk/world` от устаревших зависимостей (`forkop`, `podkop`, `netshift`) и разрешение конфликта `ip-tiny` ↔ `ip-full`.
-  - Корректное определение модулей ядра (`nft_tproxy`, `tun`, `inet_diag`, `netlink_diag`, `nft_nat`), вкомпилированных статически (`/sys/module/`).
+- **Единое нативное ядро `tachyon-core` (Rust)**:
+  - Начиная с **Tachyon 1.8.0**, единственным поддерживаемым ядром является `tachyon-core` (~4.2 МБ ОЗУ, без пауз GC, встроенные Adaptive Desync 2.0, AmneziaWG 2.0, VLESS/xHTTP/Reality, Hysteria2, TUIC, ShadowTLS, AnyTLS, CSQTT, WDTT/QWDTT v3, Mieru, встроенные FPTN и Tailscale, IPv6/FakeIPv6 `fc00::/18`, Leak Guard и бинарные списки `.trs`).
+  - При обновлении роутера со старых конфигураций установщик автоматически удаляет устаревшие пакеты `sing-box` и мигрирует профиль на `engine='tachyon-core'` и `subscription_engine='core'`.
+  - Быстрое обновление ядра (`-switch-engine tachyon-core` или клавиша `S`) без переустановки LuCI и без потери подписок.
+- **Полная совместимость с OpenWrt 25.12+ (APK) и 23.05–24.10 (OPKG)**:
+  - Офлайн-установка локальных `.apk` и `.ipk` пакетов (включая нативные пакеты `tachyon-core-*.apk`/`.ipk`) с fallback на виртуальный пакет при жестких hash-привязках `apk`.
+  - Автоматическая очистка `/etc/apk/world` от устаревших зависимостей (`forkop`, `podkop`, `netshift`), удаление stale lock-файлов (`flock 1000`, `99-tachyon-wan`) и разрешение конфликта `ip-tiny` ↔ `ip-full`.
+  - Проверка модулей ядра (`nft_tproxy`, `nft_fib_inet`, `tun`, `inet_diag`, `netlink_diag`, `nft_nat`, `tcp_bbr`) через `/sys/module/` и best-effort активация TCP BBR (`/etc/sysctl.d/99-tachyon-bbr.conf`).
 - **Мастер быстрой настройки (`-wizard` / клавиша `A`)**:
   - Проверка DNS провайдера на перехват/спуфинг UDP 53 и выбор самого быстрого DoH-резолвера.
-  - Подбор стратегии обхода DPI: нативный **Tachyon Adaptive Desync 2.0** (`adaptive`, `fake_split`, `fake_disorder`, `multi_split` + UDP QUIC Fake) на ядре `tachyon-core` либо профили `zapret2`/`nfqws2`.
+  - Подбор стратегии пакетной десинхронизации: нативный **Tachyon Adaptive Desync 2.0** (`adaptive`, `fake_split`, `fake_disorder`, `multi_split` + UDP QUIC Fake) на ядре `tachyon-core` либо профили `zapret2`/`nfqws2`.
   - Настройка сетевого стека и проверка доступности целевых ресурсов через роутер.
 - **AmneziaWG 2.0 и Cloudflare WARP (`-awg` / клавиша `W`)**:
   - Автоматическая регистрация аккаунта Cloudflare WARP прямо с роутера, импорт `.conf` файлов и контейнеров `vpn://`.
   - Поддержка расширенных параметров обфускации AmneziaWG 2.0: `Jc`, `Jmin`, `Jmax`, `S1..S4`, `H1..H4`, сигнатур `I1..I5`, `J1..J3` и `ITime`.
 - **Универсальный менеджер подписок (`-sub`, `-test-sub`)**:
-  - Поддержка HTTPS-подписок (`subscription_engine='core'`), контейнеров `happ://crypt4/...`, `fptn:` / `fptnb:`, `vless://`, `vmess://`, `trojan://`, `ss://`, `hy2://`, `tuic://`, `anytls://`, `awg://`, `mieru://`, `snell://`, `sudoku://`, `masque://`, `trusttunnel://`, `naive+https://`, `tg://`, `mtproto://`, `warp://` и многострочных списков ссылок.
+  - Поддержка HTTPS-подписок (`subscription_engine='core'`), контейнеров `happ://crypt4/...`, `fptn:` / `fptnb:`, `vless://`, `vmess://`, `trojan://`, `ss://`, `hy2://`, `tuic://`, `anytls://`, `csqtt://`, `wdtt://`, `qwdtt://`, `awg://`, `mieru://`, `mierus://`, `openvpn://`, `tailscale://`, `snell://`, `sudoku://`, `masque://`, `trusttunnel://`, `naive+https://`, `tg://`, `mtproto://`, `warp://` и многострочных списков ссылок.
   - Параллельный замер TCP-задержки до всех узлов подписки.
 - **Инструменты диагностики и восстановления**:
-  - **7-точечная диагностика (`-diag` / `D`)**: проверка архитектуры, памяти, модулей ядра, таблиц `nftables`, карантина сбойных секций (`/var/run/tachyon/validator-quarantined.json`), DNS и конфликтов.
+  - **7-точечная диагностика (`-diag` / `D`)**: проверка архитектуры, памяти, модулей ядра (`nft_tproxy`, `nft_fib`, `tun`, `tcp_bbr`), таблиц `nftables`, карантина сбойных секций (`/var/run/tachyon/validator-quarantined.json`), DNS и конфликтов.
   - **Тест скорости и Bufferbloat (`-speedtest` / `P`)**: потоковый замер скорости WAN и туннеля, оценка задержки под нагрузкой (грейд A+..F) и контроль перегрузки CPU SoftIRQ.
   - **Тюнинг сетевого стека (`-tune-network` / `T`)**: включение TCP BBR + `fq_codel`, расчет буферов `rmem`/`wmem` по объему ОЗУ, оптимизация таймаутов `conntrack` и отключение несовместимого с TProxy `Flow Offloading` в `fw4`.
-  - **Аварийный сброс (`-rescue` / `R`)**: удаление таблиц `inet tachyon`, `inet tachyon_tailscale`, очистка policy routing (`fwmark`, таблиц `tachyon`/`105`/`100`/`4247`/`4248`, netns `fkpsc`), восстановление `dnsmasq` из бэкапа и возврат прямого доступа в интернет.
+  - **Аварийный сброс (`-rescue` / `R`)**: удаление таблиц `TachyonTable`, `TachyonKillSwitch` (fail-closed) и `tachyon_tailscale`, очистка policy routing (`fwmark`, таблиц `tachyon`/`105`/`100`/`4247`/`4248`, netns `fkpsc`), восстановление `dnsmasq` из бэкапа и возврат прямого доступа в интернет.
 - **Управление флотом роутеров (`-fleet-scan`, `-fleet-deploy` / клавиша `F`)**:
   - Сканирование заданных подсетей, сбор инвентаря моделей и версий Tachyon, параллельное развертывание и обновление в несколько потоков.
 
@@ -67,7 +67,7 @@
 
 </div>
 
-1. **SSH-аудит роутера**: определение модели, версии OpenWrt, архитектуры (`aarch64_cortex-a53`, `aarch64_generic`, `x86_64`, `mipsel_24kc`, `mips_24kc`, `arm_cortex-a7_neon-vfpv4`, `arm_cortex-a9`, `arm_cortex-a15_neon-vfpv4`), пакетного менеджера (`apk` / `opkg`), свободного места и конфликтов, синхронизация системных часов с ПК.
+1. **SSH-аудит роутера**: определение модели, версии OpenWrt, архитектуры (`aarch64`, `armv7`, `armv6`, `x86_64`, `mipsel`, `mips`, `riscv64`, `i386_pentium4`), пакетного менеджера (`apk` / `opkg`), свободного места и конфликтов, синхронизация системных часов с ПК.
 2. **Загрузка пакетов на ПК**: параллельный тест зеркал GitHub (`gh-proxy.com`, `ghfast.top`, `gh.ddlc.top`, `gh-proxy.org`, `direct`), скачивание релиза Tachyon, бинарных списков `.trs`/`.srs` (`Dushnilin/tachyon-lists`) и ядра, сверка SHA-256.
 3. **Снимок и подготовка базы**: сохранение `/etc/config/tachyon` и `/etc/tachyon` на ПК, вызов `tachyon snapshot-save`, очистка зависших lock-файлов и исправление `/etc/apk/world`.
 4. **Потоковая передача в `/tmp`**: загрузка пакетов через `tar-over-SSH` в RAM (`tmpfs`), офлайн-установка и настройка UCI (`engine='tachyon-core'`, `subscription_engine='core'`).
@@ -113,14 +113,14 @@ curl -fsSL https://raw.githubusercontent.com/Dushnilin/tachyon-installer/main/in
 Запустите `./tachyon-installer` (или `.\tachyon-installer.exe` на Windows) без флагов:
 
 - `Tab` / `↑` `↓` — перемещение между полями и разделами;
-- `←` `→` или клавиши `1`–`6` — выбор ядра прокси, версии и зеркала на экране параметров;
+- `←` `→` или клавиши `1`–`2` — выбор режима установки ядра (`tachyon-core` / пропуск), версии и зеркала на экране параметров;
 - `Space` — переключение флагов (`luci-i18n-tachyon-ru`, `zram-swap`);
 - Горячие клавиши на стартовом экране и дашборде:
   - `A` — мастер быстрой настройки (DNS + Adaptive Desync 2.0 + сетевой тюнинг);
   - `W` — настройка AmneziaWG 2.0 / Cloudflare WARP;
   - `P` — тест скорости WAN/туннеля и Bufferbloat;
   - `F` — сканирование и пакетное обновление флота роутеров;
-  - `S` — горячая смена ядра прокси;
+  - `S` — обновление или повторное развертывание `tachyon-core` без переустановки LuCI;
   - `D` — диагностика роутера;
   - `M` — мониторинг нагрузки CPU/RAM/сессий в реальном времени;
   - `T` — оптимизация сетевого стека (`sysctl` + BBR);
@@ -195,7 +195,7 @@ cd tachyon-installer
 go build -o tachyon-installer .
 
 # Кросс-компиляция всех 6 десктопных целей (windows/linux/darwin, amd64 + arm64) в dist/
-go run scripts/build.go -v 1.12.0
+go run scripts/build.go -v 1.13.0
 ```
 
 ---

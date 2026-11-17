@@ -30,7 +30,7 @@ func VerifyAndFallback(client *gossh.Client, execFn sshutil.ExecFunc, progressFn
 	progress("Определение активного ядра прокси...", 0.05)
 	activeEngine := detectActiveEngine(client, execFn)
 
-	// Early check: if configuration is empty (e.g. fresh install with no subscription), skip waiting for sing-box
+	// Early check: if configuration is empty (e.g. fresh install with no subscription), skip waiting for tachyon-core
 	subStatus := CheckSubscriptions(client, execFn)
 	if subStatus.HasEmptySubscription {
 		progress("Конфигурация еще не заполнена (требуется подписка)...", 0.30)
@@ -82,10 +82,7 @@ func VerifyAndFallback(client *gossh.Client, execFn sshutil.ExecFunc, progressFn
 }
 
 func verifyProcessAndService(client *gossh.Client, execFn sshutil.ExecFunc, activeEngine string, onRetry func(attempt int)) bool {
-	procCheck := fmt.Sprintf(`pgrep -x %s >/dev/null || pgrep -f "%s" >/dev/null`, activeEngine, activeEngine)
-	if activeEngine == "sing-box" || activeEngine == "tachyon-core" || strings.HasPrefix(activeEngine, "sing-box") {
-		procCheck = `pgrep -x tachyon-core >/dev/null || pgrep -x sing-box >/dev/null || pgrep -f "tachyon-core" >/dev/null || pgrep -f "sing-box" >/dev/null`
-	}
+	procCheck := `pgrep -x tachyon-core >/dev/null || pgrep -f "tachyon-core" >/dev/null`
 
 	checkCmd := fmt.Sprintf(`
 if [ -x /usr/bin/tachyon ]; then
@@ -187,9 +184,11 @@ func TriggerFallback(client *gossh.Client, execFn sshutil.ExecFunc) {
 		"uci -q set tachyon.settings.enabled='0'",
 		"uci commit tachyon",
 		"nft delete table inet TachyonTable >/dev/null 2>&1 || true",
+		"nft delete table inet TachyonKillSwitch >/dev/null 2>&1 || true",
 		"nft delete table inet tachyon_table >/dev/null 2>&1 || true",
 		"nft delete table inet tachyon >/dev/null 2>&1 || true",
 		"nft delete table inet tachyon_tailscale >/dev/null 2>&1 || true",
+		"rm -f /usr/share/nftables.d/ruleset-post/90-tachyon-kill-switch.nft 2>/dev/null || true",
 		"while ip rule del fwmark 0x04000000/0x04000000 lookup tachyon 2>/dev/null; do :; done",
 		"while ip rule del fwmark 0x04000000/0x04000000 lookup 105 2>/dev/null; do :; done",
 		"while ip rule del fwmark 0x10000000/0x10000000 lookup 100 2>/dev/null; do :; done",
@@ -207,12 +206,9 @@ func detectActiveEngine(client *gossh.Client, execFn sshutil.ExecFunc) string {
 	out, err := execFn(client, "uci -q get tachyon.settings.engine 2>/dev/null || echo ''")
 	if err == nil {
 		v := strings.TrimSpace(out)
-		if v != "" && v != "none" {
+		if v != "" && v != "none" && !strings.HasPrefix(v, "sing-box") {
 			return v
 		}
 	}
-	if tcOut, errTC := execFn(client, "[ -x /usr/bin/tachyon-core ] && echo tachyon-core || echo ''"); errTC == nil && strings.TrimSpace(tcOut) == "tachyon-core" {
-		return "tachyon-core"
-	}
-	return "sing-box"
+	return "tachyon-core"
 }

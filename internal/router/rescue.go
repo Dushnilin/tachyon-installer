@@ -39,12 +39,14 @@ killall -9 tachyon-core sing-box nfqws nfqws2 2>/dev/null || true
 # 2. Flush and delete nftables rules (fw4)
 if command -v nft >/dev/null 2>&1; then
     nft delete table inet TachyonTable >/dev/null 2>&1 || true
+    nft delete table inet TachyonKillSwitch >/dev/null 2>&1 || true
     nft delete table inet tachyon_table >/dev/null 2>&1 || true
     nft delete table inet tachyon >/dev/null 2>&1 || true
     nft delete table inet tachyon_tailscale >/dev/null 2>&1 || true
     nft delete table ip tachyon >/dev/null 2>&1 || true
     nft delete table ip6 tachyon >/dev/null 2>&1 || true
 fi
+rm -f /usr/share/nftables.d/ruleset-post/90-tachyon-kill-switch.nft /usr/share/nftables.d/chain-pre/input/10-tachyon.nft 2>/dev/null || true
 
 # 3. Flush legacy iptables rules (fw3)
 if command -v iptables >/dev/null 2>&1; then
@@ -117,8 +119,8 @@ echo "RESCUE_DONE:$GW_OK:$NET_OK"
 	}
 
 	report.ActionsTaken = append(report.ActionsTaken,
-		"Остановлены службы Tachyon, tachyon-core и sing-box",
-		"Сброшены таблицы nftables (inet tachyon / tachyon_tailscale)",
+		"Остановлены службы Tachyon и tachyon-core",
+		"Сброшены таблицы nftables (TachyonTable / TachyonKillSwitch / tachyon_tailscale)",
 		"Очищены маршруты TProxy (таблицы tachyon/105, 100, 4247/4248)",
 		"Восстановлены настройки dnsmasq и перезапущен DNS-резолвер",
 		"Перезапущен системный межсетевой экран (firewall)",

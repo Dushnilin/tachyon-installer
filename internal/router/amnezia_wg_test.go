@@ -153,14 +153,14 @@ func TestApplyAWGSection(t *testing.T) {
 	if !strings.Contains(executedCmd, "community_lists='youtube'") {
 		t.Errorf("expected youtube in community_lists")
 	}
-	if !strings.Contains(executedCmd, "uci -q set tachyon.settings.engine='sing-box'") {
-		t.Errorf("expected engine='sing-box' in command")
+	if !strings.Contains(executedCmd, "uci -q set tachyon.settings.engine='tachyon-core'") {
+		t.Errorf("expected engine='tachyon-core' in command")
 	}
 }
 
 func TestTestAWGSection_Mock(t *testing.T) {
 	mockExec := func(client *gossh.Client, cmd string) (string, error) {
-		if strings.Contains(cmd, "sing-box") && strings.Contains(cmd, "pgrep") {
+		if strings.Contains(cmd, "tachyon-core") && strings.Contains(cmd, "pgrep") {
 			return "PROCESS:OK", nil
 		}
 		if strings.Contains(cmd, "nslookup") {

@@ -15,7 +15,7 @@ func ShowSubscriptionSetupForm(ctx *AppContext) {
 
 	text := "\n  [#38bdf8]Tachyon установлен на роутер[-]\n\n" +
 		"  [#a1a1a6]Вставьте ссылку на подписку (HTTPS / Happ crypt4), конфигурационную ссылку[-]\n" +
-		"  [#a1a1a6](VLESS, Trojan, Shadowsocks, VMess, Hysteria2, TUIC, AnyTLS, FPTN) или base64:[-]"
+		"  [#a1a1a6](VLESS, Trojan, Shadowsocks, VMess, Hysteria2, TUIC, AnyTLS, FPTN, CSQTT, WDTT, Mieru) или base64:[-]"
 
 	textView := tview.NewTextView().
 		SetDynamicColors(true).
@@ -24,7 +24,7 @@ func ShowSubscriptionSetupForm(ctx *AppContext) {
 
 	statusView := tview.NewTextView().
 		SetDynamicColors(true).
-		SetText("  [#71717a]Поддерживаются HTTPS/Happ ссылки, прямые URI (vless://, hy2://, fptn:...) и base64[-] ")
+		SetText("  [#71717a]Поддерживаются HTTPS/Happ ссылки, прямые URI (vless://, hy2://, fptn:, csqtt://, wdtt://) и base64[-] ")
 	statusView.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
 
 	subInput := tview.NewInputField().
@@ -35,7 +35,7 @@ func ShowSubscriptionSetupForm(ctx *AppContext) {
 	subInput.SetChangedFunc(func(text string) {
 		trimmed := strings.TrimSpace(text)
 		if trimmed == "" {
-			statusView.SetText("  [#71717a]Поддерживаются HTTPS/Happ ссылки, прямые URI (vless://, hy2://, fptn:...) и base64[-] ")
+			statusView.SetText("  [#71717a]Поддерживаются HTTPS/Happ ссылки, прямые URI (vless://, hy2://, fptn:, csqtt://, wdtt://) и base64[-] ")
 			return
 		}
 		analysis := routerpkg.AnalyzeSubscription(trimmed)

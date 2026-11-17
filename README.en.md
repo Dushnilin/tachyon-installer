@@ -17,7 +17,7 @@
 
 ## Overview
 
-**Tachyon Installer** is a standalone cross-platform utility (interactive TUI and headless CLI) for deploying, diagnosing, and maintaining the **[Tachyon](https://github.com/Dushnilin/tachyon)** (v1.7.9+) routing ecosystem on **OpenWrt** routers (23.05, 24.10, 25.12, and SNAPSHOT across both `opkg` and `apk`).
+**Tachyon Installer** is a standalone cross-platform utility (interactive TUI and headless CLI) for deploying, diagnosing, and maintaining the **[Tachyon](https://github.com/Dushnilin/tachyon)** (v1.8.0+) routing ecosystem on **OpenWrt** routers (23.05, 24.10, 25.12, and SNAPSHOT across both `opkg` and `apk`).
 
 ### Why a Host-Side Installer
 
@@ -31,29 +31,29 @@ Under restrictive network conditions or on fresh OpenWrt installations, the rout
 
 ## Core Capabilities
 
-- **First-Class `tachyon-core` (Rust) & Multi-Engine Support**:
-  - `tachyon-core` — primary pure-Rust engine (~4.2 MB RAM, zero GC pauses, built-in Adaptive Desync 2.0, AmneziaWG 2.0, xHTTP, Reality, Hysteria2, TUIC, ShadowTLS, AnyTLS, Tailscale, Torrent Detector, and binary `.trs` rule-sets). Recommended for all routers with >= 64 MB RAM.
-  - `sing-box-extended` / `sing-box-tiny` / `sing-box-lx` — alternative `sing-box` builds (including compact and compressed variants).
-  - Engine hot-swap (`-switch-engine` or hotkey `S`) switches engines in seconds without reinstalling LuCI or resetting subscriptions.
-- **OpenWrt 25.12 (APK) & 23.05–24.10 (OPKG) Compatibility**:
-  - Offline local `.apk` installation (`apk add --allow-untrusted --no-network --repositories-file /dev/null`) with virtual package fallback for pinned APK world constraints.
-  - Automatic `/etc/apk/world` cleanup of legacy conflicting packages (`forkop`, `podkop`, `netshift`) and `ip-tiny` ↔ `ip-full` conflict resolution.
-  - Built-in kernel module detection via `/sys/module/` (`nft_tproxy`, `tun`, `inet_diag`, `netlink_diag`, `nft_nat`).
+- **Single Native `tachyon-core` Engine (Rust)**:
+  - Starting with **Tachyon 1.8.0**, `tachyon-core` is the sole supported core (~4.2 MB RAM, zero GC pauses, built-in Adaptive Desync 2.0, AmneziaWG 2.0, VLESS/xHTTP/Reality, Hysteria2, TUIC, ShadowTLS, AnyTLS, CSQTT, WDTT/QWDTT v3, Mieru, embedded FPTN and Tailscale, IPv6/FakeIPv6 `fc00::/18`, Leak Guard, and binary `.trs` rule-sets).
+  - When upgrading older installations, the installer removes legacy `sing-box` packages and migrates UCI settings to `engine='tachyon-core'` and `subscription_engine='core'`.
+  - In-place core update (`-switch-engine tachyon-core` or hotkey `S`) upgrades `tachyon-core` without reinstalling LuCI or resetting subscriptions.
+- **OpenWrt 25.12+ (APK) & 23.05–24.10 (OPKG) Compatibility**:
+  - Offline local `.apk` and `.ipk` installation (including native `tachyon-core-*.apk`/`.ipk` packages) with virtual package fallback for pinned APK world constraints.
+  - Automatic `/etc/apk/world` cleanup of legacy conflicting packages (`forkop`, `podkop`, `netshift`), stale init lock cleanup (`flock 1000`, `99-tachyon-wan`), and `ip-tiny` ↔ `ip-full` conflict resolution.
+  - Kernel module verification via `/sys/module/` (`nft_tproxy`, `nft_fib_inet`, `tun`, `inet_diag`, `netlink_diag`, `nft_nat`, `tcp_bbr`) and best-effort TCP BBR sysctl setup (`/etc/sysctl.d/99-tachyon-bbr.conf`).
 - **Guided Setup (`-wizard` / hotkey `A`)**:
   - Tests ISP UDP 53 DNS spoofing/poisoning and benchmarks clean DoH resolvers.
-  - Evaluates DPI bypass strategies: native **Tachyon Adaptive Desync 2.0** (`adaptive`, `fake_split`, `fake_disorder`, `multi_split` + UDP QUIC Fake) on `tachyon-core`, or `zapret2`/`nfqws2` profiles.
+  - Evaluates packet desynchronization profiles: native **Tachyon Adaptive Desync 2.0** (`adaptive`, `fake_split`, `fake_disorder`, `multi_split` + UDP QUIC Fake) on `tachyon-core`, or `zapret2`/`nfqws2` profiles.
   - Tunes kernel network parameters and runs end-to-end reachability probes through the router.
 - **AmneziaWG 2.0 & Cloudflare WARP (`-awg` / hotkey `W`)**:
   - Registers Cloudflare WARP keys directly from the router, or imports `.conf` files and `vpn://` containers.
   - Supports full AmneziaWG 2.0 CPS signature tags (`Jc`, `Jmin`, `Jmax`, `S1..S4`, `H1..H4`, `I1..I5`, `J1..J3`, `ITime`).
 - **Universal Subscription Manager (`-sub`, `-test-sub`)**:
-  - Supports HTTPS subscription URLs (`subscription_engine='core'`), `happ://crypt4/...`, `fptn:` / `fptnb:`, `vless://`, `vmess://`, `trojan://`, `ss://`, `hy2://`, `tuic://`, `anytls://`, `awg://`, `mieru://`, `snell://`, `sudoku://`, `masque://`, `trusttunnel://`, `naive+https://`, `tg://`, `mtproto://`, `warp://`, and multi-URI lines.
+  - Supports HTTPS subscription URLs (`subscription_engine='core'`), `happ://crypt4/...`, `fptn:` / `fptnb:`, `vless://`, `vmess://`, `trojan://`, `ss://`, `hy2://`, `tuic://`, `anytls://`, `csqtt://`, `wdtt://`, `qwdtt://`, `awg://`, `mieru://`, `mierus://`, `openvpn://`, `tailscale://`, `snell://`, `sudoku://`, `masque://`, `trusttunnel://`, `naive+https://`, `tg://`, `mtproto://`, `warp://`, and multi-URI lines.
   - Concurrent TCP handshake latency benchmark across all parsed nodes.
 - **Diagnostics, Speed Doctor & Emergency Rescue**:
-  - **7-Point Diagnostics (`-diag` / `D`)**: inspects CPU architecture, RAM/Flash, kernel modules, `nftables` chains, section quarantine state (`/var/run/tachyon/validator-quarantined.json`), DNS resolution, and conflicting services.
+  - **7-Point Diagnostics (`-diag` / `D`)**: inspects CPU architecture, RAM/Flash, kernel modules (`nft_tproxy`, `nft_fib`, `tun`, `tcp_bbr`), `nftables` chains, section quarantine state (`/var/run/tachyon/validator-quarantined.json`), DNS resolution, and conflicting services.
   - **Speed & Bufferbloat Doctor (`-speedtest` / `P`)**: measures WAN and tunnel throughput, loaded ping delta (A+..F grade), and CPU SoftIRQ saturation without writing to flash.
-  - **Network Stack Tuning (`-tune-network` / `T`)**: enables TCP BBR + `fq_codel`, scales socket buffers (`rmem`/`wmem`) to router RAM, tunes `conntrack` timeouts, and disables incompatible `fw4` Flow Offloading so TProxy/nftables rules are not bypassed.
-  - **Emergency Rescue (`-rescue` / `R`)**: flushes `inet tachyon` and `inet tachyon_tailscale` tables, cleans policy routing (`fwmark`, tables `tachyon`/`105`/`100`/`4247`/`4248`, netns `fkpsc`), restores `dnsmasq` backups, and recovers direct WAN connectivity.
+  - **Network Stack Tuning (`-tune-network` / `T`)**: enables TCP BBR + `fq_codel`, scales socket buffers (`rmem`/`wmem`) to router RAM, tunes `conntrack` timeouts, and disables incompatible `fw4` Flow Offloading so TProxy/nftables rules are not skipped by hardware offload.
+  - **Emergency Rescue (`-rescue` / `R`)**: flushes `TachyonTable`, `TachyonKillSwitch` (fail-closed), and `tachyon_tailscale` tables, cleans policy routing (`fwmark`, tables `tachyon`/`105`/`100`/`4247`/`4248`, netns `fkpsc`), restores `dnsmasq` backups, and recovers direct WAN connectivity.
 - **Multi-Router Fleet Manager (`-fleet-scan`, `-fleet-deploy` / hotkey `F`)**:
   - Scans local CIDR subnets for OpenWrt routers, builds a hardware/version inventory, and deploys or updates Tachyon concurrently.
 
@@ -67,7 +67,7 @@ Under restrictive network conditions or on fresh OpenWrt installations, the rout
 
 </div>
 
-1. **SSH Router Audit**: detects router model, OpenWrt release, target architecture (`aarch64_cortex-a53`, `aarch64_generic`, `x86_64`, `mipsel_24kc`, `mips_24kc`, `arm_cortex-a7_neon-vfpv4`, `arm_cortex-a9`, `arm_cortex-a15_neon-vfpv4`), package manager (`apk` / `opkg`), free RAM/Flash, and synchronizes router UTC clock with the host PC.
+1. **SSH Router Audit**: detects router model, OpenWrt release, target architecture (`aarch64`, `armv7`, `armv6`, `x86_64`, `mipsel`, `mips`, `riscv64`, `i386_pentium4`), package manager (`apk` / `opkg`), free RAM/Flash, and synchronizes router UTC clock with the host PC.
 2. **Host-Side Package Acquisition**: benchmarks GitHub mirrors (`gh-proxy.com`, `ghfast.top`, `gh.ddlc.top`, `gh-proxy.org`, `direct`), downloads Tachyon packages, `.trs`/`.srs` rule-sets (`Dushnilin/tachyon-lists`), and engine binaries, and verifies SHA-256 checksums.
 3. **Snapshot & World Scrub**: backs up `/etc/config/tachyon` and `/etc/tachyon` to the host PC, triggers `tachyon snapshot-save`, clears stale locks, and scrubs `/etc/apk/world`.
 4. **RAM Streaming (`tar-over-SSH`)**: streams packages into `/tmp`, performs offline installation, and configures UCI (`engine='tachyon-core'`, `subscription_engine='core'`).
@@ -113,14 +113,14 @@ Standalone zero-dependency binaries are available on **[GitHub Releases](https:/
 Run `./tachyon-installer` (or `.\tachyon-installer.exe` on Windows) with no flags:
 
 - `Tab` / `↑` `↓` — navigate fields and sections;
-- `←` `→` or keys `1`–`6` — select proxy engine, version, and mirror on the options screen;
+- `←` `→` or keys `1`–`2` — select core deployment mode (`tachyon-core` / skip), version, and mirror on the options screen;
 - `Space` — toggle options (`luci-i18n-tachyon-ru`, `zram-swap`);
 - Global shortcuts on the welcome and options screens:
   - `A` — guided setup wizard (DNS + Adaptive Desync 2.0 + network tuning);
   - `W` — AmneziaWG 2.0 / Cloudflare WARP setup;
   - `P` — WAN/tunnel speed & Bufferbloat test;
   - `F` — multi-router fleet discovery and batch deployment;
-  - `S` — hot-swap proxy engine;
+  - `S` — update or redeploy `tachyon-core` without reinstalling LuCI;
   - `D` — 7-point router diagnostics;
   - `M` — live CPU/RAM/conntrack monitor;
   - `T` — kernel network stack tuning (`sysctl` + BBR);
@@ -195,7 +195,7 @@ cd tachyon-installer
 go build -o tachyon-installer .
 
 # Cross-compile all 6 desktop targets (windows/linux/darwin, amd64 + arm64) into dist/
-go run scripts/build.go -v 1.12.0
+go run scripts/build.go -v 1.13.0
 ```
 
 ---

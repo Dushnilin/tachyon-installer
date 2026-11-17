@@ -322,18 +322,18 @@ func RunExpressInstall(ctx *AppContext, opts InstallOptions) {
 		} else {
 			result := routerpkg.VerifyAndFallback(sshClient, execFn, ctx.SetSubTask)
 			if result.OK {
-				ctx.ConsoleWrite("[#22c55e]🎉 ПОЛНЫЙ УСПЕХ: Служба Tachyon запущена и проверена![-]\n")
-				ctx.ConsoleWrite("[#cbd5e1]⚡ Сквозная проверка обхода блокировок и Fake-IP с роутера...[-]\n")
+				ctx.ConsoleWrite("[#22c55e]✓ Служба Tachyon запущена и проверена[-]\n")
+				ctx.ConsoleWrite("[#cbd5e1]→ Сквозная проверка маршрутизации и Fake-IP с роутера...[-]\n")
 				bpReport := routerpkg.TestBypass(sshClient, execFn)
 				if bpReport.Success {
 					ctx.ConsoleWritef("[#22c55e]✓ %s[-]\n", bpReport.Details)
 				} else {
-					ctx.ConsoleWritef("[#eab308]⚠️ %s[-]\n", bpReport.Details)
+					ctx.ConsoleWritef("[#eab308]! %s[-]\n", bpReport.Details)
 				}
 				postInstallDiagnostics(ctx, func(cmd string) (string, error) { return execFn(sshClient, cmd) })
 				FinishAndExit(ctx, true, tachyonAssets.Version)
 			} else {
-				ctx.ConsoleWritef("[#eab308]⚠️  Проверка завершилась с предупреждением: %s[-]\n", result.Reason)
+				ctx.ConsoleWritef("[#eab308]! Проверка завершилась с предупреждением: %s[-]\n", result.Reason)
 				postInstallDiagnostics(ctx, func(cmd string) (string, error) { return execFn(sshClient, cmd) })
 				FinishAndExit(ctx, false, tachyonAssets.Version)
 			}
@@ -369,17 +369,17 @@ func RunSaveSubscription(ctx *AppContext, subURL string) {
 
 	result := routerpkg.VerifyAndFallback(ctx.SSHClient, execFn, ctx.SetSubTask)
 	if result.OK {
-		ctx.ConsoleWrite("[#22c55e]🎉 ПОДПИСКА АКТИВНА: Обход блокировок запущен и проверен![-]\n")
-		ctx.ConsoleWrite("[#cbd5e1]⚡ Сквозная проверка обхода блокировок и Fake-IP с роутера...[-]\n")
+		ctx.ConsoleWrite("[#22c55e]✓ Подписка активна: служба маршрутизации запущена и проверена[-]\n")
+		ctx.ConsoleWrite("[#cbd5e1]→ Сквозная проверка маршрутизации и Fake-IP с роутера...[-]\n")
 		bpReport := routerpkg.TestBypass(ctx.SSHClient, execFn)
 		if bpReport.Success {
 			ctx.ConsoleWritef("[#22c55e]✓ %s[-]\n", bpReport.Details)
 		} else {
-			ctx.ConsoleWritef("[#eab308]⚠️ %s[-]\n", bpReport.Details)
+			ctx.ConsoleWritef("[#eab308]! %s[-]\n", bpReport.Details)
 		}
 		FinishAndExit(ctx, true, "")
 	} else {
-		ctx.ConsoleWritef("[#eab308]⚠️ Подписка сохранена, статус проверки: %s[-]\n", result.Reason)
+		ctx.ConsoleWritef("[#eab308]! Подписка сохранена, статус проверки: %s[-]\n", result.Reason)
 		FinishAndExit(ctx, false, "")
 	}
 }

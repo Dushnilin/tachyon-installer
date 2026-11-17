@@ -15,7 +15,7 @@ func TestLoadOfflineBundle(t *testing.T) {
 		TachyonVersion: "1.4.9",
 		Packages: []OfflinePackageInfo{
 			{Filename: "tachyon_1.4.9_all.ipk", Size: 12345, Category: "tachyon"},
-			{Filename: "sing-box_arm64.tar.gz", Size: 67890, Category: "engine", Arch: "arm64"},
+			{Filename: "tachyon-core-aarch64-v0.5.8.apk", Size: 67890, Category: "engine", Arch: "arm64"},
 		},
 	}
 

@@ -34,7 +34,7 @@ func DefaultConfig() *Config {
 		Username:       "root",
 		Password:       "",
 		TachyonVersion: "latest",
-		SelectedEngine: "sing-box-extended",
+		SelectedEngine: "tachyon-core",
 		SelectedMirror: "auto",
 		InstallI18n:    true,
 	}
@@ -47,8 +47,9 @@ func Load(path string) *Config {
 	if err == nil {
 		var cfg Config
 		if err := json.Unmarshal(data, &cfg); err == nil && cfg.RouterIP != "" {
-			if cfg.SelectedEngine == "" {
-				cfg.SelectedEngine = "sing-box-extended"
+			switch strings.ToLower(strings.TrimSpace(cfg.SelectedEngine)) {
+			case "", "core", "tachyon-core", "sing-box", "sing-box-extended", "sing-box-extended-compressed", "sing-box-tiny", "sing-box-lx":
+				cfg.SelectedEngine = "tachyon-core"
 			}
 			if cfg.SelectedMirror == "" {
 				cfg.SelectedMirror = "auto"

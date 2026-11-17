@@ -59,7 +59,7 @@ cat /proc/uptime 2>/dev/null
 echo "--- DEV ---"
 cat /proc/net/dev 2>/dev/null
 echo "--- PROC ---"
-ps 2>/dev/null | grep -E 'tachyon-core|sing-box' | grep -v grep | head -n 1
+ps 2>/dev/null | grep -E 'tachyon-core' | grep -v grep | head -n 1
 echo "--- CONN ---"
 cat /proc/sys/net/netfilter/nf_conntrack_count 2>/dev/null || echo 0
 `

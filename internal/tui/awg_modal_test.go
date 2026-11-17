@@ -33,7 +33,7 @@ func TestAWGTestReport_FormatSummary(t *testing.T) {
 	rep := &routerpkg.AWGTestReport{
 		SectionName:    "warp",
 		ServiceRunning: true,
-		EngineName:     "sing-box",
+		EngineName:     "tachyon-core",
 		FakeIPActive:   true,
 		ResolvedIP:     "198.18.0.55",
 		EgressIP:       "104.28.192.1",

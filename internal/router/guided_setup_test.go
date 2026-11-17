@@ -96,7 +96,7 @@ func TestRunGuidedSetup_TunnelWithSubscription(t *testing.T) {
 			LatencyMs: 14,
 		},
 		SubscriptionURL: "vless://user@1.1.1.1:443?type=tcp#Node",
-		SelectedEngine:  "sing-box",
+		SelectedEngine:  "tachyon-core",
 		EnableTune:      true,
 	}
 

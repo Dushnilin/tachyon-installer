@@ -129,11 +129,7 @@ func NewOptionsSelector(profile ProfileData) *OptionsSelector {
 	initialEngIdx := 0
 
 	engines := []EngineItem{
-		{Key: "tachyon-core", Name: "tachyon-core", Badge: "Rust", Desc: "Нативное ядро на Rust (4.2 МБ RAM, 0ms GC, Desync, xHTTP/VLESS)"},
-		{Key: "sing-box-extended", Name: "sing-box-extended", Badge: "xHTTP", Desc: "xHTTP, Reality, ShadowTLS, gRPC, TUIC, Hy2"},
-		{Key: "sing-box-extended-compressed", Name: "sing-box-ext-compressed", Badge: "xHTTP (сжат)", Desc: "sing-box-extended в сжатом бинарнике (минимум Flash)"},
-		{Key: "sing-box-tiny", Name: "sing-box-tiny", Badge: "Tiny", Desc: "Минималистичная сборка OpenWrt (минимум RAM)"},
-		{Key: "sing-box-lx", Name: "sing-box-lx", Badge: "Leadaxe", Desc: "Компактная сборка sing-box от Leadaxe"},
+		{Key: "tachyon-core", Name: "tachyon-core", Badge: "Rust", Desc: "Нативное ядро на Rust (4.2 МБ RAM, 0ms GC, Desync, FPTN, CSQTT/WDTT, Mieru)"},
 		{Key: "skip", Name: "Без ядра", Badge: "Пропустить", Desc: "Настроить или загрузить ядро позже в LuCI"},
 	}
 
@@ -1150,6 +1146,9 @@ func (opt *OptionsSelector) printClip(screen tcell.Screen, text string, x, y, ma
 
 // Preselect applies previously used values. Unknown values are ignored.
 func (opt *OptionsSelector) Preselect(engine, mirror, version string, installRussian bool) {
+	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(engine)), "sing-box") {
+		engine = "tachyon-core"
+	}
 	for i, e := range opt.engines {
 		if e.Key == engine {
 			opt.selectedEngine, opt.engineCursor = i, i

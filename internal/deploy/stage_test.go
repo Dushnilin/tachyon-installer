@@ -19,7 +19,7 @@ func TestStagingArea_Lifecycle(t *testing.T) {
 		t.Errorf("staging directory does not exist: %s", stage.Dir)
 	}
 
-	path, err := stage.WriteRunnerScript("sing-box-extended", false)
+	path, err := stage.WriteRunnerScript("tachyon-core", false)
 	if err != nil {
 		t.Fatalf("WriteRunnerScript failed: %v", err)
 	}
@@ -33,7 +33,7 @@ func TestStagingArea_Lifecycle(t *testing.T) {
 	if !strings.Contains(strContent, "opkg install --force-reinstall") {
 		t.Errorf("expected opkg command in runner script for isAPK=false")
 	}
-	if !strings.Contains(strContent, "sing-box-extended") {
+	if !strings.Contains(strContent, "tachyon-core") {
 		t.Errorf("expected selected engine in runner script")
 	}
 
@@ -63,13 +63,10 @@ func TestGenerateRunnerScript_APK(t *testing.T) {
 
 func TestVariantMarkerForEngine(t *testing.T) {
 	cases := map[string]string{
-		"tachyon-core":                 "tachyon-core",
-		"sing-box-extended":            "extended",
-		"sing-box-extended-compressed": "extended-compressed",
-		"sing-box-lx":                  "lx",
-		"sing-box-tiny":                "tiny",
-		"sing-box":                     "stable",
-		"skip":                         "",
+		"tachyon-core":      "tachyon-core",
+		"sing-box-extended": "tachyon-core",
+		"sing-box":          "tachyon-core",
+		"skip":              "",
 	}
 	for eng, want := range cases {
 		if got := deploy.VariantMarkerForEngine(eng); got != want {
@@ -98,6 +95,9 @@ func TestGenerateUninstallScript(t *testing.T) {
 	}
 	if !strings.Contains(opkgScript, "rm -rf /etc/config/tachyon") {
 		t.Errorf("expected tachyon config cleanup in uninstall script")
+	}
+	if !strings.Contains(opkgScript, "TachyonKillSwitch") {
+		t.Errorf("expected TachyonKillSwitch cleanup in uninstall script")
 	}
 }
 

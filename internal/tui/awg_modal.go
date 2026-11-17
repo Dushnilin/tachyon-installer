@@ -24,7 +24,7 @@ func ShowAWGModal(ctx *AppContext, returnPage string) {
 		"  [#38bdf8:b]Генератор и настройка AmneziaWG 2.0 в Tachyon:[-]\n\n" +
 		"  [#a1a1a6]• Создает секцию с обфускацией протокола WireGuard (Jc, S1–S4, H1–H4, CPS I1–I5, J1–J3)[-]\n" +
 		"  [#a1a1a6]• Встроенный генератор профиля Cloudflare WARP с обфускацией заголовков[-]\n" +
-		"  [#a1a1a6]• Автоматическое подключение списков маршрутизации (YouTube, Discord, РКН)[-]\n" +
+		"  [#a1a1a6]• Автоматическое подключение списков маршрутизации (YouTube, Discord, RU-списки)[-]\n" +
 		"  [#a1a1a6]• Проверка туннеля и доступности сервисов[-]\n\n" +
 		"  [#71717a]Выберите действие ниже: сгенерируйте профиль WARP или вставьте свой .conf / vpn://[-]\n"
 
@@ -125,8 +125,8 @@ func ShowAWGModal(ctx *AppContext, returnPage string) {
 
 				msg := "\n  [#4cc38a:b]✓ Секция AmneziaWG применена и активирована[-]\n\n" +
 					"  [#a1a1a6]• Служба Tachyon перезапущена[-]\n" +
-					"  [#a1a1a6]• Списки YouTube, Discord и РКН подключены[-]\n\n" +
-					"  [#38bdf8]Нажмите «Проверить работу» для тестирования обхода.[-]\n"
+					"  [#a1a1a6]• Списки маршрутизации (YouTube, Discord) подключены[-]\n\n" +
+					"  [#38bdf8]Нажмите «Проверить работу» для тестирования соединения.[-]\n"
 				infoView.SetText(msg)
 			})
 		}()
@@ -134,7 +134,7 @@ func ShowAWGModal(ctx *AppContext, returnPage string) {
 
 	// 3. Action: Test Connectivity & Bypass
 	runTest := func() {
-		infoView.SetText("\n  [#38bdf8]Тестирование обхода через AmneziaWG...[-]\n  [#71717a]Проверка ядра прокси, DNS, YouTube, Discord и внешнего IP...[-]\n")
+		infoView.SetText("\n  [#38bdf8]Тестирование соединения через AmneziaWG...[-]\n  [#71717a]Проверка ядра прокси, DNS, YouTube, Discord и внешнего IP...[-]\n")
 
 		go func() {
 			rep, err := routerpkg.TestAWGSection(ctx.SSHClient, execFn, "awg")

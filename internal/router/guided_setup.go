@@ -12,11 +12,11 @@ import (
 type GuidedSetupMode string
 
 const (
-	// ModeStandaloneDPI configures packet-level DPI bypass (Adaptive Desync / zapret) without external proxy servers.
+	// ModeStandaloneDPI configures packet-level adaptive desync (zapret2 / tachyon-core) without external proxy servers.
 	ModeStandaloneDPI GuidedSetupMode = "standalone_dpi"
-	// ModeTunnel configures tachyon-core / sing-box tunnel using the user's subscription.
+	// ModeTunnel configures tachyon-core tunnel using the user's subscription.
 	ModeTunnel GuidedSetupMode = "tunnel"
-	// ModeHybrid configures DPI bypass for domestic/heavy traffic + tunnel for blocked sites.
+	// ModeHybrid configures local desync ruleset + tunnel routing for selected domains.
 	ModeHybrid GuidedSetupMode = "hybrid"
 )
 

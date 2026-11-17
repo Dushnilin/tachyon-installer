@@ -30,6 +30,7 @@ var CommonRouterArchitectures = []string{
 	"mipsle",
 	"mips",
 	"x86_64",
+	"armv7",
 }
 
 // CreateOfflineBundle downloads Tachyon packages and popular engine binaries into a local directory.
@@ -114,18 +115,20 @@ func CreateOfflineBundle(
 		}
 	}
 
-	// 2. Download tachyon-core and sing-box-extended for requested architectures
-	logFn("→ [2/2] Загрузка ядер для распространенных архитектур...\n")
+	// 2. Download tachyon-core packages (.ipk and .apk) for requested architectures
+	logFn("→ [2/2] Загрузка ядер tachyon-core для распространенных архитектур...\n")
+	seenEngineFiles := make(map[string]bool)
 	for _, arch := range archList {
-		for _, eng := range []EngineType{EngineTachyonCore, EngineSingBoxExtended} {
-			engAssets, errEng := ResolveEngineAssets(ctx, dlClient, eng, arch, arch, false)
+		for _, isAPK := range []bool{false, true} {
+			engAssets, errEng := ResolveEngineAssets(ctx, dlClient, EngineTachyonCore, arch, arch, isAPK)
 			if errEng != nil || len(engAssets) == 0 {
 				continue
 			}
 			for _, ea := range engAssets {
-				if ea == nil || ea.URL == "" {
+				if ea == nil || ea.URL == "" || seenEngineFiles[ea.Filename] {
 					continue
 				}
+				seenEngineFiles[ea.Filename] = true
 				dest := filepath.Join(targetDir, ea.Filename)
 				if fi, errStat := os.Stat(dest); errStat == nil {
 					manifest.Packages = append(manifest.Packages, OfflinePackageInfo{
@@ -136,7 +139,7 @@ func CreateOfflineBundle(
 					})
 					continue
 				}
-				logFn(fmt.Sprintf("  -> Ядро [%s/%s]: %s...\n", eng, arch, ea.Filename))
+				logFn(fmt.Sprintf("  -> Ядро [%s/%s]: %s...\n", EngineTachyonCore, arch, ea.Filename))
 				_, errDl := dlClient.DownloadFile(ctx, ea.URL, dest, ea.Filename, nil)
 				if errDl == nil {
 					fi, _ := os.Stat(dest)

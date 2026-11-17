@@ -707,13 +707,9 @@ uci -q add_list tachyon.%s.community_lists='twitter' 2>/dev/null || true
 	}
 
 	cmd.WriteString(`
-# 3. Ensure active engine (tachyon-core or sing-box) is enabled
-if [ "$(uci -q get tachyon.settings.engine 2>/dev/null)" = "tachyon-core" ] || [ "$(cat /etc/tachyon/tachyon-core-variant 2>/dev/null)" = "tachyon-core" ]; then
-    uci -q set tachyon.settings.engine='tachyon-core' 2>/dev/null || true
-    uci -q set tachyon.settings.subscription_engine='core' 2>/dev/null || true
-else
-    uci -q set tachyon.settings.engine='sing-box' 2>/dev/null || true
-fi
+# 3. Ensure active engine (tachyon-core) is enabled
+uci -q set tachyon.settings.engine='tachyon-core' 2>/dev/null || true
+uci -q set tachyon.settings.subscription_engine='core' 2>/dev/null || true
 uci -q set tachyon.settings.enabled='1' 2>/dev/null || true
 uci commit tachyon 2>/dev/null || true
 
@@ -739,30 +735,21 @@ func TestAWGSection(client *gossh.Client, execFn sshutil.ExecFunc, sectionName s
 
 	report := &AWGTestReport{
 		SectionName: sectionName,
-		EngineName:  "sing-box",
+		EngineName:  "tachyon-core",
 		Probes:      []TargetProbe{},
 	}
 
 	// 1. Process check
 	procCheck := `
-if pgrep -x tachyon-core >/dev/null || pgrep -f "tachyon-core" >/dev/null || [ "$(cat /etc/tachyon/tachyon-core-variant 2>/dev/null)" = "tachyon-core" ]; then
-    if pgrep -x tachyon-core >/dev/null || pgrep -x sing-box >/dev/null || pgrep -f "tachyon-core" >/dev/null || pgrep -f "sing-box" >/dev/null; then
-        echo "PROCESS:OK:tachyon-core"
-    else
-        echo "PROCESS:FAILED:tachyon-core"
-    fi
-elif pgrep -x sing-box >/dev/null || pgrep -f "sing-box" >/dev/null; then
-    echo "PROCESS:OK:sing-box"
+if pgrep -x tachyon-core >/dev/null || pgrep -f "tachyon-core" >/dev/null; then
+    echo "PROCESS:OK:tachyon-core"
 else
-    echo "PROCESS:FAILED:sing-box"
+    echo "PROCESS:FAILED:tachyon-core"
 fi
 `
 	procOut, _ := execFn(client, procCheck)
 	if strings.Contains(procOut, "PROCESS:OK") {
 		report.ServiceRunning = true
-	}
-	if strings.Contains(procOut, ":tachyon-core") {
-		report.EngineName = "tachyon-core"
 	}
 
 	// 2. DNS Fake-IP check

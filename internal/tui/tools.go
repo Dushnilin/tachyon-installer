@@ -146,8 +146,8 @@ func ShowRescueModal(ctx *AppContext, returnPage string) {
 
 	initialText := "\n" +
 		"  [#e5484d:b]Экстренное восстановление прямого интернета:[-]\n\n" +
-		"  [#a1a1a6]1. Остановит службы Tachyon, tachyon-core и sing-box[-]\n" +
-		"  [#a1a1a6]2. Очистит таблицы nftables (inet tachyon, tachyon_tailscale) и iptables[-]\n" +
+		"  [#a1a1a6]1. Остановит службы Tachyon и tachyon-core[-]\n" +
+		"  [#a1a1a6]2. Очистит таблицы nftables (TachyonTable, TachyonKillSwitch, tachyon_tailscale)[-]\n" +
 		"  [#a1a1a6]3. Сбросит маршруты TProxy (таблицы tachyon/105, 100, 4247/4248)[-]\n" +
 		"  [#a1a1a6]4. Восстановит настройки dnsmasq и перезапустит firewall[-]\n" +
 		"  [#a1a1a6]5. Проверит доступность шлюза провайдера и интернета (8.8.8.8)[-]\n"

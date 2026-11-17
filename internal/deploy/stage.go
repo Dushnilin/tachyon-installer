@@ -31,24 +31,24 @@ func (s *StagingArea) Cleanup() {
 }
 
 // VariantMarkerForEngine maps an installer engine selection to the Tachyon
-// /etc/tachyon/tachyon-core-variant marker value (used by Tachyon 1.5.20+ for
-// AmneziaWG schema and TLS feature detection).
+// /etc/tachyon/tachyon-core-variant marker value (used by Tachyon for schema
+// and binary capabilities detection). Since Tachyon 1.8.0 only tachyon-core
+// is supported; legacy sing-box variants normalize to tachyon-core.
 func VariantMarkerForEngine(selectedEngine string) string {
-	switch selectedEngine {
-	case "tachyon-core":
-		return "tachyon-core"
-	case "sing-box-extended":
-		return "extended"
-	case "sing-box-extended-compressed":
-		return "extended-compressed"
-	case "sing-box-lx":
-		return "lx"
-	case "sing-box-tiny":
-		return "tiny"
-	case "sing-box":
-		return "stable"
-	default:
+	switch strings.ToLower(strings.TrimSpace(selectedEngine)) {
+	case "skip":
 		return ""
+	default:
+		return "tachyon-core"
+	}
+}
+
+func normalizeInstallEngine(selectedEngine string) string {
+	switch strings.ToLower(strings.TrimSpace(selectedEngine)) {
+	case "skip":
+		return "skip"
+	default:
+		return "tachyon-core"
 	}
 }
 
@@ -76,16 +76,19 @@ fi
 `
 	}
 
-	variantMarker := VariantMarkerForEngine(selectedEngine)
+	normEngine := normalizeInstallEngine(selectedEngine)
+	variantMarker := VariantMarkerForEngine(normEngine)
 
 	script := `#!/bin/sh
-# Tachyon Host-Assisted Express Installer
+# Tachyon Host-Assisted Express Installer (Tachyon 1.8.0+ / install.sh v3.3.0 sync)
 set -e
 
 echo "==> [1/5] Подготовка системы и остановка служб..."
-# Release stale procd/tachyon locks
+# Release stale procd/tachyon init locks
 rm -rf /var/run/tachyon/starting /var/run/tachyon/reloading /var/run/tachyon*.lock 2>/dev/null || true
-for _p in $(pgrep -f "99-tachyon-wan" 2>/dev/null || true); do kill -9 "$_p" 2>/dev/null || true; done
+for _p in $(pgrep -f "99-tachyon-wan" 2>/dev/null || true) $(pgrep -f "flock.*1000" 2>/dev/null || true) $(pgrep -f "/etc/init.d/tachyon" 2>/dev/null || true); do
+    [ "$_p" != "$$" ] && kill -9 "$_p" 2>/dev/null || true
+done
 
 if [ -x /etc/init.d/tachyon ]; then
     /etc/init.d/tachyon stop >/dev/null 2>&1 || true
@@ -95,6 +98,7 @@ if [ -x /etc/init.d/tachyon-core ]; then
 fi
 if [ -x /etc/init.d/sing-box ]; then
     /etc/init.d/sing-box stop >/dev/null 2>&1 || true
+    /etc/init.d/sing-box disable >/dev/null 2>&1 || true
 fi
 if [ -x /usr/bin/tachyon ]; then
     /usr/bin/tachyon stop >/dev/null 2>&1 || true
@@ -118,31 +122,17 @@ else
     opkg remove --force-depends ip-tiny >/dev/null 2>&1 || true
 fi
 ` + zramSection + `
-ENGINE="` + selectedEngine + `"
+ENGINE="` + normEngine + `"
 VARIANT_MARKER="` + variantMarker + `"
 
-# Pre-clean conflicting engine packages/symlinks before installing packages
-case "$ENGINE" in
-    tachyon-core|sing-box-extended-compressed|sing-box-lx)
-        if [ "$PKG_MGR" = "apk" ]; then
-            apk del --no-network --repositories-file /dev/null --force-broken-world sing-box-extended sing-box-tiny sing-box >/dev/null 2>&1 || true
-        else
-            opkg remove --force-depends sing-box-extended sing-box-tiny sing-box >/dev/null 2>&1 || true
-        fi
-        ;;
-    sing-box-extended|sing-box-tiny|sing-box)
-        rm -f /usr/bin/sing-box /usr/bin/tachyon-core 2>/dev/null || true
-        if [ "$ENGINE" != "sing-box-extended" ]; then
-            if [ "$PKG_MGR" = "apk" ]; then apk del --no-network --repositories-file /dev/null --force-broken-world sing-box-extended >/dev/null 2>&1 || true; else opkg remove --force-depends sing-box-extended >/dev/null 2>&1 || true; fi
-        fi
-        if [ "$ENGINE" != "sing-box-tiny" ]; then
-            if [ "$PKG_MGR" = "apk" ]; then apk del --no-network --repositories-file /dev/null --force-broken-world sing-box-tiny >/dev/null 2>&1 || true; else opkg remove --force-depends sing-box-tiny >/dev/null 2>&1 || true; fi
-        fi
-        if [ "$ENGINE" != "sing-box" ]; then
-            if [ "$PKG_MGR" = "apk" ]; then apk del --no-network --repositories-file /dev/null --force-broken-world sing-box >/dev/null 2>&1 || true; else opkg remove --force-depends sing-box >/dev/null 2>&1 || true; fi
-        fi
-        ;;
-esac
+# Pre-clean legacy sing-box packages when installing tachyon-core (Tachyon 1.8.0+)
+if [ "$ENGINE" = "tachyon-core" ]; then
+    if [ "$PKG_MGR" = "apk" ]; then
+        apk del --no-network --repositories-file /dev/null --force-broken-world sing-box-extended sing-box-tiny sing-box >/dev/null 2>&1 || true
+    else
+        opkg remove --force-depends sing-box-extended sing-box-tiny sing-box >/dev/null 2>&1 || true
+    fi
+fi
 
 echo "==> [2/5] Установка пакетов Tachyon..."
 if [ "$PKG_MGR" = "apk" ]; then
@@ -154,7 +144,7 @@ if [ "$PKG_MGR" = "apk" ]; then
         sed -i -E "/^tachyon([ \t<>=~].*)?\$/d; /^luci-app-tachyon([ \t<>=~].*)?\$/d; /^luci-i18n-tachyon-ru([ \t<>=~].*)?\$/d" /etc/apk/world 2>/dev/null || true
     fi
     # Ensure runtime dependencies & kmods (skipping built-in kernel modules)
-    for _kmod in kmod-nft-tproxy:nft_tproxy kmod-tun:tun kmod-inet-diag:inet_diag kmod-netlink-diag:netlink_diag kmod-nft-nat:nft_nat; do
+    for _kmod in kmod-nft-tproxy:nft_tproxy kmod-nft-fib:nft_fib_inet kmod-tun:tun kmod-inet-diag:inet_diag kmod-netlink-diag:netlink_diag kmod-nft-nat:nft_nat kmod-tcp-bbr:tcp_bbr; do
         _pkg="${_kmod%:*}"
         _mod="${_kmod#*:}"
         if [ ! -d "/sys/module/$_mod" ] && ! modprobe "$_mod" >/dev/null 2>&1; then
@@ -175,7 +165,7 @@ if [ "$PKG_MGR" = "apk" ]; then
     }
 else
     # Ensure runtime kmods if not built-in
-    for _kmod in kmod-nft-tproxy:nft_tproxy kmod-tun:tun kmod-inet-diag:inet_diag kmod-netlink-diag:netlink_diag kmod-nft-nat:nft_nat; do
+    for _kmod in kmod-nft-tproxy:nft_tproxy kmod-nft-fib:nft_fib_inet kmod-tun:tun kmod-inet-diag:inet_diag kmod-netlink-diag:netlink_diag kmod-nft-nat:nft_nat kmod-tcp-bbr:tcp_bbr; do
         _pkg="${_kmod%:*}"
         _mod="${_kmod#*:}"
         if [ ! -d "/sys/module/$_mod" ] && ! modprobe "$_mod" >/dev/null 2>&1; then
@@ -191,108 +181,54 @@ else
     }
 fi
 
-# If standalone tachyon-core or sing-box binary was uploaded (or compressed archive)
+# Best-effort TCP BBR sysctl activation (install.sh v3.3.0 sync)
+if [ -d /sys/module/tcp_bbr ] || modprobe tcp_bbr >/dev/null 2>&1; then
+    if grep -qw "bbr" /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null; then
+        mkdir -p /etc/sysctl.d 2>/dev/null || true
+        printf 'net.core.default_qdisc=fq\nnet.ipv4.tcp_congestion_control=bbr\n' > /etc/sysctl.d/99-tachyon-bbr.conf 2>/dev/null || true
+        sysctl -w net.core.default_qdisc=fq >/dev/null 2>&1 || true
+        sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1 || true
+    fi
+fi
+
+# If standalone tachyon-core binary or tar.gz archive was uploaded
 if [ -f /tmp/tachyon-install/tachyon-core ]; then
     echo "==> Установка бинарного файла ядра tachyon-core..."
-    rm -f /usr/bin/sing-box /usr/bin/tachyon-core 2>/dev/null || true
+    rm -f /usr/bin/tachyon-core 2>/dev/null || true
     mv -f /tmp/tachyon-install/tachyon-core /usr/bin/tachyon-core
     chmod 0755 /usr/bin/tachyon-core
-    ln -sf /usr/bin/tachyon-core /usr/bin/sing-box
-elif [ -f /tmp/tachyon-install/sing-box ]; then
-    echo "==> Установка бинарного файла ядра ($ENGINE)..."
-    rm -f /usr/bin/sing-box /usr/bin/tachyon-core 2>/dev/null || true
-    mv -f /tmp/tachyon-install/sing-box /usr/bin/tachyon-core
-    chmod 0755 /usr/bin/tachyon-core
-    ln -sf /usr/bin/tachyon-core /usr/bin/sing-box
 elif ls /tmp/tachyon-install/tachyon-core*.tar.gz >/dev/null 2>&1; then
     echo "==> Распаковка архива ядра tachyon-core..."
     for archive in /tmp/tachyon-install/tachyon-core*.tar.gz; do
         tar -xzf "$archive" -C /tmp/tachyon-install/ 2>/dev/null || tar -xf "$archive" -C /tmp/tachyon-install/ 2>/dev/null || true
         rm -f "$archive"
     done
-    FOUND_BIN=$(find /tmp/tachyon-install/ -type f \( -name "tachyon-core*" -o -name "sing-box" \) ! -name "*.sha256" ! -name "*.txt" ! -name "*.md" ! -name "*.sh" 2>/dev/null | head -1)
+    FOUND_BIN=$(find /tmp/tachyon-install/ -type f -name "tachyon-core*" ! -name "*.tar.gz" ! -name "*.ipk" ! -name "*.apk" ! -name "*.sha256" ! -name "*.txt" ! -name "*.md" ! -name "*.sh" 2>/dev/null | head -1)
     if [ -n "$FOUND_BIN" ]; then
-        rm -f /usr/bin/sing-box /usr/bin/tachyon-core 2>/dev/null || true
+        rm -f /usr/bin/tachyon-core 2>/dev/null || true
         mv -f "$FOUND_BIN" /usr/bin/tachyon-core
         chmod 0755 /usr/bin/tachyon-core
-        ln -sf /usr/bin/tachyon-core /usr/bin/sing-box
-    fi
-elif ls /tmp/tachyon-install/sing-box*.tar.gz >/dev/null 2>&1; then
-    echo "==> Распаковка архива ядра sing-box..."
-    for archive in /tmp/tachyon-install/sing-box*.tar.gz; do
-        tar -xzf "$archive" -C /tmp/tachyon-install/ 2>/dev/null || true
-        rm -f "$archive"
-    done
-    FOUND_BIN=$(find /tmp/tachyon-install/ -type f -name "sing-box*" ! -name "*.tar.gz" ! -name "*.ipk" ! -name "*.apk" ! -name "*.sha256" 2>/dev/null | head -1)
-    if [ -n "$FOUND_BIN" ]; then
-        rm -f /usr/bin/sing-box /usr/bin/tachyon-core 2>/dev/null || true
-        mv -f "$FOUND_BIN" /usr/bin/tachyon-core
-        chmod 0755 /usr/bin/tachyon-core
-        ln -sf /usr/bin/tachyon-core /usr/bin/sing-box
-    fi
-elif [ "` + selectedEngine + `" = "sing-box-tiny" ]; then
-    echo "==> Установка sing-box-tiny через пакетный менеджер роутера..."
-    if [ -x /usr/bin/tachyon ]; then
-        /usr/bin/tachyon component_action sing_box install_tiny 2>&1 || true
-    elif [ "$PKG_MGR" = "apk" ]; then
-        apk update >/dev/null 2>&1 || true
-        apk add sing-box-tiny 2>&1 || true
-    else
-        opkg update >/dev/null 2>&1 || true
-        opkg install sing-box-tiny 2>&1 || true
-    fi
-elif [ "` + selectedEngine + `" = "sing-box" ]; then
-    echo "==> Установка sing-box (stable) через пакетный менеджер роутера..."
-    if [ -x /usr/bin/tachyon ]; then
-        /usr/bin/tachyon component_action sing_box install_stable 2>&1 || true
-    elif [ "$PKG_MGR" = "apk" ]; then
-        apk update >/dev/null 2>&1 || true
-        apk add sing-box 2>&1 || true
-    else
-        opkg update >/dev/null 2>&1 || true
-        opkg install sing-box 2>&1 || true
     fi
 fi
 
-# Ensure /usr/bin/tachyon-core and /usr/bin/sing-box symlinks are consistent for package installs
-if [ -f /usr/bin/sing-box ] && [ ! -L /usr/bin/sing-box ] && [ ! -e /usr/bin/tachyon-core ]; then
-    ln -sf /usr/bin/sing-box /usr/bin/tachyon-core 2>/dev/null || true
-elif [ -f /usr/bin/tachyon-core ] && [ ! -L /usr/bin/tachyon-core ] && [ ! -e /usr/bin/sing-box ]; then
-    ln -sf /usr/bin/tachyon-core /usr/bin/sing-box 2>/dev/null || true
-fi
-
-# Write variant marker & clear stale cache.db if installing a tachyon-core / sing-box family engine
+# Write variant marker & clear stale cache.db for tachyon-core
 if [ -n "$VARIANT_MARKER" ]; then
-    mkdir -p /etc/tachyon /etc/tachyon-core /tmp/tachyon-core /usr/share/tachyon-core /usr/share/sing-box 2>/dev/null || true
+    mkdir -p /etc/tachyon /etc/tachyon-core /tmp/tachyon-core /usr/share/tachyon-core 2>/dev/null || true
     printf '%s\n' "$VARIANT_MARKER" > /etc/tachyon/tachyon-core-variant 2>/dev/null || true
-    if [ "$VARIANT_MARKER" = "tachyon-core" ] && [ -x /usr/bin/tachyon-core ]; then
+    if [ -x /usr/bin/tachyon-core ]; then
         _tc_ver=$(/usr/bin/tachyon-core --version 2>/dev/null | head -n 1 | awk '{print $NF}')
         [ -n "$_tc_ver" ] && printf '%s\n' "$_tc_ver" > /etc/tachyon/tachyon-core-version 2>/dev/null || true
     fi
-    rm -f /tmp/tachyon-core/cache.db* /usr/share/tachyon-core/cache.db* /usr/share/sing-box/cache.db* /etc/tachyon-core/cache.db* /var/run/sing-box/cache.db* 2>/dev/null || true
-    if [ -x /etc/init.d/sing-box ]; then
-        /etc/init.d/sing-box stop >/dev/null 2>&1 || true
-        /etc/init.d/sing-box disable >/dev/null 2>&1 || true
-    fi
+    rm -f /tmp/tachyon-core/cache.db* /usr/share/tachyon-core/cache.db* /etc/tachyon-core/cache.db* /var/run/sing-box/cache.db* 2>/dev/null || true
     if [ ! -x /etc/init.d/tachyon-core ] && command -v ucode >/dev/null 2>&1 && [ -f /usr/lib/tachyon/core/process.uc ]; then
         ucode -L /usr/lib/tachyon -e 'let fs = require("fs"); let cp = require("core.process"); fs.writefile("/etc/init.d/tachyon-core", cp.managed_core_init_script("", true)); fs.chmod("/etc/init.d/tachyon-core", 0755);' 2>/dev/null || true
     fi
 fi
 
-if [ -n "$ENGINE" ] && [ "$ENGINE" != "skip" ]; then
-    echo "==> [3/5] Настройка активного ядра в UCI ($ENGINE)..."
-    case "$ENGINE" in
-        tachyon-core)
-            uci -q set tachyon.settings.engine="tachyon-core"
-            uci -q set tachyon.settings.subscription_engine="core"
-            ;;
-        sing-box*|extended*|tiny|lx)
-            uci -q set tachyon.settings.engine="sing-box"
-            ;;
-        *)
-            uci -q set tachyon.settings.engine="$ENGINE"
-            ;;
-    esac
+if [ "$ENGINE" != "skip" ]; then
+    echo "==> [3/5] Настройка активного ядра в UCI (tachyon-core)..."
+    uci -q set tachyon.settings.engine="tachyon-core"
+    uci -q set tachyon.settings.subscription_engine="core"
     uci commit tachyon 2>/dev/null || true
 fi
 
@@ -331,18 +267,24 @@ echo "==> [1/4] Остановка служб Tachyon и освобождени�
 rm -rf /var/run/tachyon/starting /var/run/tachyon/reloading /var/run/tachyon*.lock 2>/dev/null || true
 for _p in $(pgrep -f "99-tachyon-wan" 2>/dev/null || true); do kill -9 "$_p" 2>/dev/null || true; done
 
-for _svc in tachyon tachyon-core sing-box; do
+for _svc in tachyon tachyon-core sing-box tachyon-torrserver-direct; do
     if [ -x "/etc/init.d/$_svc" ]; then
         "/etc/init.d/$_svc" stop >/dev/null 2>&1 || true
         "/etc/init.d/$_svc" disable >/dev/null 2>&1 || true
     fi
 done
+for _p in $(pgrep -f "usr/lib/tachyon/(dns_failover|watchdog|telegram)" 2>/dev/null || true); do
+    [ "$_p" != "$$" ] && kill -9 "$_p" 2>/dev/null || true
+done
 killall -9 tachyon tachyon-core sing-box nfqws nfqws2 2>/dev/null || true
 
-# Clean nftables tables
+# Clean nftables tables and firewall drop-ins (including Fail-Closed KillSwitch)
 nft delete table inet TachyonTable 2>/dev/null || true
+nft delete table inet TachyonKillSwitch 2>/dev/null || true
 nft delete table inet tachyon 2>/dev/null || true
 nft delete table inet tachyon_tailscale 2>/dev/null || true
+rm -f /usr/share/nftables.d/ruleset-post/90-tachyon-kill-switch.nft /usr/share/nftables.d/chain-pre/input/10-tachyon.nft 2>/dev/null || true
+rm -f /etc/dnsmasq.d/tachyon*.conf /tmp/dnsmasq.d/tachyon*.conf /etc/sysctl.d/99-tachyon-bbr.conf 2>/dev/null || true
 
 # Clean policy routing rules and tables (105 / tachyon, 100, Tailscale 4247/4248)
 for _ipt in "ip" "ip -6"; do
@@ -406,7 +348,7 @@ else
 fi
 
 echo "==> [3/4] Очистка конфигурации и временных файлов..."
-rm -rf /etc/config/tachyon /etc/tachyon /etc/tachyon-core /etc/.tachyon /etc/init.d/tachyon /etc/init.d/tachyon-core /etc/hotplug.d/iface/99-tachyon-wan /usr/bin/tachyon /usr/bin/tachyon-core /usr/lib/tachyon /usr/share/tachyon-core /tmp/tachyon* /var/run/tachyon /tmp/luci-modulecache/ /tmp/luci-indexcache* 2>/dev/null || true
+rm -rf /etc/config/tachyon /etc/tachyon /etc/tachyon-core /etc/.tachyon /etc/init.d/tachyon /etc/init.d/tachyon-core /etc/init.d/tachyon-torrserver-direct /etc/hotplug.d/iface/99-tachyon-wan /usr/bin/tachyon /usr/bin/tachyon-core /usr/lib/tachyon /usr/share/tachyon-core /tmp/tachyon* /var/run/tachyon /var/log/tachyon* /tmp/luci-modulecache/ /tmp/luci-indexcache* 2>/dev/null || true
 
 echo "==> [4/4] Сброс сетевых правил и перезапуск firewall..."
 if [ -x /etc/init.d/firewall ]; then

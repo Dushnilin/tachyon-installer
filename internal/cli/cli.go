@@ -90,10 +90,10 @@ func ParseFlags(args []string, defaultCfg *appconfig.Config, appVersion string) 
 	fs.StringVar(&opts.Username, "user", defaultCfg.Username, "SSH имя пользователя")
 	fs.StringVar(&opts.Password, "pass", "", "SSH пароль")
 	fs.StringVar(&opts.KeyPath, "key", defaultCfg.KeyPath, "Путь к SSH приватному ключу")
-	fs.StringVar(&opts.Engine, "engine", defaultCfg.SelectedEngine, "Ядро прокси: tachyon-core, sing-box-extended, sing-box-extended-compressed, sing-box-tiny, sing-box-lx, skip")
-	fs.StringVar(&opts.SwitchEngine, "switch-engine", "", "Горячая смена ядра прокси на роутере без переустановки LuCI")
+	fs.StringVar(&opts.Engine, "engine", defaultCfg.SelectedEngine, "Ядро прокси: tachyon-core, skip")
+	fs.StringVar(&opts.SwitchEngine, "switch-engine", "", "Обновление/переключение активного ядра (tachyon-core) на роутере без переустановки LuCI")
 	fs.StringVar(&opts.Mirror, "mirror", defaultCfg.SelectedMirror, "Зеркало загрузки GitHub: auto, direct, https://gh-proxy.com/ и др.")
-	fs.StringVar(&opts.Version, "version", defaultCfg.TachyonVersion, "Версия Tachyon: latest или тег релиза (например 1.7.9)")
+	fs.StringVar(&opts.Version, "version", defaultCfg.TachyonVersion, "Версия Tachyon: latest или тег релиза (например 1.8.0)")
 	fs.BoolVar(&opts.InstallI18n, "i18n", defaultCfg.InstallI18n, "Установить русскую локализацию LuCI")
 	fs.BoolVar(&opts.InstallZRAM, "zram", defaultCfg.InstallZRAM, "Включить zRAM-swap (сжатый SWAP в ОЗУ)")
 	fs.StringVar(&opts.Subscription, "sub", "", "Ссылка на подписку (HTTPS, vless:// или base64)")
@@ -133,6 +133,13 @@ func ParseFlags(args []string, defaultCfg *appconfig.Config, appVersion string) 
 
 	if err := fs.Parse(args); err != nil {
 		return nil, err
+	}
+
+	if opts.Engine != "" && opts.Engine != "skip" {
+		opts.Engine = string(dlpkg.NormalizeEngine(opts.Engine))
+	}
+	if opts.SwitchEngine != "" {
+		opts.SwitchEngine = string(dlpkg.NormalizeEngine(opts.SwitchEngine))
 	}
 
 	return opts, nil
@@ -679,7 +686,7 @@ func Run(opts *Options) int {
 			fmt.Printf("  [✓] Выбран DNS по умолчанию: %s\n", chosenDNS.Name)
 		}
 
-		fmt.Println("→ [3/5] Подбор оптимальной стратегии обхода DPI...")
+		fmt.Println("→ [3/5] Подбор оптимальной стратегии десинхронизации пакетов...")
 		fuzzReport := routerpkg.RunDPIFuzzer(client, execCmd, nil)
 		var chosenStrat routerpkg.DPIStrategy
 		if fuzzReport.WinningStrategy != nil {
@@ -831,7 +838,7 @@ func Run(opts *Options) int {
 			return string(out), err
 		}
 
-		fmt.Println("\n→ Проверка сквозного обхода через роутер...")
+		fmt.Println("\n→ Проверка сквозной маршрутизации через роутер...")
 		bypassRes := routerpkg.TestBypass(client, execFn)
 		if bypassRes.Success {
 			fmt.Printf("  [✓] %s\n", bypassRes.Details)
@@ -990,7 +997,7 @@ func runHeadlessInstall(client *gossh.Client, isAPK bool, opts *Options) int {
 	time.Sleep(3 * time.Second)
 	checkRes := routerpkg.VerifyAndFallback(client, execCmd, progFn)
 
-	fmt.Println("\n→ Проверка сквозного обхода блокировок через роутер...")
+	fmt.Println("\n→ Проверка сквозной маршрутизации и Fake-IP через роутер...")
 	bypassRes := routerpkg.TestBypass(client, execCmd)
 	if bypassRes.Success {
 		fmt.Printf("  [✓] %s\n", bypassRes.Details)
