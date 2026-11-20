@@ -36,7 +36,7 @@ func main() {
 	var targetOS string
 	var targetArch string
 
-	flag.StringVar(&version, "v", "1.13.0", "Release version string")
+	flag.StringVar(&version, "v", "1.14.0", "Release version string")
 	flag.StringVar(&targetOS, "os", "all", "Target OS (windows, linux, darwin, all)")
 	flag.StringVar(&targetArch, "arch", "all", "Target Arch (amd64, arm64, all)")
 	flag.Parse()

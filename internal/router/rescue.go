@@ -56,8 +56,11 @@ if command -v iptables >/dev/null 2>&1; then
     iptables -t mangle -D PREROUTING -j TACHYON >/dev/null 2>&1 || true
 fi
 
-# 4. Clean TProxy and policy routing (tables tachyon/105, 100, Tailscale 4247/4248)
+# 4. Clean TProxy and policy routing (tables tachyon/105, 100, Tailscale 4247/4248, 2.0 TUN kill-switch pref 9499-9501)
 for _ipt in "ip" "ip -6"; do
+    for _p in 9499 9500 9501; do
+        while $_ipt rule del pref "$_p" 2>/dev/null; do :; done
+    done
     while $_ipt rule del fwmark 0x04000000/0x04000000 lookup tachyon 2>/dev/null; do :; done
     while $_ipt rule del fwmark 0x04000000/0x04000000 lookup 105 2>/dev/null; do :; done
     while $_ipt rule del fwmark 0x10000000/0x10000000 lookup 100 2>/dev/null; do :; done

@@ -228,7 +228,15 @@ func CheckSubscriptions(client *gossh.Client, execFn sshutil.ExecFunc) Subscript
 	}
 
 	uciOut, uciErr := execFn(client, "uci show tachyon 2>/dev/null")
-	if uciErr != nil {
+	if uciErr != nil || strings.TrimSpace(uciOut) == "" {
+		// Check Tachyon 2.0 JSON state store when UCI is absent
+		jsonOut, jsonErr := execFn(client, "cat /etc/tachyon/tachyon.json 2>/dev/null")
+		if jsonErr == nil && strings.TrimSpace(jsonOut) != "" {
+			if (strings.Contains(jsonOut, `"subscription_url"`) || strings.Contains(jsonOut, `"outbounds"`) || strings.Contains(jsonOut, `"proxy_links"`)) &&
+				(strings.Contains(jsonOut, "https://") || strings.Contains(jsonOut, "vless://") || strings.Contains(jsonOut, "trojan://") || strings.Contains(jsonOut, "hy2://") || strings.Contains(jsonOut, "fptn:") || strings.Contains(jsonOut, "happ://")) {
+				return status
+			}
+		}
 		status.HasEmptySubscription = true
 		return status
 	}
@@ -314,7 +322,10 @@ uci -q set tachyon.settings.subscription_engine='core' 2>/dev/null || true
 uci -q set tachyon.settings.enabled='1' 2>/dev/null || true
 uci commit tachyon 2>/dev/null || true
 
-# 4. Synchronously fetch subscription proxies into cache so core can start
+# 4. Import UCI into Tachyon 2.0 JSON store if running 2.0, then update subscriptions
+if [ -f /etc/tachyon/tachyon.json ] && [ -x /usr/bin/tachyon ]; then
+    /usr/bin/tachyon import_legacy >/dev/null 2>&1 || true
+fi
 if [ -x /usr/bin/tachyon ]; then
     /usr/bin/tachyon subscription_update main >/dev/null 2>&1 || /usr/bin/tachyon subscription_update >/dev/null 2>&1 || true
 fi

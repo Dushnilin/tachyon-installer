@@ -61,13 +61,10 @@ func CheckForUpdate(ctx context.Context, currentVersion string) (hasUpdate bool,
 // IsNewerVersion reports whether the remote semver tag is newer than the local one.
 func IsNewerVersion(remote, local string) bool { return isNewerVersion(remote, local) }
 
-// isNewerVersion compares two semver tags like "v1.3.1" and "v1.3.0".
+// isNewerVersion compares two semver tags like "v1.3.1", "v2.0.0-beta.7", and "v1.3.0".
 func isNewerVersion(remote, local string) bool {
-	remote = strings.TrimPrefix(strings.TrimSpace(remote), "v")
-	local = strings.TrimPrefix(strings.TrimSpace(local), "v")
-
-	rParts := parseSemver(remote)
-	lParts := parseSemver(local)
+	rParts, rPre := parseSemverWithPre(strings.TrimPrefix(strings.TrimSpace(remote), "v"))
+	lParts, lPre := parseSemverWithPre(strings.TrimPrefix(strings.TrimSpace(local), "v"))
 
 	for i := 0; i < 3; i++ {
 		if rParts[i] > lParts[i] {
@@ -77,18 +74,73 @@ func isNewerVersion(remote, local string) bool {
 			return false
 		}
 	}
-	return false
+
+	// Same core major.minor.patch: stable > prerelease
+	if rPre == "" && lPre != "" {
+		return true
+	}
+	if rPre != "" && lPre == "" {
+		return false
+	}
+	if rPre == lPre {
+		return false
+	}
+	return comparePrerelease(rPre, lPre) > 0
 }
 
-func parseSemver(s string) [3]int {
+func parseSemverWithPre(s string) ([3]int, string) {
 	var parts [3]int
-	chunks := strings.Split(s, ".")
+	core := s
+	pre := ""
+	if idx := strings.IndexByte(s, '-'); idx != -1 {
+		core = s[:idx]
+		pre = s[idx+1:]
+	}
+	chunks := strings.Split(core, ".")
 	for i := 0; i < len(chunks) && i < 3; i++ {
-		// Strip any trailing prerelease tags like "-rc1"
-		numStr := strings.Split(chunks[i], "-")[0]
-		if val, err := strconv.Atoi(numStr); err == nil {
+		if val, err := strconv.Atoi(chunks[i]); err == nil {
 			parts[i] = val
 		}
 	}
-	return parts
+	return parts, pre
+}
+
+func comparePrerelease(a, b string) int {
+	ap := strings.Split(a, ".")
+	bp := strings.Split(b, ".")
+	maxLen := len(ap)
+	if len(bp) > maxLen {
+		maxLen = len(bp)
+	}
+	for i := 0; i < maxLen; i++ {
+		if i >= len(ap) {
+			return -1
+		}
+		if i >= len(bp) {
+			return 1
+		}
+		ai, aErr := strconv.Atoi(ap[i])
+		bi, bErr := strconv.Atoi(bp[i])
+		switch {
+		case aErr == nil && bErr == nil:
+			if ai != bi {
+				if ai > bi {
+					return 1
+				}
+				return -1
+			}
+		case aErr == nil && bErr != nil:
+			return -1
+		case aErr != nil && bErr == nil:
+			return 1
+		default:
+			if ap[i] != bp[i] {
+				if ap[i] > bp[i] {
+					return 1
+				}
+				return -1
+			}
+		}
+	}
+	return 0
 }

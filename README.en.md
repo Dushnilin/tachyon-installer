@@ -31,6 +31,9 @@ Under restrictive network conditions or on fresh OpenWrt installations, the rout
 
 ## Core Capabilities
 
+- **Support for 1.8.x Stable & 2.0 Beta Releases (`-version beta`)**:
+  - Supports both the stable branch (`latest` with `tachyon_*.apk`/`.ipk`, `luci-app-tachyon`, `sha256sums.txt`) and `2.0` branch pre-releases (`beta` or an explicit tag like `v2.0.0-beta.7` with single-bundle per-architecture `tachyon-<arch>-v<ver>.apk`/`.ipk`, `SHA256SUMS`, and embedded `:1680` panel).
+  - The TUI shows both release channels (`latest` and `beta`); upgrading a `1.x` router to `2.0` automatically migrates and preserves `/etc/config/tachyon` in `/etc/tachyon/backup-pre-2.0/tachyon.uci`, cleans up legacy `ucode`/`rpcd` files, and disables the standalone `tachyon-core` init service.
 - **Single Native `tachyon-core` Engine (Rust)**:
   - Starting with **Tachyon 1.8.0**, `tachyon-core` is the sole supported core (~4.2 MB RAM, zero GC pauses, built-in Adaptive Desync 2.0, AmneziaWG 2.0, VLESS/xHTTP/Reality, Hysteria2, TUIC, ShadowTLS, AnyTLS, CSQTT, WDTT/QWDTT v3, Mieru, embedded FPTN and Tailscale, IPv6/FakeIPv6 `fc00::/18`, Leak Guard, and binary `.trs` rule-sets).
   - When upgrading older installations, the installer removes legacy `sing-box` packages and migrates UCI settings to `engine='tachyon-core'` and `subscription_engine='core'`.
@@ -133,8 +136,12 @@ Run `./tachyon-installer` (or `.\tachyon-installer.exe` on Windows) with no flag
 ### Headless CLI Automation
 
 ```bash
-# Express installation with tachyon-core engine and zRAM-swap
+# Express installation of the latest stable release with tachyon-core and zRAM-swap
 ./tachyon-installer -ip 192.168.1.1 -pass "secret" -engine tachyon-core -zram -yes
+
+# Install the latest 2.0 beta pre-release or an explicit beta tag
+./tachyon-installer -ip 192.168.1.1 -pass "secret" -version beta -yes
+./tachyon-installer -ip 192.168.1.1 -pass "secret" -version v2.0.0-beta.7 -yes
 
 # Express installation with immediate subscription import (HTTPS, vless://, happ://crypt4/..., fptn:)
 ./tachyon-installer -ip 192.168.1.1 -pass "secret" -sub "https://example.com/sub" -yes
@@ -195,7 +202,7 @@ cd tachyon-installer
 go build -o tachyon-installer .
 
 # Cross-compile all 6 desktop targets (windows/linux/darwin, amd64 + arm64) into dist/
-go run scripts/build.go -v 1.13.0
+go run scripts/build.go -v 1.14.0
 ```
 
 ---

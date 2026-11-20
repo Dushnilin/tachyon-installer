@@ -46,8 +46,8 @@ df -k /overlay 2>/dev/null | awk 'END{print $2"|"$4}' || df -k / 2>/dev/null | a
 command -v apk >/dev/null 2>&1 && echo "apk" || echo "opkg"
 [ -x /sbin/fw4 ] && echo "fw4" || echo "fw3"
 ( uci -q get tachyon.settings.engine 2>/dev/null || uci -q get tachyon.main.engine 2>/dev/null || ( pgrep -f "tachyon-core" >/dev/null 2>&1 && echo "tachyon-core" ) || ( pgrep -f "sing-box" >/dev/null 2>&1 && echo "sing-box" ) || echo "none" )
-( for p in luci-app-tachyon tachyon; do V=$(opkg status "$p" 2>/dev/null | awk -F': ' '/Version:/{print $2; exit}'); [ -n "$V" ] && { echo "$V"; break; }; V=$(opkg list-installed "$p" 2>/dev/null | awk '{print $3; exit}'); [ -n "$V" ] && { echo "$V"; break; }; done; [ -z "$V" ] && command -v apk >/dev/null 2>&1 && { V=$(apk list -I 'luci-app-tachyon*' 2>/dev/null | head -1 | awk -F'-' '{print $(NF-1)}'); [ -z "$V" ] && V=$(apk list -I 'tachyon*' 2>/dev/null | head -1 | awk -F'-' '{print $(NF-1)}'); [ -z "$V" ] && V=$(apk info -e luci-app-tachyon 2>/dev/null); [ -z "$V" ] && V=$(apk info -e tachyon 2>/dev/null); [ -n "$V" ] && echo "$V"; }; [ -z "$V" ] && { V=$(uci -q get tachyon.settings.version 2>/dev/null || uci -q get tachyon.main.version 2>/dev/null || cat /etc/tachyon_version 2>/dev/null || cat /usr/share/tachyon/version 2>/dev/null); [ -n "$V" ] && echo "$V"; }; [ -z "$V" ] && ( [ -f /etc/config/tachyon ] || [ -f /etc/init.d/tachyon ] || [ -x /usr/bin/tachyon ] ) && echo "installed" || true )
-( for p in tachyon-core sing-box-extended sing-box-lx sing-box-tiny sing-box; do V=$(opkg status "$p" 2>/dev/null | awk -F': ' '/Version:/{print $2; exit}'); [ -n "$V" ] && { echo "$V"; break; }; done; [ -z "$V" ] && command -v apk >/dev/null 2>&1 && { V=$(apk list -I 'tachyon-core*' 2>/dev/null | head -1 | awk '{print $1}'); [ -z "$V" ] && V=$(apk list -I 'sing-box*' 2>/dev/null | head -1 | awk '{print $1}'); [ -n "$V" ] && echo "$V"; }; [ -z "$V" ] && [ -x /usr/bin/tachyon-core ] && { V=$(/usr/bin/tachyon-core version 2>/dev/null | head -1 | awk '{print $3}'); [ -z "$V" ] && V=$(/usr/bin/tachyon-core --version 2>/dev/null | head -1 | awk '{print $2}'); [ -n "$V" ] && echo "$V"; }; [ -z "$V" ] && [ -x /usr/bin/sing-box ] && /usr/bin/sing-box version 2>/dev/null | head -1 | awk '{print $3}' || true )`
+( V=""; [ -x /usr/bin/tachyon ] && ! head -c 2 /usr/bin/tachyon 2>/dev/null | grep -q '^#!' && V=$(/usr/bin/tachyon --version 2>/dev/null | head -1 | awk '{print $NF}'); [ -z "$V" ] && for p in luci-app-tachyon tachyon; do V=$(opkg status "$p" 2>/dev/null | awk -F': ' '/Version:/{print $2; exit}'); [ -n "$V" ] && break; V=$(opkg list-installed "$p" 2>/dev/null | awk '{print $3; exit}'); [ -n "$V" ] && break; done; [ -z "$V" ] && command -v apk >/dev/null 2>&1 && { V=$(apk list -I 'luci-app-tachyon*' 2>/dev/null | head -1 | sed -n 's/^luci-app-tachyon-\([^ ]*\).*/\1/p'); [ -z "$V" ] && V=$(apk list -I 'tachyon-[0-9]*' 2>/dev/null | head -1 | sed -n 's/^tachyon-\([^ ]*\).*/\1/p'); [ -z "$V" ] && V=$(apk info -e luci-app-tachyon 2>/dev/null); [ -z "$V" ] && V=$(apk info -e tachyon 2>/dev/null); }; [ -z "$V" ] && V=$(uci -q get tachyon.settings.version 2>/dev/null || uci -q get tachyon.main.version 2>/dev/null || cat /etc/tachyon_version 2>/dev/null || cat /usr/share/tachyon/version 2>/dev/null); [ -n "$V" ] && echo "$V" || { ( [ -f /etc/config/tachyon ] || [ -f /etc/tachyon/tachyon.json ] || [ -f /etc/init.d/tachyon ] || [ -x /usr/bin/tachyon ] ) && echo "installed" || true; } )
+( for p in tachyon-core sing-box-extended sing-box-lx sing-box-tiny sing-box; do V=$(opkg status "$p" 2>/dev/null | awk -F': ' '/Version:/{print $2; exit}'); [ -n "$V" ] && { echo "$V"; break; }; done; [ -z "$V" ] && command -v apk >/dev/null 2>&1 && { V=$(apk list -I 'tachyon-core*' 2>/dev/null | head -1 | awk '{print $1}'); [ -z "$V" ] && V=$(apk list -I 'sing-box*' 2>/dev/null | head -1 | awk '{print $1}'); [ -n "$V" ] && echo "$V"; }; [ -z "$V" ] && V=$(cat /var/run/tachyon/tachyon-core-version 2>/dev/null || cat /etc/tachyon/tachyon-core-version 2>/dev/null | head -1); [ -z "$V" ] && [ -x /usr/bin/tachyon-core ] && { V=$(/usr/bin/tachyon-core version 2>/dev/null | head -1 | awk '{print $3}'); [ -z "$V" ] && V=$(/usr/bin/tachyon-core --version 2>/dev/null | head -1 | awk '{print $2}'); }; [ -n "$V" ] && echo "$V" || true )`
 
 	session, err := client.NewSession()
 	if err != nil {
@@ -78,12 +78,17 @@ func CleanPackageVersion(v string) string {
 	v = strings.TrimPrefix(v, "tachyon_")
 	v = strings.TrimPrefix(v, "v")
 
-	if idx := strings.Index(v, "-r"); idx != -1 {
-		v = v[:idx]
-	} else if strings.Count(v, "-") == 1 {
-		parts := strings.Split(v, "-")
-		if len(parts) == 2 && len(parts[0]) > 0 {
-			v = parts[0]
+	if idx := strings.LastIndex(v, "-r"); idx != -1 {
+		rev := v[idx+2:]
+		if rev != "" && strings.Trim(rev, "0123456789") == "" {
+			v = v[:idx]
+		}
+	}
+	// Strip apk/opkg numeric build suffix like "1.4.9-1", but preserve semver prereleases like "2.0.0-beta.7"
+	if idx := strings.LastIndex(v, "-"); idx != -1 {
+		suffix := v[idx+1:]
+		if suffix != "" && strings.Trim(suffix, "0123456789") == "" {
+			v = v[:idx]
 		}
 	}
 	return strings.TrimSpace(v)

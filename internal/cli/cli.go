@@ -93,7 +93,7 @@ func ParseFlags(args []string, defaultCfg *appconfig.Config, appVersion string) 
 	fs.StringVar(&opts.Engine, "engine", defaultCfg.SelectedEngine, "Ядро прокси: tachyon-core, skip")
 	fs.StringVar(&opts.SwitchEngine, "switch-engine", "", "Обновление/переключение активного ядра (tachyon-core) на роутере без переустановки LuCI")
 	fs.StringVar(&opts.Mirror, "mirror", defaultCfg.SelectedMirror, "Зеркало загрузки GitHub: auto, direct, https://gh-proxy.com/ и др.")
-	fs.StringVar(&opts.Version, "version", defaultCfg.TachyonVersion, "Версия Tachyon: latest или тег релиза (например 1.8.0)")
+	fs.StringVar(&opts.Version, "version", defaultCfg.TachyonVersion, "Версия Tachyon: latest (стабильный), beta (ветка 2.0) или тег релиза (например 1.8.2, v2.0.0-beta.7)")
 	fs.BoolVar(&opts.InstallI18n, "i18n", defaultCfg.InstallI18n, "Установить русскую локализацию LuCI")
 	fs.BoolVar(&opts.InstallZRAM, "zram", defaultCfg.InstallZRAM, "Включить zRAM-swap (сжатый SWAP в ОЗУ)")
 	fs.StringVar(&opts.Subscription, "sub", "", "Ссылка на подписку (HTTPS, vless:// или base64)")
@@ -916,7 +916,7 @@ func runHeadlessInstall(client *gossh.Client, isAPK bool, opts *Options) int {
 	}
 	fmt.Printf("[✓] Релиз: %s\n", rel.TagName)
 
-	assets, err := dlpkg.ResolveTachyonAssets(rel, isAPK, opts.InstallI18n)
+	assets, err := dlpkg.ResolveTachyonAssetsForArch(rel, isAPK, opts.InstallI18n, distribArch, detectedArch)
 	if err != nil {
 		fmt.Printf("[✗] Ошибка разрешения файлов Tachyon: %v\n", err)
 		return 1
@@ -1005,14 +1005,24 @@ func runHeadlessInstall(client *gossh.Client, isAPK bool, opts *Options) int {
 		fmt.Printf("  [!] %s\n", bypassRes.Details)
 	}
 
-	luciURL := fmt.Sprintf("http://%s/cgi-bin/luci/admin/services/tachyon", opts.RouterIP)
+	isV2 := dlpkg.IsV2Tag(rel.TagName)
+	panelURL := fmt.Sprintf("http://%s/cgi-bin/luci/admin/services/tachyon", opts.RouterIP)
+	luciURL := panelURL
+	if isV2 {
+		panelURL = fmt.Sprintf("http://%s:1680/", opts.RouterIP)
+	}
 	if checkRes.OK {
 		fmt.Println("\n[✓] Установка завершена.")
-		fmt.Printf("Панель управления доступна в веб-интерфейсе LuCI: %s\n", luciURL)
+		if isV2 {
+			fmt.Printf("Веб-панель Tachyon 2.0: %s\n", panelURL)
+			fmt.Printf("Лаунчер в LuCI:        %s\n", luciURL)
+		} else {
+			fmt.Printf("Панель управления доступна в веб-интерфейсе LuCI: %s\n", luciURL)
+		}
 		return 0
 	}
 
-	fmt.Printf("\n[!] Установка завершена, но служба сообщила: %s\nВеб-интерфейс: %s\n", checkRes.Reason, luciURL)
+	fmt.Printf("\n[!] Установка завершена, но служба сообщила: %s\nВеб-панель: %s\n", checkRes.Reason, panelURL)
 	return 0
 }
 
@@ -1022,7 +1032,7 @@ func verifyFiles(dir string) bool {
 		return false
 	}
 	for _, e := range entries {
-		if e.IsDir() || e.Name() == "sha256sums.txt" {
+		if e.IsDir() || e.Name() == "sha256sums.txt" || e.Name() == "SHA256SUMS" {
 			continue
 		}
 		p := filepath.Join(dir, e.Name())

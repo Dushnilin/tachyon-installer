@@ -144,7 +144,7 @@ func deployToNode(
 		}
 
 		// Download Tachyon packages
-		tachyonAssets, errRes := dlpkg.ResolveTachyonAssets(tachyonRel, node.IsAPK, cfg.InstallI18n)
+		tachyonAssets, errRes := dlpkg.ResolveTachyonAssetsForArch(tachyonRel, node.IsAPK, cfg.InstallI18n, node.DistribArch, node.Arch)
 		if errRes != nil {
 			_ = os.RemoveAll(stagingDir)
 			node.DeployError = errRes.Error()

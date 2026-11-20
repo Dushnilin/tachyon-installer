@@ -151,3 +151,20 @@ func TestParseProfile_Short(t *testing.T) {
 		t.Error("expected error for too-short input")
 	}
 }
+
+func TestCleanPackageVersion_V2Beta(t *testing.T) {
+	cases := []struct {
+		in   string
+		want string
+	}{
+		{"luci-app-tachyon-1.8.2-r1", "1.8.2"},
+		{"tachyon-2.0.0-beta.7-r1", "2.0.0-beta.7"},
+		{"v2.0.0-beta.7", "2.0.0-beta.7"},
+		{"1.4.9-1", "1.4.9"},
+	}
+	for _, tc := range cases {
+		if got := router.CleanPackageVersion(tc.in); got != tc.want {
+			t.Errorf("CleanPackageVersion(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}

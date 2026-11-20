@@ -24,7 +24,7 @@ func verifyStagedFiles(ctx *AppContext, dir string) bool {
 
 	allOK := true
 	for _, e := range entries {
-		if e.IsDir() || e.Name() == "sha256sums.txt" {
+		if e.IsDir() || e.Name() == "sha256sums.txt" || e.Name() == "SHA256SUMS" {
 			continue
 		}
 		path := filepath.Join(dir, e.Name())

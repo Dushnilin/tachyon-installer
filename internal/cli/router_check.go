@@ -42,7 +42,11 @@ func runRouterCheck(opts *Options, client *gossh.Client) int {
 	fmt.Println("→ Запрос последней версии Tachyon с GitHub...")
 	mirrorMgr := dlpkg.NewMirrorManager(opts.Mirror)
 	dlClient := dlpkg.NewClient(mirrorMgr)
-	rel, err := dlpkg.FetchTachyonReleaseByTag(context.Background(), dlClient, "latest")
+	targetChannel := "latest"
+	if dlpkg.IsV2Tag(installed) || dlpkg.IsPrereleaseTag(installed) {
+		targetChannel = "beta"
+	}
+	rel, err := dlpkg.FetchTachyonReleaseByTag(context.Background(), dlClient, targetChannel)
 	if err != nil {
 		fmt.Printf("[!] Не удалось получить последнюю версию: %v\n", err)
 		return 1

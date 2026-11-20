@@ -75,6 +75,9 @@ func ParseSHA256Sums(content string) map[string]string {
 			hash := strings.ToLower(strings.TrimSpace(fields[0]))
 			filename := strings.TrimSpace(fields[1])
 			filename = strings.TrimPrefix(filename, "*")
+			if idx := strings.LastIndexAny(filename, "/\\"); idx != -1 {
+				filename = filename[idx+1:]
+			}
 			// Only valid 64-char hex hashes
 			if len(hash) == 64 {
 				result[filename] = hash

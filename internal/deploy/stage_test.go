@@ -99,5 +99,13 @@ func TestGenerateUninstallScript(t *testing.T) {
 	if !strings.Contains(opkgScript, "TachyonKillSwitch") {
 		t.Errorf("expected TachyonKillSwitch cleanup in uninstall script")
 	}
+	if !strings.Contains(opkgScript, "tachyon-launcher.json") {
+		t.Errorf("expected Tachyon 2.0 launcher cleanup in uninstall script")
+	}
+
+	runner := deploy.GenerateRunnerScript("tachyon-core", true)
+	if !strings.Contains(runner, "IS_TACHYON_V2") || !strings.Contains(runner, "backup-pre-2.0") {
+		t.Errorf("expected Tachyon 2.0 detection and 1.x->2.0 migration in runner script")
+	}
 }
 

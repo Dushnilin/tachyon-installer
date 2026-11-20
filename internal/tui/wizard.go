@@ -522,16 +522,28 @@ func ShowOptionsWizard(ctx *AppContext, profile ProfileData) {
 		if err != nil {
 			return
 		}
-		var tags []string
+		var stableTags []string
+		var betaTags []string
 		for _, r := range rels {
-			if !r.Draft && !r.Prerelease && r.TagName != "" && len(tags) < 5 {
-				tags = append(tags, r.TagName)
+			if r.Draft || r.TagName == "" {
+				continue
+			}
+			if r.Prerelease || dlpkg.IsPrereleaseTag(r.TagName) || dlpkg.IsV2Tag(r.TagName) {
+				if !r.Prerelease && !dlpkg.IsPrereleaseTag(r.TagName) {
+					if len(stableTags) < 4 {
+						stableTags = append(stableTags, r.TagName)
+					}
+				} else if len(betaTags) < 3 {
+					betaTags = append(betaTags, r.TagName)
+				}
+			} else if len(stableTags) < 4 {
+				stableTags = append(stableTags, r.TagName)
 			}
 		}
-		if len(tags) == 0 {
+		if len(stableTags) == 0 && len(betaTags) == 0 {
 			return
 		}
-		ctx.App.QueueUpdateDraw(func() { optSelector.SetReleases(tags) })
+		ctx.App.QueueUpdateDraw(func() { optSelector.SetReleaseChannels(stableTags, betaTags) })
 	}()
 
 	modal := CreateWizardModalCustom(panel, 94, 30)

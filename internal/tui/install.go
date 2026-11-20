@@ -171,7 +171,7 @@ func RunExpressInstall(ctx *AppContext, opts InstallOptions) {
 		}
 		ctx.ConsoleWritef("[#22c55e]✓ Найден релиз: [#f1f5f9]Tachyon %s[-][-]\n", tachyonRel.TagName)
 
-		tachyonAssets, err := dlpkg.ResolveTachyonAssets(tachyonRel, isAPK, opts.InstallI18n)
+		tachyonAssets, err := dlpkg.ResolveTachyonAssetsForArch(tachyonRel, isAPK, opts.InstallI18n, distribArch, detectedArch)
 		if err != nil {
 			ctx.ConsoleWritef("[#ef5350]❌ Ошибка разрешения файлов Tachyon: %v[-]\n", err)
 			return

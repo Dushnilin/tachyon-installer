@@ -303,3 +303,23 @@ func TestZRAMOptionAndHardwareAdvice(t *testing.T) {
 		t.Errorf("expected InstallZRAM to be false by default for 1024MB RAM router")
 	}
 }
+
+func TestSetReleaseChannels_WithBeta(t *testing.T) {
+	opt := NewOptionsSelector(ProfileData{RAMTotal: 512, RAMFree: 300})
+	opt.SetReleaseChannels([]string{"1.8.2", "1.8.1"}, []string{"v2.0.0-beta.7", "v2.0.0-beta.6"})
+
+	if len(opt.versions) < 4 {
+		t.Fatalf("expected at least 4 version items, got %d", len(opt.versions))
+	}
+	if opt.versions[0].Key != "latest" {
+		t.Errorf("expected index 0 Key=latest, got %q", opt.versions[0].Key)
+	}
+	if opt.versions[1].Key != "beta" || !strings.Contains(opt.versions[1].Name, "v2.0.0-beta.7") {
+		t.Errorf("expected index 1 Key=beta with v2.0.0-beta.7, got %+v", opt.versions[1])
+	}
+
+	opt.Preselect("tachyon-core", "auto", "beta", true)
+	if got := opt.GetInstallOptions().TachyonVersion; got != "beta" {
+		t.Errorf("expected Preselect('beta') -> TachyonVersion='beta', got %q", got)
+	}
+}

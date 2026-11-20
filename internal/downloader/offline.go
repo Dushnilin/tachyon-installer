@@ -66,51 +66,61 @@ func CreateOfflineBundle(
 		return nil, fmt.Errorf("fetch tachyon release: %w", err)
 	}
 
-	// 1. Download base Tachyon packages for both OPKG and APK
-	for _, isAPK := range []bool{false, true} {
-		assets, errRes := ResolveTachyonAssets(rel, isAPK, true)
-		if errRes != nil {
-			continue
-		}
-
-		type dlItem struct {
-			name string
-			url  string
-		}
-		items := []dlItem{
-			{assets.BackendName, assets.BackendURL},
-			{assets.AppName, assets.AppURL},
-			{assets.I18nName, assets.I18nURL},
-			{assets.SHA256Name, assets.SHA256URL},
-		}
-
-		for _, item := range items {
-			if item.name == "" || item.url == "" {
+	// 1. Download base Tachyon packages for both OPKG and APK (and per-arch for 2.0+)
+	seenTachyonFiles := make(map[string]bool)
+	tachyonArchs := []string{""}
+	if IsV2Tag(rel.TagName) {
+		tachyonArchs = archList
+	}
+	for _, arch := range tachyonArchs {
+		for _, isAPK := range []bool{false, true} {
+			assets, errRes := ResolveTachyonAssetsForArch(rel, isAPK, true, arch, arch)
+			if errRes != nil {
 				continue
 			}
-			dest := filepath.Join(targetDir, item.name)
-			if fi, errStat := os.Stat(dest); errStat == nil {
-				logFn(fmt.Sprintf("  • Уже скачан: %s\n", item.name))
-				manifest.Packages = append(manifest.Packages, OfflinePackageInfo{
-					Filename: item.name,
-					Size:     fi.Size(),
-					Category: "tachyon",
-				})
-				continue
+
+			type dlItem struct {
+				name string
+				url  string
 			}
-			logFn(fmt.Sprintf("  -> Скачивание: %s...\n", item.name))
-			_, errDl := dlClient.DownloadFile(ctx, item.url, dest, item.name, nil)
-			if errDl == nil {
-				fi, _ := os.Stat(dest)
-				size := int64(0)
-				if fi != nil {
-					size = fi.Size()
+			items := []dlItem{
+				{assets.BackendName, assets.BackendURL},
+				{assets.AppName, assets.AppURL},
+				{assets.I18nName, assets.I18nURL},
+				{assets.SHA256Name, assets.SHA256URL},
+			}
+
+			for _, item := range items {
+				if item.name == "" || item.url == "" || seenTachyonFiles[item.name] {
+					continue
 				}
-				manifest.Packages = append(manifest.Packages, OfflinePackageInfo{
-					Filename: item.name,
-					Size:     size,
-					Category: "tachyon",
-				})
+				seenTachyonFiles[item.name] = true
+				dest := filepath.Join(targetDir, item.name)
+				if fi, errStat := os.Stat(dest); errStat == nil {
+					logFn(fmt.Sprintf("  • Уже скачан: %s\n", item.name))
+					manifest.Packages = append(manifest.Packages, OfflinePackageInfo{
+						Filename: item.name,
+						Size:     fi.Size(),
+						Category: "tachyon",
+						Arch:     arch,
+					})
+					continue
+				}
+				logFn(fmt.Sprintf("  -> Скачивание: %s...\n", item.name))
+				_, errDl := dlClient.DownloadFile(ctx, item.url, dest, item.name, nil)
+				if errDl == nil {
+					fi, _ := os.Stat(dest)
+					size := int64(0)
+					if fi != nil {
+						size = fi.Size()
+					}
+					manifest.Packages = append(manifest.Packages, OfflinePackageInfo{
+						Filename: item.name,
+						Size:     size,
+						Category: "tachyon",
+						Arch:     arch,
+					})
+				}
 			}
 		}
 	}

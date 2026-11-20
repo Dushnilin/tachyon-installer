@@ -8,6 +8,7 @@ import (
 	"github.com/rivo/tview"
 
 	"tachyon-installer/internal/browser"
+	dlpkg "tachyon-installer/internal/downloader"
 	"tachyon-installer/internal/tui/widgets"
 )
 
@@ -125,14 +126,17 @@ func FinishAndExit(ctx *AppContext, success bool, archiveVer string) {
 	if ctx.Config != nil && ctx.Config.RouterIP != "" {
 		ip = ctx.Config.RouterIP
 	}
-	luciURL := fmt.Sprintf("http://%s/cgi-bin/luci/admin/services/tachyon", ip)
+	panelURL := fmt.Sprintf("http://%s/cgi-bin/luci/admin/services/tachyon", ip)
+	if dlpkg.IsV2Tag(archiveVer) {
+		panelURL = fmt.Sprintf("http://%s:1680/", ip)
+	}
 
 	// Set input capture on console view to handle [O] to open browser and [Q/Esc/Enter] to exit
 	ctx.ConsoleView.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Rune() {
 		case 'o', 'O', 'щ', 'Щ':
-			_ = browser.OpenURL(luciURL)
-			ctx.ConsoleWritef("[#22c55e]✓ Открытие веб-интерфейса в браузере: %s[-]\n", luciURL)
+			_ = browser.OpenURL(panelURL)
+			ctx.ConsoleWritef("[#22c55e]✓ Открытие веб-интерфейса в браузере: %s[-]\n", panelURL)
 			return nil
 		case 'q', 'Q', 'й', 'Й':
 			ctx.App.Stop()
@@ -146,7 +150,7 @@ func FinishAndExit(ctx *AppContext, success bool, archiveVer string) {
 	})
 
 	ctx.App.QueueUpdateDraw(func() {
-		ShowFinishDialog(ctx, success, luciURL)
+		ShowFinishDialog(ctx, success, panelURL)
 	})
 }
 
@@ -170,7 +174,7 @@ func ShowFinishDialog(ctx *AppContext, success bool, luciURL string) {
 		SetBorderColor(titleColor)
 
 	text := fmt.Sprintf("\n  [#ededed]Служба Tachyon настроена и проверена на роутере.[-]\n\n"+
-		"  [#71717a]Веб-интерфейс LuCI:[-] [#38bdf8]%s[-]\n\n"+
+		"  [#71717a]Веб-панель управления:[-] [#38bdf8]%s[-]\n\n"+
 		"  [#a1a1a6]Нажмите кнопку ниже или клавишу [O], чтобы открыть панель управления в браузере.[-]", luciURL)
 
 	textView := tview.NewTextView().
@@ -181,7 +185,7 @@ func ShowFinishDialog(ctx *AppContext, success bool, luciURL string) {
 	form := tview.NewForm()
 	StyleForm(form)
 
-	form.AddButton("Открыть LuCI в браузере (Enter)", func() {
+	form.AddButton("Открыть панель в браузере (Enter)", func() {
 		_ = browser.OpenURL(luciURL)
 		ctx.ConsoleWritef("[#4cc38a]✓ Открытие веб-интерфейса в браузере: %s[-]\n", luciURL)
 	})

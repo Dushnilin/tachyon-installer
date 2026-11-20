@@ -376,7 +376,7 @@ func checkTachyon(pkgs string, run Exec) Result {
 
 func checkService(run Exec) Result {
 	r := Result{ID: "service", Title: "Служба Tachyon"}
-	out, _ := run(`[ -x /usr/bin/tachyon ] && /usr/bin/tachyon get_status 2>/dev/null | grep -Eq '"running"[[:space:]]*:[[:space:]]*(1|true)' && echo RUNNING || echo STOPPED`)
+	out, _ := run(`[ -x /usr/bin/tachyon ] && /usr/bin/tachyon get_status 2>/dev/null | grep -Eq '"(running|core_running)"[[:space:]]*:[[:space:]]*(1|true)' && echo RUNNING || { [ -x /usr/bin/tachyon ] && /usr/bin/tachyon status 2>/dev/null | grep -Eq '"(running|core_running)"[[:space:]]*:[[:space:]]*(1|true)' && echo RUNNING || echo STOPPED; }`)
 	if strings.Contains(out, "RUNNING") {
 		r.Status, r.Detail = OK, "запущена"
 		return r
@@ -389,7 +389,7 @@ func checkService(run Exec) Result {
 
 func checkEngines(run Exec) Result {
 	r := Result{ID: "engines", Title: "Ядро прокси"}
-	out, _ := run(`p=$(command -v tachyon-core 2>/dev/null); if [ -n "$p" ]; then v=$(cat /etc/tachyon/tachyon-core-version 2>/dev/null | head -n1); [ -z "$v" ] && v=$(tachyon-core --version 2>/dev/null | head -n1 | awk '{print $NF}'); echo "tachyon-core=$p${v:+ ($v)}"; fi`)
+	out, _ := run(`p=$(command -v tachyon-core 2>/dev/null); if [ -n "$p" ]; then v=$(cat /var/run/tachyon/tachyon-core-version /etc/tachyon/tachyon-core-version 2>/dev/null | head -n1); [ -z "$v" ] && v=$(tachyon-core --version 2>/dev/null | head -n1 | awk '{print $NF}'); echo "tachyon-core=$p${v:+ ($v)}"; fi`)
 	out = strings.TrimSpace(out)
 	if out == "" {
 		r.Status = Warn

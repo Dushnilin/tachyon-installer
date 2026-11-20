@@ -204,7 +204,10 @@ func PrintFinalResultsToConsole(ctx *AppContext, success bool, archiveVer string
 		ip = ctx.Config.RouterIP
 	}
 	luciURL := fmt.Sprintf("http://%s/cgi-bin/luci/admin/services/tachyon", ip)
-	ctx.ConsoleWrite(fmt.Sprintf("  [#4cc38a]✓[-] Tachyon:   [#ededed]v%s[-]\n", archiveVer))
+	ctx.ConsoleWrite(fmt.Sprintf("  [#4cc38a]✓[-] Tachyon:   [#ededed]v%s[-]\n", strings.TrimPrefix(archiveVer, "v")))
+	if strings.HasPrefix(strings.TrimPrefix(archiveVer, "v"), "2.") {
+		ctx.ConsoleWrite(fmt.Sprintf("  [#4cc38a]✓[-] Web Panel: [#ededed]http://%s:1680/[-]\n", ip))
+	}
 	ctx.ConsoleWrite(fmt.Sprintf("  [#4cc38a]✓[-] LuCI Web:  [#ededed]%s[-]\n", luciURL))
 	ctx.ConsoleWrite(fmt.Sprintf("  [#4cc38a]✓[-] SSH:       [#ededed]ssh root@%s[-]\n\n", ip))
 	if ctx.FirewallNotReady {

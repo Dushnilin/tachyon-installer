@@ -31,6 +31,9 @@
 
 ## Ключевые возможности
 
+- **Поддержка релизов 1.8.x и бета-сборок ветки 2.0 (`-version beta`)**:
+  - Поддерживается как стабильная ветка (`latest`, пакеты `tachyon_*.apk`/`.ipk`, `luci-app-tachyon`, `sha256sums.txt`), так и бета-релизы ветки `2.0` (`beta` или конкретный тег, например `v2.0.0-beta.7`: единый архитектурный пакет `tachyon-<arch>-v<ver>.apk`/`.ipk`, `SHA256SUMS`, встроенная панель `:1680`).
+  - В TUI отображаются оба канала (`latest` и `beta`), а при обновлении с `1.x` на `2.0` выполняется автоматическая миграция с сохранением `/etc/config/tachyon` в `/etc/tachyon/backup-pre-2.0/tachyon.uci`, очисткой legacy-файлов `ucode`/`rpcd` и отключением отдельного init-сервиса `tachyon-core`.
 - **Единое нативное ядро `tachyon-core` (Rust)**:
   - Начиная с **Tachyon 1.8.0**, единственным поддерживаемым ядром является `tachyon-core` (~4.2 МБ ОЗУ, без пауз GC, встроенные Adaptive Desync 2.0, AmneziaWG 2.0, VLESS/xHTTP/Reality, Hysteria2, TUIC, ShadowTLS, AnyTLS, CSQTT, WDTT/QWDTT v3, Mieru, встроенные FPTN и Tailscale, IPv6/FakeIPv6 `fc00::/18`, Leak Guard и бинарные списки `.trs`).
   - При обновлении роутера со старых конфигураций установщик автоматически удаляет устаревшие пакеты `sing-box` и мигрирует профиль на `engine='tachyon-core'` и `subscription_engine='core'`.
@@ -133,8 +136,12 @@ curl -fsSL https://raw.githubusercontent.com/Dushnilin/tachyon-installer/main/in
 ### Неинтерактивный режим (Headless CLI)
 
 ```bash
-# Экспресс-установка с ядром tachyon-core и включением zRAM-swap
+# Экспресс-установка стабильной версии с ядром tachyon-core и включением zRAM-swap
 ./tachyon-installer -ip 192.168.1.1 -pass "secret" -engine tachyon-core -zram -yes
+
+# Установка актуальной бета-сборки с ветки 2.0 (pre-release) или точного тега
+./tachyon-installer -ip 192.168.1.1 -pass "secret" -version beta -yes
+./tachyon-installer -ip 192.168.1.1 -pass "secret" -version v2.0.0-beta.7 -yes
 
 # Установка с одновременным импортом подписки (HTTPS, vless://, happ://crypt4/..., fptn:)
 ./tachyon-installer -ip 192.168.1.1 -pass "secret" -sub "https://example.com/sub" -yes
@@ -195,7 +202,7 @@ cd tachyon-installer
 go build -o tachyon-installer .
 
 # Кросс-компиляция всех 6 десктопных целей (windows/linux/darwin, amd64 + arm64) в dist/
-go run scripts/build.go -v 1.13.0
+go run scripts/build.go -v 1.14.0
 ```
 
 ---

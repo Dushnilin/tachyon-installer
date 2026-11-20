@@ -151,6 +151,7 @@ func NewOptionsSelector(profile ProfileData) *OptionsSelector {
 
 		versions: []VersionItem{
 			{Key: "latest", Name: "latest", Badge: "Стабильный"},
+			{Key: "beta", Name: "beta (ветка 2.0)", Badge: "2.0 Beta"},
 			{Key: "custom", Name: "Вручную...", Badge: ""},
 		},
 		selectedVersion:   0,
@@ -339,7 +340,7 @@ func (opt *OptionsSelector) Draw(screen tcell.Screen) {
 	// -------------------------------------------------------------
 	sec2Header := fmt.Sprintf("  %s2. Версия Tachyon%s", TagMuted, TagReset)
 	if opt.activeSection == SectionVersion {
-		sec2Header = fmt.Sprintf("  %s▶ 2. Версия Tachyon%s  %s↑↓←→ выбор, Space/цифры 1-7, Enter на «Вручную»%s", TagCyanBold, TagReset, TagSubText, TagReset)
+		sec2Header = fmt.Sprintf("  %s▶ 2. Версия Tachyon%s  %s↑↓←→ выбор, Space/цифры 1-%d, Enter на «Вручную»%s", TagCyanBold, TagReset, TagSubText, len(opt.versions), TagReset)
 	}
 	opt.printClip(screen, sec2Header, x, curY, width, tview.AlignLeft, tcell.ColorDefault)
 	curY++
@@ -1118,12 +1119,38 @@ func (opt *OptionsSelector) mirrorGridCols(width int) int {
 // SetReleases replaces the version list with fetched release tags (newest first).
 // Must be called from the UI goroutine.
 func (opt *OptionsSelector) SetReleases(tags []string) {
+	opt.SetReleaseChannels(tags, nil)
+}
+
+// SetReleaseChannels populates the version selector with both stable tags and 2.0 beta releases.
+// Must be called from the UI goroutine.
+func (opt *OptionsSelector) SetReleaseChannels(stableTags, betaTags []string) {
 	list := []VersionItem{{Key: "latest", Name: "latest", Badge: "Рекомендуется"}}
-	if len(tags) > 0 {
-		list[0].Name = fmt.Sprintf("latest (%s)", tags[0])
+	if len(stableTags) > 0 {
+		list[0].Name = fmt.Sprintf("latest (%s)", stableTags[0])
 	}
-	for _, t := range tags {
-		list = append(list, VersionItem{Key: t, Name: t})
+	if len(betaTags) > 0 {
+		list = append(list, VersionItem{
+			Key:   "beta",
+			Name:  fmt.Sprintf("beta (%s)", betaTags[0]),
+			Badge: "2.0 Beta",
+		})
+		for i, t := range betaTags {
+			if i >= 2 {
+				break
+			}
+			list = append(list, VersionItem{Key: t, Name: t, Badge: "Beta"})
+		}
+		for i, t := range stableTags {
+			if i >= 2 {
+				break
+			}
+			list = append(list, VersionItem{Key: t, Name: t})
+		}
+	} else {
+		for _, t := range stableTags {
+			list = append(list, VersionItem{Key: t, Name: t})
+		}
 	}
 	list = append(list, VersionItem{Key: "custom", Name: "Вручную..."})
 	opt.versions = list

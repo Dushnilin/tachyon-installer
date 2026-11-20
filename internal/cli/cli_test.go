@@ -65,11 +65,11 @@ func TestParseFlags_HeadlessTriggers(t *testing.T) {
 	}
 
 	// 7. -switch-engine (and legacy sing-box* normalization -> tachyon-core)
-	optsSwitch, err := ParseFlags([]string{"-switch-engine", "tachyon-core"}, cfg, "v1.13.0")
+	optsSwitch, err := ParseFlags([]string{"-switch-engine", "tachyon-core"}, cfg, "v1.14.0")
 	if err != nil || !optsSwitch.ShouldRunHeadless() || optsSwitch.SwitchEngine != "tachyon-core" {
 		t.Errorf("expected -switch-engine to trigger headless mode with engine tachyon-core")
 	}
-	optsLegacy, err := ParseFlags([]string{"-switch-engine", "sing-box-tiny"}, cfg, "v1.13.0")
+	optsLegacy, err := ParseFlags([]string{"-switch-engine", "sing-box-tiny"}, cfg, "v1.14.0")
 	if err != nil || optsLegacy.SwitchEngine != "tachyon-core" {
 		t.Errorf("expected legacy -switch-engine sing-box-tiny to normalize to tachyon-core, got %q", optsLegacy.SwitchEngine)
 	}
